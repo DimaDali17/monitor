@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>EasyForm Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F0EBE1;--bg2:#E8E1D4;--bg3:#FAF8F4;--card:#FFF;--border:rgba(160,148,128,.25);--border2:rgba(160,148,128,.45);--ink:#1A1610;--ink2:#6B6357;--ink3:#A09688;--green:#2D7A4F;--red:#B84040;--amber:#A06820;--blue:#005BFF;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+
+.header{background:var(--bg2);border-bottom:1px solid var(--border2);padding:0 20px;height:60px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.logo{width:38px;height:38px;border-radius:10px;object-fit:cover}
+.bname{font-size:16px;font-weight:700}.bsub{font-size:9px;color:var(--ink3);letter-spacing:.12em;text-transform:uppercase}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.clock{font-size:12px;color:var(--ink2);white-space:nowrap}
+.tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px}
+.tab{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:0;color:var(--ink3);font-family:inherit;white-space:nowrap}
+.tab.on{background:var(--ink);color:var(--bg3)}
+.tab.ozon.on{background:var(--blue);color:#fff}
+.b{padding:5px 10px;background:0;border:1px solid var(--border2);border-radius:7px;font-size:11px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.b:hover{background:var(--ink);color:var(--bg3);border-color:var(--ink)}
+.b:disabled{opacity:.4;cursor:default}
+.upd{font-size:10px;color:var(--ink3)}
+
+.sov{display:none;position:fixed;inset:0;background:rgba(240,235,225,.95);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center}
+.sov.show{display:flex}
+.sc{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;box-shadow:0 8px 40px rgba(0,0,0,.1);max-height:90vh;overflow-y:auto}
+.slogo{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.stitle{font-size:20px;font-weight:700}.ssub{font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase}
+.ssec{font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.fg{margin-bottom:10px}
+.fl{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;font-weight:700}
+.fi{width:100%;padding:8px 12px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0}
+.fi:focus{border-color:var(--ink)}
+.sbtn{width:100%;padding:12px;background:var(--ink);color:var(--bg3);border:0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px}
+.smsg{font-size:12px;margin-top:8px;text-align:center}
+.smsg.err{color:var(--red)}
+
+.main{padding:20px;max-width:1400px;margin:0 auto}
+.mg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.mc{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px 16px}
+.ml{font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:7px}
+.mv{font-size:24px;font-weight:700;line-height:1}.mv.g{color:var(--green)}.mv.a{color:var(--amber)}.mv.sm{font-size:18px}.mv.oz{color:var(--blue)}
+.md{font-size:11px;margin-top:4px}
+.du{color:var(--green)}.dd{color:var(--red)}.ds{color:var(--ink3)}
+
+.sec{margin-bottom:20px}
+.sh{display:flex;align-items:center;justify-content:space-between;padding-bottom:7px;margin-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;gap:6px}
+.st{font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.12em}
+.sm{font-size:11px;color:var(--ink3)}
+.flt{padding:5px 10px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0;width:170px}
+.flt:focus{border-color:var(--ink)}
+
+.tw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden}
+.sw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;padding:8px 12px;font-size:9px;font-weight:700;color:var(--ink3);background:var(--bg3);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);font-family:inherit;white-space:nowrap}
+thead th.sa{background:var(--ink)!important;color:var(--bg3)!important}
+thead th.wh{background:var(--bg2)!important;color:var(--ink2)!important}
+thead th[onclick]{cursor:pointer;user-select:none}
+tbody td{padding:7px 12px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--bg3)}
+.tp{font-size:11px;font-weight:700;color:var(--ink2);background:var(--bg2);padding:2px 8px;border-radius:20px}
+.art{font-family:monospace;font-size:11px;color:var(--ink2)}
+.nb{font-size:9px;background:#E4F0EB;color:var(--green);padding:2px 6px;border-radius:10px;font-weight:700;margin-right:4px}
+.pr{font-weight:700}.pc{font-size:11px;color:var(--blue);font-weight:600}
+.qo{color:var(--green);font-weight:700}.ql{color:var(--amber);font-weight:700}.qx{color:var(--red);font-weight:700}
+.tc{font-weight:700;background:var(--bg3)!important;text-align:center;font-size:15px}
+.er td{text-align:center;padding:10px}
+.eb{background:0;border:1px solid var(--border2);border-radius:7px;padding:5px 16px;font-size:11px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit}
+.eb:hover{background:var(--ink);color:var(--bg3);border-color:var(--ink)}
+.fl2{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.ff{background:#FEE8E8;color:#B84040}.fw{background:#FEF3E2;color:#A06820}
+.fk{background:#E8F4EE;color:#2D7A4F}.fd{background:#EDEDF0;color:#6B6B80}.fe{background:#F5F5F5;color:#A09688}
+.dbw{background:var(--bg2);border-radius:4px;height:5px;width:70px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:5px}
+.db{height:100%;border-radius:4px}
+.bf{background:#B84040}.bw{background:#A06820}.bk{background:#2D7A4F}.bd{background:#A09688}
+.em{padding:28px;text-align:center;color:var(--ink3)}
+.lm{padding:50px;text-align:center;color:var(--ink3)}
+.sb{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--ink2);display:flex;gap:10px;align-items:flex-start;word-break:break-all}
+.sde{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--red)}
+.sp{display:inline-block;animation:spin .8s linear infinite}
+.loadbtn{margin-top:14px;padding:9px 22px;background:var(--ink);color:var(--bg3);border:0;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="sov show" id="setup">
+<div class="sc">
+  <div class="slogo">
+    <img id="slogoimg" class="logo" alt="">
+    <div><div class="stitle">EasyForm</div><div class="ssub">WB + Ozon Dashboard</div></div>
+  </div>
+  <div class="ssec">Wildberries</div>
+  <div class="fg"><div class="fl">API-ключ Easyform</div><input class="fi" type="password" id="sk1" placeholder="eyJ..."></div>
+  <div class="fg"><div class="fl">API-ключ EZFR</div><input class="fi" type="password" id="sk2" placeholder="eyJ..."></div>
+  <div class="ssec">Ozon</div>
+  <div class="fg"><div class="fl">Client-ID</div><input class="fi" id="soid" placeholder="123456"></div>
+  <div class="fg"><div class="fl">API-ключ</div><input class="fi" type="password" id="sokey" placeholder="xxx-xxx-xxx"></div>
+  <div class="ssec">Прокси</div>
+  <div class="fg"><div class="fl">Прокси 1 — для EF + Ozon</div><input class="fi" id="sprx" value="https://wb-proxy.ooo6311ooo.workers.dev"></div>
+  <div class="fg"><div class="fl">Прокси 2 — для EZFR (для разнесения; от 429 спасает только РАЗНЫЙ IP/аккаунт CF)</div><input class="fi" id="sprx2" placeholder="https://wb-proxy-2.xxx.workers.dev (на ДРУГОМ аккаунте Cloudflare)"></div>
+  <button class="sbtn" onclick="doSave()">Сохранить и загрузить EF</button>
+  <div class="smsg" id="smsg"></div>
+</div></div>
+
+<div class="header">
+  <img id="hlogo" class="logo" alt="">
+  <div><div class="bname" id="hname">EasyForm</div><div class="bsub">Dashboard</div></div>
+  <div class="hright">
+    <div class="clock" id="clk"></div>
+    <div class="tabs">
+      <button class="tab on" onclick="go(1)">Easyform</button>
+      <button class="tab" onclick="go(2)">EZFR</button>
+      <button class="tab ozon" onclick="go(3)">Ozon</button>
+    </div>
+    <button class="b" id="rb1" onclick="reload(1)"><span id="ri1">↻</span> EF</button>
+    <button class="b" id="rb2" onclick="reload(2)"><span id="ri2">↻</span> EZFR</button>
+    <button class="b" id="rb3" onclick="reload(3)"><span id="ri3">↻</span> Ozon</button>
+    <span class="upd" id="upd"></span>
+    <button class="b" onclick="openSetup()">⚙</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="v1"><div class="lm">⚙ Введите API-ключи</div></div>
+  <div id="v2" style="display:none"><div class="lm">⚙ Введите API-ключи</div></div>
+  <div id="v3" style="display:none"><div class="lm">⚙ Введите API-ключи</div></div>
+</div>
+
+<script>
+/* ── Логотипы (оригиналы, сжаты до 76px ~7.5КБ вместо ~290КБ) ── */
+const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAwUAAgQBBgj/xAAuEAABBAEDAgQGAQUAAAAAAAABAAIDEQQFEiExQRMUIlEGMmFxgZFSFTNCYqH/xAAYAQEBAQEBAAAAAAAAAAAAAAABAAIDBP/EABwRAQEAAgMBAQAAAAAAAAAAAAABESECMUESMv/aAAwDAQACEQMRAD8A+jURsZIsC0tz80Y74o7ovct8E1tHK80dquWEdQq0jiQHg0o6MOFt/ScLICisW0q8DkoLoV2NBQ2+rnt7KzpAwJgdkYG9Ch2qsl8W3dugXUIi+I43CJk7esTt347phps/iwNcDdhTUYRNjPaRdhYvh15OKGnq07f0s+teHRdtFqR5bQa3KxiMsbmggOI4J90pOiZ4N+Ys9/SKTytnUEkvZ0+RjxYKzh3iuofKP+rG6OTT8SR8khe+up4paMH+y37KlzVjDQ520LDJM/Jk8KPp/k72WzIhfJHTTV8X7KY+OyBoaBQ7nuVXN0praMYI2Bo6BRFlcwn0oVpQM4uM/ZK9CbtMw7CRyaTGmEn2WPSIdkReR87i79lHp8Mw8tXfNAHqp4fiCkq/pWfI+5Jtovo0K5crOoJJexdcyWy4UgabIHNI2A64Wn6LPqOD5bTZG8n0mye5RNLduxoz9AszP1s38mQk2hY8zOEQAHqeeA0dSiZDzHGXAWewWXGxS1xll9Uh/Q+gW7b1BJ6Njte1lyG3u5KKouITPlHe0Rjq7j8I0LBG0AcAJY3UGHUJI3EAtoC1u80wD5gqVWNYfSscjaOSlWRqsEAtzwszZMvUT6Q6GL+R6n7KvJTi2anm+ZxpYmchoNlV0N27CiP+oXZcZkOG6NgoUfyg/D7rwmD24WZn621fybSNBpUKI48BDK2wiiiiiRalovmpvFje5j/cLPHomW40/Lft+i9HSlBZvGNfVLcTRYMc7yN7/wCTuSmTWhooClFEySdM25DyG7onD3CT6DktiMuO405jzx+U7dyCkmbp8LsoSDex56lppZ5a21x3o+EofwDddVEDEibDCGtuvcmyUZaZdUUUSn//2Q==";
+const L2="data:image/jpeg;base64,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";
+const L3="data:image/jpeg;base64,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";
+
+let PX='https://wb-proxy.ooo6311ooo.workers.dev';   // Прокси 1 → EF + Ozon
+let PX2='';                                         // Прокси 2 → EZFR
+const K={1:'',2:'',oid:'',okey:''};
+const D={1:null,2:null,3:null};
+const EXP={1:false,2:false,3:false};                // разворот таблицы заказов
+const EXS={1:false,2:false,3:false};                // разворот остатков
+const EXD={1:false,2:false,3:false};                // разворот дефицита
+const SS={1:null,2:null,3:null};
+const FS={1:'',2:'',3:''};                          // фильтр остатков по артикулу
+const DS={1:{c:'days',d:1},2:{c:'days',d:1},3:{c:'days',d:1}};
+const LIM=20;
+
+// clock
+setInterval(()=>{
+  document.getElementById('clk').textContent=
+    new Date().toLocaleDateString('ru',{day:'2-digit',month:'2-digit',year:'numeric'})+' · '+
+    new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+},1000);
+
+function td(){return new Date().toISOString().slice(0,10)}
+function yd(){return new Date(Date.now()-864e5).toISOString().slice(0,10)}
+function wd(){return new Date(Date.now()-7*864e5).toISOString().slice(0,10)}
+
+// setup
+function doSave(){
+  K[1]=document.getElementById('sk1').value.trim();
+  K[2]=document.getElementById('sk2').value.trim();
+  K.oid=document.getElementById('soid').value.trim();
+  K.okey=document.getElementById('sokey').value.trim();
+  PX=document.getElementById('sprx').value.trim()||PX;
+  PX2=document.getElementById('sprx2').value.trim();
+  try{localStorage.setItem('ef_d',JSON.stringify({k1:K[1],k2:K[2],oid:K.oid,okey:K.okey,px:PX,px2:PX2}))}catch(e){}
+  document.getElementById('setup').classList.remove('show');
+  // При сохранении грузим только основной кабинет EF. Остальные — по кнопке.
+  if(K[1]){D[1]=null;reload(1);}
+  placeholders();
+}
+function openSetup(){
+  document.getElementById('sk1').value=K[1];
+  document.getElementById('sk2').value=K[2];
+  document.getElementById('soid').value=K.oid;
+  document.getElementById('sokey').value=K.okey;
+  document.getElementById('sprx').value=PX;
+  document.getElementById('sprx2').value=PX2;
+  document.getElementById('setup').classList.add('show');
+}
+
+// Заглушка «нажмите для загрузки» для незагруженных кабинетов
+function placeholders(){
+  [1,2,3].forEach(n=>{
+    if(D[n])return;
+    const has=(n<=2)?!!K[n]:(!!K.oid&&!!K.okey);
+    const el=document.getElementById('v'+n);
+    el.innerHTML=has
+      ?`<div class="lm">Данные не загружены<br><button class="loadbtn" onclick="reload(${n})">↻ Загрузить ${n===1?'Easyform':n===2?'EZFR':'Ozon'}</button></div>`
+      :'<div class="lm">⚙ Введите API-ключи</div>';
+  });
+}
+
+// tabs — переключение НЕ грузит данные (только по кнопке)
+function go(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n-1)});
+  [1,2,3].forEach(i=>document.getElementById('v'+i).style.display=i===n?'block':'none');
+  document.getElementById('hlogo').src=n===1?L1:n===2?L2:L3;
+  document.getElementById('hname').textContent=n===1?'EasyForm':n===2?'EZFR':'Ozon';
+}
+
+/* ═══ RATE-LIMITED FETCH ═══
+   EF (каб.1) и Ozon → прокси 1 (PX).  EZFR (каб.2) → прокси 2 (PX2).
+   ВАЖНО: оба прокси у вас на одном аккаунте Cloudflare = один IP для WB,
+   а статистика WB лимитит по IP+токену. Поэтому очередь к WB — ОБЩАЯ:
+   все WB-запросы (EF и EZFR) идут строго по одному, с большой паузой. */
+function pxFor(cab){return (cab===2&&PX2)?PX2:PX;}
+let _wbBusy=Promise.resolve();   // общая очередь ко всем WB-запросам
+let _wbLast=0;
+const WB_GAP=7000;               // пауза между любыми двумя WB-запросами, мс
+function wbQueue(fn){
+  const run=_wbBusy.then(async()=>{
+    const g=Math.max(0,_wbLast+WB_GAP-Date.now());
+    if(g>0)await new Promise(r=>setTimeout(r,g));
+    try{return await fn();}finally{_wbLast=Date.now();}
+  });
+  _wbBusy=run.catch(()=>{});      // очередь не должна рваться при ошибке
+  return run;
+}
+
+async function wbGet(url,token,cab){
+  const purl=pxFor(cab)+'?url='+encodeURIComponent(url);
+  const waits=[8000,15000,30000];          // нарастающие паузы между попытками
+  let lastInfo='';
+  return wbQueue(async()=>{
+    for(let i=0;i<=waits.length;i++){
+      let r,txt='';
+      try{
+        r=await fetch(purl,{headers:{'X-WB-Token':token}});
+        txt=await r.text();
+      }catch(netErr){lastInfo='сеть/прокси: '+netErr;r=null;}
+
+      const retriable = !r || r.status===429 || r.status>=500 || !txt || !txt.trim();
+      if(retriable){
+        if(r) lastInfo = r.status===429 ? '429 (лимит токена/IP)' :
+                         r.status>=500 ? ('WB '+r.status) :
+                         (!txt||!txt.trim()) ? 'пустой ответ' : ('WB '+r.status);
+        if(i===waits.length){
+          throw new Error('WB: не удалось получить данные после '+(waits.length+1)+' попыток ('+lastInfo+'). Токен, вероятно, занят (PBI?). Подождите 1–2 мин и нажмите ↻.');
+        }
+        const ra=r?parseInt(r.headers.get('retry-after')||'0',10):0;
+        const wait=ra>0?ra*1000:waits[i];
+        const ic=document.getElementById('ri'+cab);if(ic)ic.innerHTML='<span class="sp">↻</span>';
+        await new Promise(x=>setTimeout(x,wait));
+        continue;
+      }
+      if(!r.ok){throw new Error('WB '+r.status+': '+txt.slice(0,200));}
+      try{return JSON.parse(txt);}
+      catch(e){throw new Error('WB: некорректный JSON — '+txt.slice(0,160));}
+    }
+  });
+}
+
+// Ozon → всегда прокси 1 (PX). Отдельный счётчик паузы.
+let _ozT=0;
+async function ozPost(url,body){
+  const g=Math.max(0,_ozT+1200-Date.now());if(g>0)await new Promise(r=>setTimeout(r,g));_ozT=Date.now();
+  const purl=PX+'?url='+encodeURIComponent(url);
+  let r=await fetch(purl,{method:'POST',headers:{'X-Ozon-Client-Id':K.oid,'X-Ozon-Api-Key':K.okey,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.status===429){await new Promise(x=>setTimeout(x,8000));_ozT=Date.now();r=await fetch(purl,{method:'POST',headers:{'X-Ozon-Client-Id':K.oid,'X-Ozon-Api-Key':K.okey,'Content-Type':'application/json'},body:JSON.stringify(body)});}
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Ozon '+r.status+': '+t.slice(0,300));}
+  return r;
+}
+
+// Безопасный разбор JSON: читаем как текст, пустой/битый ответ → {} вместо краха.
+async function safeJson(r,label){
+  const txt=await r.text().catch(()=>'');
+  if(!txt||!txt.trim())return {};
+  try{return JSON.parse(txt);}
+  catch(e){throw new Error((label||'API')+': некорректный ответ — '+txt.slice(0,160));}
+}
+async function reload(n){
+  const btn=document.getElementById('rb'+n),ic=document.getElementById('ri'+n);
+  if(btn)btn.disabled=true;if(ic)ic.innerHTML='<span class="sp">↻</span>';
+  document.getElementById('v'+n).innerHTML='<div class="lm"><span class="sp">↻</span> Загрузка...</div>';
+  try{
+    if(n<=2)await loadWB(n);else await loadOZ();
+  }catch(e){
+    document.getElementById('v'+n).innerHTML=`<div class="sb"><div class="sde"></div><div>${e.message}</div></div>`;
+  }
+  if(btn)btn.disabled=false;if(ic)ic.textContent='↻';
+  document.getElementById('upd').textContent='обн. '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
+}
+
+/* ═══ WB ═══  ровно 2 запроса, методы как в рабочем PBI.
+   orders:  /supplier/orders?dateFrom=<ГГГГ-01-01>T00:00:00Z&flag=0
+   stocks:  /supplier/stocks?dateFrom=<ГГГГ-01-01>T00:00:00Z&flag=0
+   Дата URL-кодируется (%3A), как в PBI. Оба идут через общую очередь wbQueue. */
+async function loadWB(n){
+  const key=K[n],t=td(),y=yd();
+  const yearStart=new Date().getFullYear()+'-01-01';
+  const df=yearStart+'T00:00:00Z';      // НЕ кодируем здесь — wbGet закодирует весь url 1 раз
+  const BASE='https://statistics-api.wildberries.ru/api/v1/supplier';
+  const allOrdersR=await wbGet(BASE+'/orders?dateFrom='+df+'&flag=0',key,n);
+  const stocksR  =await wbGet(BASE+'/stocks?dateFrom='+df+'&flag=0',key,n);
+  const allOrders=Array.isArray(allOrdersR)?allOrdersR:[];
+  const stocks=Array.isArray(stocksR)?stocksR:[];
+  // дефицит считаем по последним 7 дням, но забираем с начала года (как PBI)
+  const w=wd();
+  const orders7=allOrders.filter(o=>(o.date||'')>=w);
+  const todayO=allOrders.filter(o=>(o.date||'').startsWith(t));
+  const yestO=allOrders.filter(o=>(o.date||'').startsWith(y));
+  D[n]={todayO,yestO,stocks,orders7};
+  renderWB(n);
+}
+
+/* ═══ OZON ═══  всего 2 запроса: orders FBO(7дн) + остатки по складам
+   Используем v2/posting/fbo/list (как в рабочем запросе PBI): result — массив. */
+async function loadOZ(){
+  const t=td(),y=yd(),w=wd();
+  const OZ='https://api-seller.ozon.ru';
+
+  // ── Заказы FBO: одно окно (7 дней), потом фильтруем в JS ──
+  let postings=[],offset=0;
+  for(let p=0;p<5;p++){            // максимум 5 страниц × 1000 = 5000 заказов
+    const body={dir:'DESC',filter:{since:w+'T00:00:00.000Z',to:t+'T23:59:59.999Z'},limit:1000,offset};
+    const r=await ozPost(OZ+'/v2/posting/fbo/list',body);
+    const d=await safeJson(r,'Ozon orders');
+    const arr=Array.isArray(d.result)?d.result:(d.result&&d.result.postings)||[];
+    postings=postings.concat(arr);
+    if(arr.length<1000)break;
+    offset+=1000;
+  }
+  const dayOf=o=>(o.created_at||o.in_process_at||'').slice(0,10);
+  const todayO=postings.filter(o=>dayOf(o)===t);
+  const yestO =postings.filter(o=>dayOf(o)===y);
+
+  // ── Остатки по складам: v2/analytics/stock_on_warehouses (как в рабочем PBI) ──
+  // Ответ: result.rows[] с полями item_code, item_name, warehouse_name, free_to_sell_amount …
+  let stocksRaw=[],soff=0;
+  for(let p=0;p<6;p++){            // максимум 6 страниц × 500 = 3000 строк
+    const rS=await ozPost(OZ+'/v2/analytics/stock_on_warehouses',{warehouse_type:'FBO',limit:500,offset:soff});
+    const d=await safeJson(rS,'Ozon stocks');
+    const rows=(d.result&&d.result.rows)||[];
+    stocksRaw=stocksRaw.concat(rows);
+    if(rows.length<500)break;
+    soff+=500;
+  }
+
+  D[3]={todayO,yestO,stocks:stocksRaw,orders7:postings,isOz:true};
+  renderOZ();
+}
+
+/* ═══ HELPERS ═══ */
+const fmt=v=>Math.round(v).toLocaleString('ru')+' ₽';
+function dlt(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% vs вчера</span>':'<span class="dd">▼ '+pct+'% vs вчера</span>';}
+function wbPrice(o){return o.finishedPrice||o.priceWithDisc||(o.totalPrice*(1-(o.discountPercent||0)/100))||o.totalPrice||0;}
+function wbQty(s){return s.quantity||s.quantityFull||s.quantityNotInOrders||0;}
+const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
+
+/* ═══ RENDER WB ═══ */
+function renderWB(n){
+  const{todayO,yestO,stocks}=D[n];
+  const tC=todayO.length,yC=yestO.length;
+  const tR=todayO.reduce((s,o)=>s+wbPrice(o),0);
+  const yR=yestO.reduce((s,o)=>s+wbPrice(o),0);
+  const dO=yC>0?Math.round((tC-yC)/yC*100):null;
+  const dR=yR>0?Math.round((tR-yR)/yR*100):null;
+
+  let h=`<div class="mg">
+    <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv">${tC}</div><div class="md">${dlt(dO)}</div></div>
+    <div class="mc"><div class="ml">Вчера</div><div class="mv">${yC}</div></div>
+    <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm g">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
+    <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
+  </div>`;
+
+  h+=ordersHTML(n,todayO,'wb');
+  h+=stocksHTML(n);
+  h+=deficitHTML(n);
+
+  document.getElementById('v'+n).innerHTML=h;
+  paintTables(n);
+}
+
+/* ═══ RENDER OZON ═══ */
+function renderOZ(){
+  const{todayO,yestO,stocks}=D[3];
+  const tC=todayO.length,yC=yestO.length;
+  const tR=todayO.reduce((s,o)=>s+ozRev(o),0);
+  const yR=yestO.reduce((s,o)=>s+ozRev(o),0);
+  const dO=yC>0?Math.round((tC-yC)/yC*100):null;
+  const dR=yR>0?Math.round((tR-yR)/yR*100):null;
+
+  let h=`<div class="mg">
+    <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv oz">${tC}</div><div class="md">${dlt(dO)}</div></div>
+    <div class="mc"><div class="ml">Вчера</div><div class="mv">${yC}</div></div>
+    <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm oz">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
+    <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
+  </div>`;
+
+  h+=ordersHTML(3,todayO,'oz');
+  h+=stocksHTML(3);
+  h+=deficitHTML(3);
+
+  document.getElementById('v3').innerHTML=h;
+  paintTables(3);
+}
+
+function paintTables(n){
+  const e1=document.getElementById('stbl'+n);if(e1)e1.innerHTML=stocksTbl(n);
+  const e2=document.getElementById('dtbl'+n);if(e2)e2.innerHTML=defTbl(n);
+}
+
+/* ═══ ORDERS TABLE ═══ */
+function ordersHTML(n,orders,type){
+  const sorted=[...orders].sort((a,b)=>{
+    const da=type==='wb'?a.date:(a.in_process_at||a.created_at);
+    const db=type==='wb'?b.date:(b.in_process_at||b.created_at);
+    return new Date(db)-new Date(da);
+  });
+  const show=EXP[n]?sorted:sorted.slice(0,LIM);
+  const rows=show.map((o,i)=>{
+    let t,art,name,qty,price,pclient,wh;
+    if(type==='wb'){
+      t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
+      art=(o.supplierArticle||'—').slice(0,16);name=(o.subject||o.category||'—').slice(0,26);
+      qty=o.quantity||1;price=wbPrice(o);pclient=o.salePrice||(price>0?Math.round(price*0.7):null);
+      wh=(o.warehouseName||'—').slice(0,20);
+    }else{
+      const dt=o.in_process_at||o.created_at;
+      t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
+      const items=o.products||[];
+      art=items.map(p=>p.offer_id||'').join(', ').slice(0,16);
+      name=items.map(p=>p.name||'').join(', ').slice(0,26);
+      qty=items.reduce((s,p)=>s+(p.quantity||1),0);
+      price=ozRev(o);pclient=null;
+      wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—').slice(0,20);
+    }
+    const nb=i<3&&!EXP[n]?'<span class="nb">NEW</span>':'';
+    const pcCol=pclient?`<td><span class="pc">${fmt(pclient)}</span></td>`:(type==='wb'?'<td>—</td>':'');
+    return `<tr><td><span class="tp">${t}</span></td><td><span class="art">${art}</span></td>
+      <td>${nb}${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td>${pcCol}
+      <td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
+  }).join('');
+
+  const exp=!EXP[n]&&sorted.length>LIM
+    ?`<tr class="er"><td colspan="8"><button class="eb" onclick="togExp(${n},'${type}')">▼ Все ${sorted.length}</button></td></tr>`
+    :sorted.length>LIM&&EXP[n]
+    ?`<tr class="er"><td colspan="8"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
+
+  const thPC=type==='wb'?'<th>Цена клиента</th>':'';
+  return `<div class="sec"><div class="sh"><span class="st">Заказы сегодня</span><span class="sm">${orders.length} заказов</span></div>
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Товар</th><th>Кол-во</th><th>Цена</th>${thPC}<th>Склад</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="8" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+}
+
+function togExp(n,type){EXP[n]=!EXP[n];if(D[n]){if(n<=2)renderWB(n);else renderOZ();}}
+
+/* ═══ STOCKS PIVOT ═══ */
+function stocksHTML(n){
+  const stocks=D[n].stocks,type=D[n].isOz?'oz':'wb';
+  const arts={},whs=new Set();
+  stocks.forEach(s=>{
+    let art,wh,q,name;
+    if(type==='wb'){art=s.supplierArticle||'—';wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';}
+    else{art=s.item_code||s.offer_id||'—';wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';}
+    whs.add(wh);
+    if(!arts[art])arts[art]={name,total:0,wh:{}};
+    arts[art].wh[wh]=(arts[art].wh[wh]||0)+q;
+    arts[art].total+=q;
+  });
+  const whTot={};whs.forEach(w=>{whTot[w]=Object.values(arts).reduce((s,a)=>s+(a.wh[w]||0),0)});
+  const whList=[...whs].sort((a,b)=>whTot[b]-whTot[a]);
+  D[n].arts=arts;D[n].whList=whList;
+  if(!SS[n])SS[n]={c:'total',d:-1};
+
+  return `<div class="sec"><div class="sh"><span class="st">Остатки по складам</span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <input class="flt" id="sflt${n}" placeholder="🔎 фильтр по артикулу" value="${FS[n]||''}" oninput="fltS(${n},this.value)">
+      <span class="sm">${Object.keys(arts).length} арт. · ${whList.length} складов</span>
+    </span></div>
+    <div class="sw" id="stbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
+}
+
+function fltS(n,val){
+  FS[n]=val;
+  const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);
+}
+function sortS(n,c){
+  if(!SS[n])SS[n]={c:'total',d:-1};
+  SS[n].d=SS[n].c===c?SS[n].d*-1:-1;SS[n].c=c;
+  const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);
+}
+
+function stocksTbl(n){
+  const d=D[n];if(!d||!d.arts)return '<div class="em">Нет данных</div>';
+  const{arts,whList}=d;
+  const{c,d:dir}=SS[n]||{c:'total',d:-1};
+  const f=(FS[n]||'').trim().toLowerCase();
+  let keys=Object.keys(arts);
+  if(f)keys=keys.filter(a=>a.toLowerCase().includes(f)||(arts[a].name||'').toLowerCase().includes(f));
+  const artL=keys.sort((a,b)=>{
+    const va=c==='total'?arts[a].total:(arts[a].wh[c]||0);
+    const vb=c==='total'?arts[b].total:(arts[b].wh[c]||0);
+    return(va-vb)*dir;
+  });
+  const ar=k=>SS[n].c===k?(SS[n].d<0?' ↓':' ↑'):' ↕';
+  const cl=k=>SS[n].c===k?' sa':'';
+  const whH=whList.map(w=>`<th class="wh${cl(w)}" onclick="sortS(${n},'${w.replace(/'/g,"\\'")}')"><span style="font-size:8px">${w.slice(0,14)}</span>${ar(w)}</th>`).join('');
+  const show=EXS[n]?artL:artL.slice(0,LIM);
+  const rows=show.map(a=>{
+    const v=arts[a];const tc=v.total===0?'qx':v.total<10?'ql':'qo';
+    const cells=whList.map(w=>{const q=v.wh[w]||0;return`<td class="${q===0?'qx':q<10?'ql':'qo'}" style="text-align:center">${q||'—'}</td>`}).join('');
+    return`<tr><td><span class="art">${a}</span><div style="font-size:10px;color:var(--ink3)">${v.name.slice(0,22)}</div></td><td class="tc ${tc}">${v.total}</td>${cells}</tr>`;
+  }).join('');
+  const span=whList.length+2;
+  const exp=artL.length>LIM
+    ? `<tr class="er"><td colspan="${span}"><button class="eb" onclick="togExS(${n})">${EXS[n]?'▲ Свернуть':'▼ Все '+artL.length}</button></td></tr>`
+    : '';
+  return`<table><thead><tr><th>Артикул</th><th class="${cl('total')}" style="background:var(--bg3)" onclick="sortS(${n},'total')">Итого${ar('total')}</th>${whH}</tr></thead><tbody>${rows||'<tr><td class="em" colspan="99">Ничего не найдено</td></tr>'}${exp}</tbody></table>`;
+}
+function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
+
+/* ═══ DEFICIT ═══ */
+function deficitHTML(n){
+  return`<div class="sec"><div class="sh"><span class="st">📦 Дефицит и неликвид</span>
+    <span class="sm" style="display:flex;gap:4px;flex-wrap:wrap">
+      <span class="fl2 ff">🔥 &lt;14дн</span><span class="fl2 fw">⚠️ 14-30</span>
+      <span class="fl2 fk">✅ 30-90</span><span class="fl2 fd">💀 &gt;90</span>
+    </span></div>
+    <div class="sw" id="dtbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
+}
+
+function sortD(n,c){const s=DS[n];s.d=s.c===c?s.d*-1:(c==='days'?1:-1);s.c=c;const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
+
+function defTbl(n){
+  const d=D[n];if(!d||!d.arts)return'<div class="em">Нет данных</div>';
+  const{arts,orders7,isOz}=d;
+  const om={};
+  (orders7||[]).forEach(o=>{
+    if(isOz){(o.products||[]).forEach(p=>{const a=p.offer_id||'—';om[a]=(om[a]||0)+(p.quantity||1)});}
+    else{const a=o.supplierArticle||'—';om[a]=(om[a]||0)+(o.quantity||1);}
+  });
+  const rows=Object.keys(arts).map(a=>{
+    const stk=arts[a].total,name=arts[a].name||'',o7=om[a]||0;
+    const dr=o7/7,need=Math.round(dr*30),days=dr>0?Math.round(stk/dr):null;
+    let fc,ft,bc,bw,sev;
+    if(days===null){fc='fe';ft='— нет продаж';bc='bd';bw=0;sev=99999;}
+    else if(days<14){fc='ff';ft='🔥 '+days+'дн';bc='bf';bw=Math.min(100,days/14*100);sev=days;}
+    else if(days<30){fc='fw';ft='⚠️ '+days+'дн';bc='bw';bw=Math.min(100,days/30*100);sev=days;}
+    else if(days<=90){fc='fk';ft='✅ '+days+'дн';bc='bk';bw=Math.min(100,days/90*100);sev=days;}
+    else{fc='fd';ft='💀 '+days+'д';bc='bd';bw=100;sev=days;}
+    const def=need>stk?need-stk:0;
+    const sc=stk===0?'qx':stk<10?'ql':'qo';
+    return{a,name,stk,o7,need,days,def,fc,ft,bc,bw,sc,sev};
+  });
+  const{c,d:dir}=DS[n];
+  rows.sort((a,b)=>{
+    if(c==='art')return dir*(a.a<b.a?-1:a.a>b.a?1:0);
+    let va,vb;
+    if(c==='stk'){va=a.stk;vb=b.stk}else if(c==='o7'){va=a.o7;vb=b.o7}
+    else if(c==='need'){va=a.need;vb=b.need}else if(c==='def'){va=a.def;vb=b.def}
+    else{va=a.sev;vb=b.sev}
+    return dir*(va-vb);
+  });
+  const ar=k=>DS[n].c===k?(DS[n].d>0?' ↑':' ↓'):' ↕';
+  const cl=k=>DS[n].c===k?' sa':'';
+  const th=(k,l,al='center')=>`<th class="${cl(k)}" onclick="sortD(${n},'${k}')" style="text-align:${al}">${l}${ar(k)}</th>`;
+  const show=EXD[n]?rows:rows.slice(0,LIM);
+  const trs=show.map(r=>`<tr>
+    <td><span class="art">${r.a}</span><div style="font-size:10px;color:var(--ink3)">${r.name.slice(0,24)}</div></td>
+    <td class="${r.sc}" style="text-align:center;font-size:14px;font-weight:700">${r.stk}</td>
+    <td style="text-align:center">${r.o7}</td>
+    <td style="text-align:center;color:var(--ink2)">${r.need||'—'}</td>
+    <td style="text-align:center;color:${r.def>0?'var(--red)':'var(--green)'};font-weight:${r.def>0?700:400}">${r.def>0?'-'+r.def:'✓'}</td>
+    <td><span class="fl2 ${r.fc}">${r.ft}</span>${r.days!=null?`<span class="dbw"><span class="db ${r.bc}" style="width:${r.bw}%"></span></span>`:''}</td>
+  </tr>`).join('');
+  const exp=rows.length>LIM
+    ? `<tr class="er"><td colspan="6"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+rows.length}</button></td></tr>`
+    : '';
+  return`<table><thead><tr>${th('art','Артикул','left')}${th('stk','Остаток')}${th('o7','7дн заказов')}${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="6">Нет</td></tr>'}${exp}</tbody></table>`;
+}
+function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
+
+/* ═══ INIT ═══ */
+window.onload=()=>{
+  document.getElementById('hlogo').src=L1;
+  document.getElementById('slogoimg').src=L1;
+  try{
+    const s=JSON.parse(localStorage.getItem('ef_d')||'{}');
+    if(s.k1)K[1]=s.k1;if(s.k2)K[2]=s.k2;if(s.oid)K.oid=s.oid;if(s.okey)K.okey=s.okey;if(s.px)PX=s.px;if(s.px2)PX2=s.px2;
+    document.getElementById('sk1').value=K[1];document.getElementById('sk2').value=K[2];
+    document.getElementById('soid').value=K.oid;document.getElementById('sokey').value=K.okey;
+    document.getElementById('sprx').value=PX;
+    document.getElementById('sprx2').value=PX2;
+    if(K[1]||K[2]||K.oid){
+      document.getElementById('setup').classList.remove('show');
+      placeholders();
+      // Автозагрузка ТОЛЬКО основного кабинета EF. Остальные — по кнопке ↻.
+      if(K[1])reload(1);
+    }
+  }catch(e){}
+};
+</script>
+</body></html>
