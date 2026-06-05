@@ -348,23 +348,35 @@ async function loadOZ(){
 
 /* ═══ HELPERS ═══ */
 const fmt=v=>Math.round(v).toLocaleString('ru')+' ₽';
-function dlt(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% vs вчера</span>':'<span class="dd">▼ '+pct+'% vs вчера</span>';}
+function dlt(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% к этому часу</span>':'<span class="dd">▼ '+pct+'% к этому часу</span>';}
 function wbPrice(o){return o.finishedPrice||o.priceWithDisc||(o.totalPrice*(1-(o.discountPercent||0)/100))||o.totalPrice||0;}
 function wbQty(s){return s.quantity||s.quantityFull||s.quantityNotInOrders||0;}
 const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
+// Фильтр вчерашних заказов до текущего часа (для честного сравнения)
+function yestToHour(orders,type){
+  const nowH=new Date().getHours(),nowM=new Date().getMinutes();
+  return orders.filter(o=>{
+    const dt=type==='oz'?(o.in_process_at||o.created_at):o.date;
+    if(!dt)return false;
+    const d=new Date(dt);
+    return d.getHours()<nowH||(d.getHours()===nowH&&d.getMinutes()<=nowM);
+  });
+}
 
 /* ═══ RENDER WB ═══ */
 function renderWB(n){
   const{todayO,yestO,stocks}=D[n];
-  const tC=todayO.length,yC=yestO.length;
+  const yH=yestToHour(yestO,'wb');            // вчера к этому часу
+  const tC=todayO.length,yC=yestO.length,yhC=yH.length;
   const tR=todayO.reduce((s,o)=>s+wbPrice(o),0);
   const yR=yestO.reduce((s,o)=>s+wbPrice(o),0);
-  const dO=yC>0?Math.round((tC-yC)/yC*100):null;
-  const dR=yR>0?Math.round((tR-yR)/yR*100):null;
+  const yhR=yH.reduce((s,o)=>s+wbPrice(o),0);
+  const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null;
+  const dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
 
   let h=`<div class="mg">
     <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv">${tC}</div><div class="md">${dlt(dO)}</div></div>
-    <div class="mc"><div class="ml">Вчера</div><div class="mv">${yC}</div></div>
+    <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
     <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm g">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
     <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
   </div>`;
@@ -380,15 +392,17 @@ function renderWB(n){
 /* ═══ RENDER OZON ═══ */
 function renderOZ(){
   const{todayO,yestO,stocks}=D[3];
-  const tC=todayO.length,yC=yestO.length;
+  const yH=yestToHour(yestO,'oz');
+  const tC=todayO.length,yC=yestO.length,yhC=yH.length;
   const tR=todayO.reduce((s,o)=>s+ozRev(o),0);
   const yR=yestO.reduce((s,o)=>s+ozRev(o),0);
-  const dO=yC>0?Math.round((tC-yC)/yC*100):null;
-  const dR=yR>0?Math.round((tR-yR)/yR*100):null;
+  const yhR=yH.reduce((s,o)=>s+ozRev(o),0);
+  const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null;
+  const dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
 
   let h=`<div class="mg">
     <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv oz">${tC}</div><div class="md">${dlt(dO)}</div></div>
-    <div class="mc"><div class="ml">Вчера</div><div class="mv">${yC}</div></div>
+    <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
     <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm oz">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
     <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
   </div>`;
@@ -415,38 +429,41 @@ function ordersHTML(n,orders,type){
   });
   const show=EXP[n]?sorted:sorted.slice(0,LIM);
   const rows=show.map((o,i)=>{
-    let t,art,name,qty,price,pclient,wh;
+    let t,art,sz,name,qty,price,pclient,wh;
     if(type==='wb'){
       t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
-      art=(o.supplierArticle||'—').slice(0,16);name=(o.subject||o.category||'—').slice(0,26);
+      art=o.supplierArticle||'—';
+      sz=o.techSize||'—';
+      name=o.subject||o.category||'—';
       qty=o.quantity||1;price=wbPrice(o);pclient=o.salePrice||(price>0?Math.round(price*0.7):null);
-      wh=(o.warehouseName||'—').slice(0,20);
+      wh=o.warehouseName||'—';
     }else{
       const dt=o.in_process_at||o.created_at;
       t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
       const items=o.products||[];
-      art=items.map(p=>p.offer_id||'').join(', ').slice(0,16);
-      name=items.map(p=>p.name||'').join(', ').slice(0,26);
+      art=items.map(p=>p.offer_id||'').join(', ');
+      // Размер из offer_id: "ART_SIZE" → SIZE; или из name
+      sz=items.map(p=>{const parts=(p.offer_id||'').split('_');return parts.length>1?parts[parts.length-1]:'—'}).join(', ');
+      name=items.map(p=>p.name||'').join(', ');
       qty=items.reduce((s,p)=>s+(p.quantity||1),0);
       price=ozRev(o);pclient=null;
-      wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—').slice(0,20);
+      wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—');
     }
-    const nb=i<3&&!EXP[n]?'<span class="nb">NEW</span>':'';
     const pcCol=pclient?`<td><span class="pc">${fmt(pclient)}</span></td>`:(type==='wb'?'<td>—</td>':'');
     return `<tr><td><span class="tp">${t}</span></td><td><span class="art">${art}</span></td>
-      <td>${nb}${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td>${pcCol}
+      <td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td>${pcCol}
       <td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
 
   const exp=!EXP[n]&&sorted.length>LIM
-    ?`<tr class="er"><td colspan="8"><button class="eb" onclick="togExp(${n},'${type}')">▼ Все ${sorted.length}</button></td></tr>`
+    ?`<tr class="er"><td colspan="9"><button class="eb" onclick="togExp(${n},'${type}')">▼ Все ${sorted.length}</button></td></tr>`
     :sorted.length>LIM&&EXP[n]
-    ?`<tr class="er"><td colspan="8"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
+    ?`<tr class="er"><td colspan="9"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
 
   const thPC=type==='wb'?'<th>Цена клиента</th>':'';
   return `<div class="sec"><div class="sh"><span class="st">Заказы сегодня</span><span class="sm">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Товар</th><th>Кол-во</th><th>Цена</th>${thPC}<th>Склад</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="8" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th>Цена</th>${thPC}<th>Склад</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="9" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 
 function togExp(n,type){EXP[n]=!EXP[n];if(D[n]){if(n<=2)renderWB(n);else renderOZ();}}
@@ -456,13 +473,21 @@ function stocksHTML(n){
   const stocks=D[n].stocks,type=D[n].isOz?'oz':'wb';
   const arts={},whs=new Set();
   stocks.forEach(s=>{
-    let art,wh,q,name;
-    if(type==='wb'){art=s.supplierArticle||'—';wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';}
-    else{art=s.item_code||s.offer_id||'—';wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';}
+    let art,sz,wh,q,name;
+    if(type==='wb'){
+      art=s.supplierArticle||'—';
+      sz=s.techSize||'—';
+      wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';
+    }else{
+      art=s.item_code||s.offer_id||'—';
+      sz='—';  // Ozon stock_on_warehouses не отдаёт размер отдельно
+      wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';
+    }
+    const key=art+' · '+sz;       // ключ = артикул + размер
     whs.add(wh);
-    if(!arts[art])arts[art]={name,total:0,wh:{}};
-    arts[art].wh[wh]=(arts[art].wh[wh]||0)+q;
-    arts[art].total+=q;
+    if(!arts[key])arts[key]={art,sz,name,total:0,wh:{}};
+    arts[key].wh[wh]=(arts[key].wh[wh]||0)+q;
+    arts[key].total+=q;
   });
   const whTot={};whs.forEach(w=>{whTot[w]=Object.values(arts).reduce((s,a)=>s+(a.wh[w]||0),0)});
   const whList=[...whs].sort((a,b)=>whTot[b]-whTot[a]);
@@ -472,7 +497,7 @@ function stocksHTML(n){
   return `<div class="sec"><div class="sh"><span class="st">Остатки по складам</span>
     <span style="display:flex;align-items:center;gap:8px">
       <input class="flt" id="sflt${n}" placeholder="🔎 фильтр по артикулу" value="${FS[n]||''}" oninput="fltS(${n},this.value)">
-      <span class="sm">${Object.keys(arts).length} арт. · ${whList.length} складов</span>
+      <span class="sm">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
     </span></div>
     <div class="sw" id="stbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
 }
@@ -493,7 +518,7 @@ function stocksTbl(n){
   const{c,d:dir}=SS[n]||{c:'total',d:-1};
   const f=(FS[n]||'').trim().toLowerCase();
   let keys=Object.keys(arts);
-  if(f)keys=keys.filter(a=>a.toLowerCase().includes(f)||(arts[a].name||'').toLowerCase().includes(f));
+  if(f)keys=keys.filter(a=>{const v=arts[a];return v.art.toLowerCase().includes(f)||v.sz.toLowerCase().includes(f)||(v.name||'').toLowerCase().includes(f)});
   const artL=keys.sort((a,b)=>{
     const va=c==='total'?arts[a].total:(arts[a].wh[c]||0);
     const vb=c==='total'?arts[b].total:(arts[b].wh[c]||0);
@@ -506,13 +531,13 @@ function stocksTbl(n){
   const rows=show.map(a=>{
     const v=arts[a];const tc=v.total===0?'qx':v.total<10?'ql':'qo';
     const cells=whList.map(w=>{const q=v.wh[w]||0;return`<td class="${q===0?'qx':q<10?'ql':'qo'}" style="text-align:center">${q||'—'}</td>`}).join('');
-    return`<tr><td><span class="art">${a}</span><div style="font-size:10px;color:var(--ink3)">${v.name.slice(0,22)}</div></td><td class="tc ${tc}">${v.total}</td>${cells}</tr>`;
+    return`<tr><td><span class="art">${v.art}</span><div style="font-size:10px;color:var(--ink3)">${v.name.slice(0,22)}</div></td><td style="text-align:center;font-weight:600">${v.sz}</td><td class="tc ${tc}">${v.total}</td>${cells}</tr>`;
   }).join('');
-  const span=whList.length+2;
+  const span=whList.length+3;
   const exp=artL.length>LIM
     ? `<tr class="er"><td colspan="${span}"><button class="eb" onclick="togExS(${n})">${EXS[n]?'▲ Свернуть':'▼ Все '+artL.length}</button></td></tr>`
     : '';
-  return`<table><thead><tr><th>Артикул</th><th class="${cl('total')}" style="background:var(--bg3)" onclick="sortS(${n},'total')">Итого${ar('total')}</th>${whH}</tr></thead><tbody>${rows||'<tr><td class="em" colspan="99">Ничего не найдено</td></tr>'}${exp}</tbody></table>`;
+  return`<table><thead><tr><th>Артикул</th><th>Размер</th><th class="${cl('total')}" style="background:var(--bg3)" onclick="sortS(${n},'total')">Итого${ar('total')}</th>${whH}</tr></thead><tbody>${rows||'<tr><td class="em" colspan="99">Ничего не найдено</td></tr>'}${exp}</tbody></table>`;
 }
 function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
 
@@ -531,17 +556,23 @@ function sortD(n,c){const s=DS[n];s.d=s.c===c?s.d*-1:(c==='days'?1:-1);s.c=c;con
 function defTbl(n){
   const d=D[n];if(!d||!d.arts)return'<div class="em">Нет данных</div>';
   const{arts,orders7,isOz}=d;
+  // Карта продаж за 7дн по ключу «артикул · размер» (как в остатках)
   let om=d._om;
   if(!om){
     om={};
     (orders7||[]).forEach(o=>{
-      if(isOz){(o.products||[]).forEach(p=>{const a=p.offer_id||'—';om[a]=(om[a]||0)+(p.quantity||1)});}
-      else{const a=o.supplierArticle||'—';om[a]=(om[a]||0)+(o.quantity||1);}
+      if(isOz){
+        (o.products||[]).forEach(p=>{const key=(p.offer_id||'—')+' · —';om[key]=(om[key]||0)+(p.quantity||1)});
+      }else{
+        const key=(o.supplierArticle||'—')+' · '+(o.techSize||'—');
+        om[key]=(om[key]||0)+(o.quantity||1);
+      }
     });
     d._om=om;
   }
   const rows=Object.keys(arts).map(a=>{
-    const stk=arts[a].total,name=arts[a].name||'',o7=om[a]||0;
+    const v=arts[a];
+    const stk=v.total,name=v.name||'',o7=om[a]||0;
     const dr=o7/7,need=Math.round(dr*30),days=dr>0?Math.round(stk/dr):null;
     let fc,ft,bc,bw,sev;
     if(days===null){fc='fe';ft='— нет продаж';bc='bd';bw=0;sev=99999;}
@@ -551,7 +582,7 @@ function defTbl(n){
     else{fc='fd';ft='💀 '+days+'д';bc='bd';bw=100;sev=days;}
     const def=need>stk?need-stk:0;
     const sc=stk===0?'qx':stk<10?'ql':'qo';
-    return{a,name,stk,o7,need,days,def,fc,ft,bc,bw,sc,sev};
+    return{a,art:v.art,sz:v.sz,name,stk,o7,need,days,def,fc,ft,bc,bw,sc,sev};
   });
   const{c,d:dir}=DS[n];
   rows.sort((a,b)=>{
@@ -567,7 +598,8 @@ function defTbl(n){
   const th=(k,l,al='center')=>`<th class="${cl(k)}" onclick="sortD(${n},'${k}')" style="text-align:${al}">${l}${ar(k)}</th>`;
   const show=EXD[n]?rows:rows.slice(0,LIM);
   const trs=show.map(r=>`<tr>
-    <td><span class="art">${r.a}</span><div style="font-size:10px;color:var(--ink3)">${r.name.slice(0,24)}</div></td>
+    <td><span class="art">${r.art}</span><div style="font-size:10px;color:var(--ink3)">${r.name.slice(0,24)}</div></td>
+    <td style="text-align:center;font-weight:600">${r.sz}</td>
     <td class="${r.sc}" style="text-align:center;font-size:14px;font-weight:700">${r.stk}</td>
     <td style="text-align:center">${r.o7}</td>
     <td style="text-align:center;color:var(--ink2)">${r.need||'—'}</td>
@@ -575,9 +607,9 @@ function defTbl(n){
     <td><span class="fl2 ${r.fc}">${r.ft}</span>${r.days!=null?`<span class="dbw"><span class="db ${r.bc}" style="width:${r.bw}%"></span></span>`:''}</td>
   </tr>`).join('');
   const exp=rows.length>LIM
-    ? `<tr class="er"><td colspan="6"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+rows.length}</button></td></tr>`
+    ? `<tr class="er"><td colspan="7"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+rows.length}</button></td></tr>`
     : '';
-  return`<table><thead><tr>${th('art','Артикул','left')}${th('stk','Остаток')}${th('o7','7дн заказов')}${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="6">Нет</td></tr>'}${exp}</tbody></table>`;
+  return`<table><thead><tr>${th('art','Артикул','left')}<th>Размер</th>${th('stk','Остаток')}${th('o7','7дн заказов')}${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="7">Нет</td></tr>'}${exp}</tbody></table>`;
 }
 function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 
