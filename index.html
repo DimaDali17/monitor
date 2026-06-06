@@ -155,7 +155,7 @@ const FSZ={1:'',2:'',3:''};                         // фильтр по раз�
 const OA={1:new Set(),2:new Set(),3:new Set()};      // развёрнутые артикулы (остатки)
 const OAD={1:new Set(),2:new Set(),3:new Set()};     // развёрнутые артикулы (дефицит)
 const DS={1:{c:'days',d:1},2:{c:'days',d:1},3:{c:'days',d:1}};
-const LIM=20;
+const LIM=10;
 
 // clock
 setInterval(()=>{
@@ -360,6 +360,16 @@ function dlt(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% к 
 function wbPrice(o){return o.finishedPrice||o.priceWithDisc||(o.totalPrice*(1-(o.discountPercent||0)/100))||o.totalPrice||0;}
 function wbQty(s){return s.quantity||s.quantityFull||s.quantityNotInOrders||0;}
 const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
+// Правильный порядок размеров: XS S M L XL 2XL 3XL… и числовые 36 37 38…
+function sizeOrd(sz){
+  const m={'XXS':1,'XS':2,'S':3,'M':4,'L':5,'XL':6,'XXL':7,'2XL':7,'XXXL':8,'3XL':8,'4XL':9,'5XL':10,'6XL':11,'7XL':12,'8XL':13};
+  const u=(sz||'').toUpperCase().trim();
+  if(m[u])return m[u];
+  const n=parseFloat(u);if(!isNaN(n))return 100+n;
+  if(u.includes('-')){const p=parseFloat(u);if(!isNaN(p))return 100+p;}
+  return 50;
+}
+function szCmp(a,b){return sizeOrd(a)-sizeOrd(b);}
 // Фильтр вчерашних заказов до текущего часа (для честного сравнения)
 function yestToHour(orders,type){
   const nowH=new Date().getHours(),nowM=new Date().getMinutes();
@@ -369,6 +379,71 @@ function yestToHour(orders,type){
     const d=new Date(dt);
     return d.getHours()<nowH||(d.getHours()===nowH&&d.getMinutes()<=nowM);
   });
+}
+
+/* ═══ HOURLY CHART: orders bars + revenue line ═══ */
+function chartHTML(todayO,yestO,type){
+  const nowH=new Date().getHours();
+  const priceFn=type==='wb'?wbPrice:ozRev;
+  // group by hour
+  const tH=Array(24).fill(0),yH=Array(24).fill(0),tR=Array(24).fill(0);
+  const getH=o=>{const dt=type==='wb'?o.date:(o.in_process_at||o.created_at);return dt?new Date(dt).getHours():0;};
+  todayO.forEach(o=>{const h=getH(o);tH[h]++;tR[h]+=priceFn(o);});
+  yestO.forEach(o=>{const h=getH(o);yH[h]++;});
+
+  const maxO=Math.max(...tH,...yH,1);
+  const maxR=Math.max(...tR,1);
+  const W=700,H=160,L=36,R=20,T=14,B=22;
+  const cW=W-L-R,cH=H-T-B;
+  const bW=Math.floor(cW/24)-2;
+
+  let bars='';
+  for(let i=0;i<24;i++){
+    const x=L+i*(cW/24)+1;
+    const v=tH[i]; const bH=maxO>0?(v/maxO)*cH:0;
+    const y=T+cH-bH;
+    let fill;
+    if(i>nowH)fill='#D5D0C8';                   // серый — час не наступил
+    else if(v>yH[i])fill='var(--green)';          // зелёный — больше вчера
+    else if(v<yH[i])fill='var(--red)';            // красный — меньше вчера
+    else fill='var(--ink3)';                       // равно
+    bars+=`<rect x="${x}" y="${y}" width="${bW}" height="${bH}" rx="2" fill="${fill}" opacity=".85"/>`;
+    // вчера — тонкая черта-ориентир
+    if(yH[i]>0){const yy=T+cH-(yH[i]/maxO)*cH;bars+=`<line x1="${x}" x2="${x+bW}" y1="${yy}" y2="${yy}" stroke="var(--ink3)" stroke-width="1" stroke-dasharray="3,2" opacity=".5"/>`;}
+  }
+  // линия выручки
+  let pts='';
+  for(let i=0;i<=nowH;i++){
+    const x=L+i*(cW/24)+bW/2;
+    const y=T+cH-(maxR>0?(tR[i]/maxR)*cH*0.9:0);
+    pts+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
+  }
+  const revLine=pts?`<path d="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>`:'';
+
+  // x-axis labels (every 3 hours)
+  let xLab='';
+  for(let i=0;i<24;i+=3){
+    const x=L+i*(cW/24)+bW/2;
+    xLab+=`<text x="${x}" y="${H-4}" text-anchor="middle" font-size="9" fill="var(--ink3)" font-family="inherit">${i}:00</text>`;
+  }
+  // y-axis (orders)
+  const ySteps=[0,Math.round(maxO/2),maxO];
+  let yLab='';
+  for(const v of ySteps){
+    const y=T+cH-(v/maxO)*cH;
+    yLab+=`<text x="${L-4}" y="${y+3}" text-anchor="end" font-size="8" fill="var(--ink3)" font-family="inherit">${v}</text>`;
+    yLab+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
+  }
+
+  return `<div class="sec" style="margin-bottom:14px"><div class="sh"><span class="st">Заказы по часам · сегодня vs вчера</span>
+    <span class="sm" style="display:flex;gap:10px">
+      <span style="color:var(--green);font-weight:700">■</span> &gt; вчера
+      <span style="color:var(--red);font-weight:700">■</span> &lt; вчера
+      <span style="color:#D5D0C8;font-weight:700">■</span> ещё не наступил
+      <span style="color:var(--blue);font-weight:700">—</span> выручка
+      <span style="color:var(--ink3)">┄</span> вчера
+    </span></div>
+    <div class="tw" style="padding:8px"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${yLab}${bars}${revLine}${xLab}</svg></div></div>`;
 }
 
 /* ═══ RENDER WB ═══ */
@@ -389,6 +464,7 @@ function renderWB(n){
     <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
   </div>`;
 
+  h+=chartHTML(todayO,yestO,'wb');
   h+=ordersHTML(n,todayO,'wb');
   h+=stocksHTML(n);
   h+=deficitHTML(n);
@@ -415,6 +491,7 @@ function renderOZ(){
     <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
   </div>`;
 
+  h+=chartHTML(todayO,yestO,'oz');
   h+=ordersHTML(3,todayO,'oz');
   h+=stocksHTML(3);
   h+=deficitHTML(3);
@@ -554,7 +631,7 @@ function stocksTbl(n){
     const onclick=hasSizes?` onclick="togArt(${n},'${a.replace(/'/g,"\\'")}')"`:' ';
     rows+=`<tr class="ar-row"${onclick}><td>${toggle}<span class="art">${a}</span><div style="font-size:10px;color:var(--ink3);display:inline;margin-left:6px">${g.name.slice(0,22)}</div></td><td class="tc ${tc}">${g.total}</td>${cells}</tr>`;
     if(open){
-      const sorted=g.sizes.sort((x,y)=>(x.sz<y.sz?-1:x.sz>y.sz?1:0));
+      const sorted=g.sizes.sort((x,y)=>szCmp(x.sz,y.sz));
       for(const sv of sorted){
         const sc=sv.total===0?'qx':sv.total<10?'ql':'qo';
         const scells=whList.map(w=>{const q=sv.wh[w]||0;return`<td class="${q===0?'qx':q<10?'ql':''}" style="text-align:center;font-size:11px">${q||'—'}</td>`}).join('');
@@ -659,7 +736,7 @@ function defTbl(n){
     const onclick=hasSizes?` onclick="togArtD(${n},'${r.art.replace(/'/g,"\\'")}')"`:' ';
     trs+=`<tr class="ar-row"${onclick}>${defRow({...r,art:toggle+r.art},false)}</tr>`;
     if(open){
-      const sorted=r.sizes.sort((x,y)=>(x.sz<y.sz?-1:x.sz>y.sz?1:0));
+      const sorted=r.sizes.sort((x,y)=>szCmp(x.sz,y.sz));
       for(const sr of sorted) trs+=`<tr class="sz-row">${defRow(sr,true)}</tr>`;
     }
   }
