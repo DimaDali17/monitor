@@ -369,9 +369,14 @@ async function loadOZ(){
 
 /* ═══ HELPERS ═══ */
 const fmt=v=>Math.round(v).toLocaleString('ru')+' ₽';
-function dlt(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% к этому часу</span>':'<span class="dd">▼ '+pct+'% к этому часу</span>';}
+function dlt(pct){
+  const h=new Date().getHours();
+  return pct==null?'':pct>=0
+    ?'<span class="du">▲ +'+pct+'% vs вчера к '+h+':00</span>'
+    :'<span class="dd">▼ '+pct+'% vs вчера к '+h+':00</span>';
+}
 function wbPrice(o){return o.finishedPrice||o.priceWithDisc||(o.totalPrice*(1-(o.discountPercent||0)/100))||o.totalPrice||0;}
-function wbQty(s){return s.quantity||s.quantityFull||s.quantityNotInOrders||0;}
+function wbQty(s){return s.quantity||0;}
 const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
 // Правильный порядок размеров: XS S M L XL 2XL 3XL… и числовые 36 37 38…
 function sizeOrd(sz){
@@ -421,7 +426,8 @@ function chartHTML(n,type){
     const cnt={};all.forEach(o=>{const dd=getD(o);cnt[dd]=(cnt[dd]||0)+1;});
     for(let i=0;i<7;i++){
       const day=days[i],prev=prevDays[i];
-      labels.push(day.slice(5));       // MM-DD
+      const dObj=new Date(day+'T12:00:00');
+      labels.push(dObj.toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''));       // "5 июн"
       todayV.push(cnt[day]||0);
       yestV.push(cnt[prev]||0);
     }
@@ -556,8 +562,8 @@ function renderWB(n){
 
   h+=chartHTML(n,'wb');
   h+=ordersHTML(n,todayO,'wb');
-  h+=stocksHTML(n);
   h+=deficitHTML(n);
+  h+=stocksHTML(n);
 
   document.getElementById('v'+n).innerHTML=h;
   D[n]=origD;                                    // восстанавливаем оригинал
@@ -588,8 +594,8 @@ function renderOZ(){
 
   h+=chartHTML(3,'oz');
   h+=ordersHTML(3,todayO,'oz');
-  h+=stocksHTML(3);
   h+=deficitHTML(3);
+  h+=stocksHTML(3);
 
   document.getElementById('v3').innerHTML=h;
   D[3]=origD;
@@ -629,7 +635,8 @@ function ordersHTML(n,orders,type){
       price=ozRev(o);
       wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—');
     }
-    return `<tr><td><span class="tp">${t}</span></td><td><span class="art">${art}</span></td>
+    const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}')" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted;cursor:pointer">${art}</a>`;
+    return `<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td>
       <td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td>
       <td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
