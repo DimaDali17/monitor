@@ -88,9 +88,9 @@ tbody tr:hover{background:var(--bg3)}
 .fb input:focus{border-color:var(--ink)}
 .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:var(--ink);color:var(--bg3);border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
 .chip .cx{cursor:pointer;opacity:.7;font-size:13px;line-height:1}.chip .cx:hover{opacity:1}
-.dd{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.1);display:none}
-.dd.show{display:block}
-.dd div{padding:6px 12px;font-size:12px;cursor:pointer}.dd div:hover{background:var(--bg3)}
+.ddrop{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.1);display:none}
+.ddrop.show{display:block}
+.ddrop div{padding:6px 12px;font-size:12px;cursor:pointer}.ddrop div:hover{background:var(--bg3)}
 .ctog{display:inline-flex;background:var(--bg);border-radius:6px;padding:2px;gap:1px}
 .ctog button{padding:3px 10px;border:0;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;background:0;color:var(--ink3)}
 .ctog button.on{background:var(--ink);color:var(--bg3)}
@@ -502,7 +502,7 @@ function filterHTML(n){
   return `<div class="fb" id="fb${n}">
     ${chips}
     <input id="fai${n}" placeholder="🔎 артикул…" oninput="faInput(${n})" onfocus="faInput(${n})" autocomplete="off">
-    <div class="dd" id="fdd${n}"></div>
+    <div class="ddrop" id="fdd${n}"></div>
   </div>`;
 }
 function faInput(n){
@@ -535,7 +535,7 @@ function applyFA(n){
     stocks:(d.stocks||[]).filter(matchS)};
 }
 // Закрыть dropdown при клике вне
-document.addEventListener('click',e=>{if(!e.target.closest('.fb'))document.querySelectorAll('.dd').forEach(d=>d.classList.remove('show'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.fb'))document.querySelectorAll('.ddrop').forEach(d=>d.classList.remove('show'));});
 
 /* ═══ RENDER WB ═══ */
 function renderWB(n){
