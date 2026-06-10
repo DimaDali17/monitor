@@ -160,12 +160,12 @@ const D={1:null,2:null,3:null};
 const EXP={1:false,2:false,3:false};                // разворот таблицы заказов
 const EXS={1:false,2:false,3:false};                // разворот остатков (общий)
 const EXD={1:false,2:false,3:false};                // разворот дефицита (общий)
-const SS={1:null,2:null,3:null};
+const SS={1:{c:'total',d:-1},2:{c:'total',d:-1},3:{c:'total',d:-1}};
 const FS={1:'',2:'',3:''};                          // фильтр остатков по артикулу
 const FSZ={1:'',2:'',3:''};                         // фильтр по размеру
 const OA={1:new Set(),2:new Set(),3:new Set()};      // развёрнутые артикулы (остатки)
 const OAD={1:new Set(),2:new Set(),3:new Set()};     // развёрнутые артикулы (дефицит)
-const DS={1:{c:'days',d:1},2:{c:'days',d:1},3:{c:'days',d:1}};
+const DS={1:{c:'stk',d:-1},2:{c:'stk',d:-1},3:{c:'stk',d:-1}};
 const CM={1:'day',2:'day',3:'day'};                  // chart mode: day/week
 const FA={1:[],2:[],3:[]};                            // фильтр по артикулам
 const LIM=10;
@@ -380,12 +380,11 @@ function wbQty(s){return s.quantity||0;}
 const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
 // Правильный порядок размеров: XS S M L XL 2XL 3XL… и числовые 36 37 38…
 function sizeOrd(sz){
-  const m={'XXS':1,'XS':2,'S':3,'M':4,'L':5,'XL':6,'XXL':7,'2XL':7,'XXXL':8,'3XL':8,'4XL':9,'5XL':10,'6XL':11,'7XL':12,'8XL':13};
+  const m={'XXS':101,'XS':102,'S':103,'M':104,'L':105,'XL':106,'XXL':107,'2XL':107,'XXXL':108,'3XL':108,'4XL':109,'5XL':110,'6XL':111,'7XL':112,'8XL':113};
   const u=(sz||'').toUpperCase().trim();
   if(m[u])return m[u];
-  const n=parseFloat(u);if(!isNaN(n))return 100+n;
-  if(u.includes('-')){const p=parseFloat(u);if(!isNaN(p))return 100+p;}
-  return 50;
+  const n=parseFloat(u);if(!isNaN(n))return n;     // числовые: 36,42,44 → идут первыми
+  return 150;
 }
 function szCmp(a,b){return sizeOrd(a)-sizeOrd(b);}
 // Фильтр вчерашних заказов до текущего часа (для честного сравнения)
@@ -529,6 +528,7 @@ function applyFA(n){
     ?(s=>f.includes(s.item_code||s.offer_id))
     :(s=>f.includes(s.supplierArticle));
   return{...d,
+    _om:null,                                      // сбросить кэш дефицита для фильтрованных данных
     todayO:(d.todayO||[]).filter(match),
     yestO:(d.yestO||[]).filter(match),
     orders7:(d.orders7||[]).filter(match),
@@ -561,13 +561,14 @@ function renderWB(n){
   </div>`;
 
   h+=chartHTML(n,'wb');
-  h+=ordersHTML(n,todayO,'wb');
+  const ordList=CM[n]==='week'?(fd.orders7||[]):todayO;
+  h+=ordersHTML(n,ordList,'wb');
   h+=deficitHTML(n);
   h+=stocksHTML(n);
 
   document.getElementById('v'+n).innerHTML=h;
-  D[n]=origD;                                    // восстанавливаем оригинал
   paintTables(n);
+  D[n]=origD;                                    // восстанавливаем оригинал
 }
 
 /* ═══ RENDER OZON ═══ */
@@ -593,13 +594,14 @@ function renderOZ(){
   </div>`;
 
   h+=chartHTML(3,'oz');
-  h+=ordersHTML(3,todayO,'oz');
+  const ordListOz=CM[3]==='week'?(fd.orders7||[]):todayO;
+  h+=ordersHTML(3,ordListOz,'oz');
   h+=deficitHTML(3);
   h+=stocksHTML(3);
 
   document.getElementById('v3').innerHTML=h;
-  D[3]=origD;
   paintTables(3);
+  D[3]=origD;
 }
 
 function paintTables(n){
@@ -646,7 +648,8 @@ function ordersHTML(n,orders,type){
     :sorted.length>LIM&&EXP[n]
     ?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
 
-  return `<div class="sec"><div class="sh"><span class="st">Заказы сегодня</span><span class="sm">${orders.length} заказов</span></div>
+  const secTitle=CM[n]==='week'?'Заказы за неделю':'Заказы сегодня';
+  return `<div class="sec"><div class="sh"><span class="st">${secTitle}</span><span class="sm">${orders.length} заказов</span></div>
     <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Склад</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
@@ -817,15 +820,16 @@ function defTbl(n){
   const th=(k,l,al='center')=>`<th class="${cl(k)}" onclick="sortD(${n},'${k}')" style="text-align:${al}">${l}${ar(k)}</th>`;
   const showArts=EXD[n]?artRows:artRows.slice(0,LIM);
 
-  function defRow(r,isSub){
+  function defRow(r,isSub,parentO7){
     const px=isSub?'padding-left:28px':'';
-    const cls=isSub?'sz-row':'ar-row';
     const label=isSub?r.sz:r.art;
     const sub=isSub?'':`<div style="font-size:10px;color:var(--ink3);display:inline;margin-left:6px">${r.name.slice(0,24)}</div>`;
     const bar=r.days!=null?`<span class="dbw"><span class="db ${r.bc}" style="width:${r.bw}%"></span></span>`:'';
+    const share=isSub&&parentO7>0?Math.round(r.o7/parentO7*100)+'%':'';
     return`<td style="${px}"><span class="${isSub?'':'art'}">${label}</span>${sub}</td>
       <td class="${r.sc}" style="text-align:center;font-size:${isSub?'12':'14'}px;font-weight:700">${r.stk}</td>
       <td style="text-align:center">${r.o7}</td>
+      <td style="text-align:center;font-size:11px;color:var(--blue);font-weight:600">${share}</td>
       <td style="text-align:center;color:var(--ink2)">${r.need||'—'}</td>
       <td style="text-align:center;color:${r.def>0?'var(--red)':'var(--green)'};font-weight:${r.def>0?700:400}">${r.def>0?'-'+r.def:'✓'}</td>
       <td><span class="fl2 ${r.fc}">${r.ft}</span>${bar}</td>`;
@@ -837,16 +841,16 @@ function defTbl(n){
     const hasSizes=r.sizes.length>1;
     const toggle=hasSizes?`<span class="tog">${open?'▼':'▶'}</span>`:'<span class="tog"> </span>';
     const onclick=hasSizes?` onclick="togArtD(${n},'${r.art.replace(/'/g,"\\'")}')"`:' ';
-    trs+=`<tr class="ar-row"${onclick}>${defRow({...r,art:toggle+r.art},false)}</tr>`;
+    trs+=`<tr class="ar-row"${onclick}>${defRow({...r,art:toggle+r.art},false,0)}</tr>`;
     if(open){
       const sorted=r.sizes.sort((x,y)=>szCmp(x.sz,y.sz));
-      for(const sr of sorted) trs+=`<tr class="sz-row">${defRow(sr,true)}</tr>`;
+      for(const sr of sorted) trs+=`<tr class="sz-row">${defRow(sr,true,r.o7)}</tr>`;
     }
   }
   const exp=artRows.length>LIM
-    ? `<tr class="er"><td colspan="6"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`
+    ? `<tr class="er"><td colspan="7"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`
     : '';
-  return`<table><thead><tr>${th('art','Артикул','left')}${th('stk','Остаток')}${th('o7','7дн заказов')}${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="6">Нет</td></tr>'}${exp}</tbody></table>`;
+  return`<table><thead><tr>${th('art','Артикул','left')}${th('stk','Остаток')}${th('o7','7дн заказов')}<th style="text-align:center">Доля</th>${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="7">Нет</td></tr>'}${exp}</tbody></table>`;
 }
 function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 
