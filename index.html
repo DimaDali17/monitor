@@ -612,12 +612,12 @@ function ordersHTML(n,orders,type){
     if(type==='wb'){t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';art=o.supplierArticle||'—';sz=o.techSize||'—';name=o.subject||o.category||'—';qty=o.quantity||1;price=wbPrice(o);wh=o.warehouseName||'—';}
     else{const dt=o.in_process_at||o.created_at;t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';const items=o.products||[];art=items.map(p=>p.offer_id||'').join(', ');sz=items.map(p=>{const pp=(p.offer_id||'').split('_');return pp.length>1?pp[pp.length-1]:'—'}).join(', ');name=items.map(p=>p.name||'').join(', ');qty=items.reduce((s,p)=>s+(p.quantity||1),0);price=ozRev(o);wh=(o.analytics_data&&o.analytics_data.warehouse_name)||'—';}
     const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}');" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted">${art}</a>`;
-    const clientPrice=price>0?Math.round(price*0.75):0;
+    const clientPrice=price>0?Math.round(price*0.80):0;
     return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${clientPrice>0?fmt(clientPrice):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
   const exp=!EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▼ Все ${sorted.length}</button></td></tr>`:EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▲ Свернуть</button></td></tr>`:'';
   return`<div class="sec"><div class="sh"><span class="st">${CM[n]==='week'?'Заказы за неделю':'Заказы сегодня'}</span><span class="sm2">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.75 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~25%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.75 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~20%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 function togExp(n){EXP[n]=!EXP[n];reRender(n);}
 
@@ -703,7 +703,11 @@ function deficitHTML(n){
 function sortD(n,c){const s=DS[n];s.d=s.c===c?s.d*-1:(c==='days'?1:-1);s.c=c;const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 function togArtD(n,art){if(OAD[n].has(art))OAD[n].delete(art);else OAD[n].add(art);const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 
-function calcDef(stk,o7){
+function calcDef(stk,o7,totalStk){
+  /* stk = ВБ (для расчёта дней запаса на ВБ)
+     totalStk = ВБ+СГП+Сырьё (для расчёта дефицита)
+     Если totalStk не передан — используем stk */
+  const ts=totalStk!=null?totalStk:stk;
   const dr=o7/7,need=Math.round(dr*30),days=dr>0?Math.round(stk/dr):null;
   let fc,bc,bw,sev;
   if(days===null){fc='fe';bc='bd';bw=0;sev=99999;}
@@ -712,7 +716,8 @@ function calcDef(stk,o7){
   else if(days<=90){fc='fk';bc='bk';bw=Math.min(100,days/90*100);sev=days;}
   else{fc='fd';bc='bd';bw=100;sev=days;}
   const ft=days===null?'нет продаж':(days<14?'🔥 ':days<30?'⚠️ ':days<=90?'✅ ':'💀 ')+days+'д';
-  return{stk,o7,need,days,def:Math.max(0,need-stk),fc,ft,bc,bw,sev,sc:stk===0?'qx':stk<10?'ql':'qo'};
+  const def=Math.max(0,need-ts);
+  return{stk,o7,need,days,def,fc,ft,bc,bw,sev,sc:stk===0?'qx':stk<10?'ql':'qo'};
 }
 
 function defTbl(n){
@@ -748,7 +753,8 @@ function defTbl(n){
     const g=byArt[a];
     const br=getBuyrate(a);
     const{sgp,raw}=getStocksForArt(a);
-    return{...calcDef(g.stk,g.o7),art:a,name:g.name,sizes:g.sizes,buyrate:br,msk:g.msk,sgp,raw,o7Art:g.o7};
+    const totalStkForDef=g.stk+sgp+raw;
+    return{...calcDef(g.stk,g.o7,totalStkForDef),art:a,name:g.name,sizes:g.sizes,buyrate:br,msk:g.msk,sgp,raw,o7Art:g.o7};
   });
 
   const{c,d:dir}=DS[n];
@@ -792,7 +798,7 @@ function defTbl(n){
     ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
     ${THF('Мес. потр.','Потребность на 30 дней исходя из среднего темпа заказов за 7 дней','th-need')}
     ${THF('Доля','Доля размера в заказах за 7 дней (для строк размеров) / доля артикула в общих заказах (для строк артикула)','th-need')}
-    ${TH('def','Дефицит шт','Нехватка товара: потребность на 30 дней минус остаток на ВБ. Минус = в порядке','th-need')}
+    ${TH('def','Дефицит шт','Нехватка товара: потребность на 30 дней минус ОБЩИЙ сток (ВБ + СГП + Сырьё). Минус = в порядке','th-need')}
     ${THF('Статус','Визуальный индикатор запаса на ВБ: 🔥 <14 дней, ⚠️ 14-30 дней, ✅ 30-90 дней, 💀 >90 дней','th-need')}
     ${TH('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости. Если нет данных — используется 70%','th-days')}
     ${THF('Всё×','Дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
@@ -866,7 +872,7 @@ function defTbl(n){
         const srRawC=srRaw===0?'qx':srRaw<10?'ql':'qo';
         const srTotC=srTotal===0?'qx':srTotal<15?'ql':'qo';
         const sr7=Math.round(srDr); // целое
-        const{def:srDef,fc:srFc,ft:srFt,bc:srBc,bw:srBw,need:srNeed}=calcDef(sr.total,sr.o7);
+        const{def:srDef,fc:srFc,ft:srFt,bc:srBc,bw:srBw,need:srNeed}=calcDef(sr.total,sr.o7,srTotal);
 
         trs+=`<tr class="sz-row">
           <td style="padding-left:28px;font-weight:600">${sr.sz}</td>
