@@ -56,6 +56,7 @@ thead th.th-raw{background:#FBE9E7!important;color:#8B4513!important;border-bott
 thead th.th-transit{background:#E3F2FD!important;color:#0D47A1!important;border-bottom:2px dashed #90CAF9}
 thead th.th-msk{background:#F3E5F5!important;color:#6A1B9A!important;border-bottom:2px dashed #CE93D8}
 thead th.th-total{background:#E8F5E9!important;color:#1B5E20!important;border-bottom:2px solid #4CAF50}
+.thg-total{background:#E8F5E9;color:#1B5E20}
 thead th.th-need{background:#FFF8E1!important;color:#F57F17!important}
 thead th.th-days{background:#E0F2F1!important;color:#004D40!important}
 .th-group{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:center;padding:3px 6px;border-bottom:1px solid var(--border)}
@@ -227,12 +228,13 @@ async function loadExternal(){
       });
     });
 
-    /* СГП: "Арт производ" + "Размер" → SUM из Штук */
+    /* СГП: колонки "Артикул ИП" (WB-арт напрямую) + "Размер" → "ИТОГО ТЕ" */
     parseCSV(rS).forEach(row=>{
-      const art=(row['Арт производ']||'').trim();
+      const art=(row['Артикул ИП']||'').trim();
       const sz=(row['Размер']||'').trim();
-      const qty=parseInt(row['SUM из Штук']||0,10)||0;
-      if(!art)return;
+      const raw=row[' ИТОГО ТЕ']||row['ИТОГО ТЕ']||row[' ИТОГО ТЕ ']||'';
+      const qty=parseInt(raw,10)||0;
+      if(!art||!qty)return;
       const k=art.toLowerCase()+';'+sz.toLowerCase();
       gSgp[k]=(gSgp[k]||0)+qty;
     });
@@ -267,35 +269,46 @@ function getBuyrate(art){
   return{val:0.7,est:true};
 }
 
-/* Получить {sgp, raw} по WB-арт + WB-размер через маппинг */
+/* Получить {sgp, raw} по WB-арт + WB-размер
+   SGP: прямой ключ WB-арт;WB-размер (лист СГП содержит WB-артикулы напрямую)
+   RAW: через маппинг произв-арт;произв-размер */
 function getStocksForSz(wbArt,wbSz){
-  const k=(wbArt.toLowerCase())+';'+(wbSz.toLowerCase());
-  const mappings=gMap[k]||[];
-  let sgp=0,raw=0;
+  const ka=wbArt.toLowerCase(),kz=wbSz.toLowerCase();
+  /* SGP — прямой поиск */
+  const sgp=gSgp[ka+';'+kz]||0;
+  /* RAW — через маппинг */
+  const mapKey=ka+';'+kz;
+  const mappings=gMap[mapKey]||[];
+  let raw=0;
   mappings.forEach(({artPr,szPr})=>{
     const kp=artPr.toLowerCase()+';'+szPr.toLowerCase();
-    sgp+=gSgp[kp]||0;
     raw+=gRaw[kp]||0;
   });
   return{sgp,raw};
 }
 
-/* Для строки артикула (без разбивки по размеру) — сумма по всем маппингам */
+/* Для строки артикула — сумма по всем размерам
+   SGP: прямой поиск по WB-арт (все размеры)
+   RAW: через маппинг */
 function getStocksForArt(wbArt){
   const ka=wbArt.toLowerCase();
-  const seen=new Set();let sgp=0,raw=0;
+  /* SGP — все ключи начинающиеся с этого артикула */
+  let sgp=0;
+  for(const [kk,v] of Object.entries(gSgp)){
+    if(kk.split(';')[0]===ka)sgp+=v;
+  }
+  /* RAW — через маппинг произв-арт */
+  const seen=new Set();let raw=0;
   for(const [k,mappings] of Object.entries(gMap)){
     if(!k.startsWith(ka+';'))continue;
     mappings.forEach(({artPr,szPr})=>{
       const kp=artPr.toLowerCase()+';'+szPr.toLowerCase();
-      if(!seen.has(kp)){seen.add(kp);sgp+=gSgp[kp]||0;raw+=gRaw[kp]||0;}
+      if(!seen.has(kp)){seen.add(kp);raw+=gRaw[kp]||0;}
     });
   }
-  /* fallback только если вообще нет маппинга в gMap для этого артикула */
+  /* RAW fallback если нет маппинга */
   if(!seen.size){
-    /* точное совпадение только */
-    for(const [kk,v] of Object.entries(gSgp)){const p=kk.split(';')[0];if(p===ka)sgp+=v;}
-    for(const [kk,v] of Object.entries(gRaw)){const p=kk.split(';')[0];if(p===ka)raw+=v;}
+    for(const [kk,v] of Object.entries(gRaw)){if(kk.split(';')[0]===ka)raw+=v;}
   }
   return{sgp,raw};
 }
@@ -599,11 +612,12 @@ function ordersHTML(n,orders,type){
     if(type==='wb'){t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';art=o.supplierArticle||'—';sz=o.techSize||'—';name=o.subject||o.category||'—';qty=o.quantity||1;price=wbPrice(o);wh=o.warehouseName||'—';}
     else{const dt=o.in_process_at||o.created_at;t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';const items=o.products||[];art=items.map(p=>p.offer_id||'').join(', ');sz=items.map(p=>{const pp=(p.offer_id||'').split('_');return pp.length>1?pp[pp.length-1]:'—'}).join(', ');name=items.map(p=>p.name||'').join(', ');qty=items.reduce((s,p)=>s+(p.quantity||1),0);price=ozRev(o);wh=(o.analytics_data&&o.analytics_data.warehouse_name)||'—';}
     const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}');" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted">${art}</a>`;
-    return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
+    const clientPrice=price>0?Math.round(price*0.75):0;
+    return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${clientPrice>0?fmt(clientPrice):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
   const exp=!EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▼ Все ${sorted.length}</button></td></tr>`:EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▲ Свернуть</button></td></tr>`:'';
   return`<div class="sec"><div class="sh"><span class="st">${CM[n]==='week'?'Заказы за неделю':'Заказы сегодня'}</span><span class="sm2">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.75 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~25%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 function togExp(n){EXP[n]=!EXP[n];reRender(n);}
 
@@ -756,36 +770,34 @@ function defTbl(n){
   const THF=(label,tip,cls,al='center')=>`<th class="${cls||''}" style="text-align:${al}" data-tip="${tip}">${label}</th>`;
 
   /* Двухуровневая шапка */
+  /* Структура: ВБ | СГП | Сырьё | *Справочно (МСК, В пути) | Общий | Потребность | Дефицит | Запас дней */
   const hdr=`<tr>
     <th rowspan="2" style="text-align:left;vertical-align:middle;background:var(--bg3)" onclick="sortD(${n},'art')" data-tip="Артикул WB. Нажмите для сортировки">Артикул${ar('art')}</th>
-    <th colspan="3" class="th-group thg-wb">📦 Склад ВБ</th>
-    <th colspan="2" class="th-group thg-sgp">🏭 СГП</th>
-    <th colspan="2" class="th-group thg-raw">🧵 Сырьё</th>
+    <th colspan="1" class="th-group thg-wb">📦 Склад ВБ</th>
+    <th colspan="1" class="th-group thg-sgp">🏭 СГП</th>
+    <th colspan="1" class="th-group thg-raw">🧵 Сырьё</th>
     <th colspan="2" class="th-group thg-ref" style="border-style:dashed">* Справочно</th>
+    <th colspan="1" class="th-group thg-total">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
     <th colspan="2" class="th-group thg-need">⚡ Дефицит</th>
     <th colspan="4" class="th-group thg-days">⏱ Запас дней (с выкупом×)</th>
   </tr>
   <tr>
     ${TH('stk','ВБ','Остаток на складах Wildberries или Ozon на сегодня','th-wb')}
-    ${THF('МСК*','Остаток на московских и ближайших складах — справочная цифра, в Общий сток не входит','th-msk')}
+    ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП, колонка ИТОГО ТЕ)','th-sgp')}
+    ${THF('Сырьё','Остаток полуфабрикатов — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
+    ${THF('МСК*','Остаток на московских складах (Коледино, Электросталь, Тула, Краснодар) — справочно, в Общий не входит','th-msk')}
+    ${THF('В пути*','Товар в процессе доставки клиенту или приёмки на склад ВБ — справочно, в расчёты не идёт','th-transit')}
     ${THF('Общий','Суммарный сток: ВБ + СГП + Сырьё. МСК и В пути не включены','th-total')}
-    ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП)','th-sgp')}
-    ${THF('Сырьё','Остаток полуфабрикатов на вашем складе — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
-    ${THF('Доля р-ра','Доля данного размера в заказах за последние 7 дней','th-need')}
-    ${THF('Сырьё','То же сырьё — продублировано для сравнения с долей размера','th-raw')}
-    ${THF('Доля р-ра','Доля данного размера в заказах за последние 7 дней','th-need')}
-    ${THF('В пути*','Товар в процессе доставки клиенту или приёмки на склад ВБ — справочная цифра, в расчёты не идёт','th-transit')}
-    ${THF('МСК*','Московский сток — повторно для удобства сравнения с запасом дней','th-msk')}
-    ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (без сегодня)','th-need')}
-    ${THF('Мес. потр.','Потребность на 30 дней исходя из темпа заказов за последние 7 дней','th-need')}
-    ${THF('Доля арт.','Доля данного артикула в общих заказах за 7 дней по всем артикулам','th-need')}
-    ${TH('def','Дефицит шт','Нехватка товара: потребность на 30 дней минус остаток на ВБ. Отрицательное значение означает достаточный запас','th-need')}
-    ${THF('Статус','Визуальный индикатор запаса: 🔥 менее 14 дней, ⚠️ 14-30 дней, ✅ 30-90 дней, 💀 более 90 дней','th-need')}
-    ${TH('days','ВБ×','Сколько дней хватит остатка ВБ с учётом выкупаемости. Если выкупаемость не задана, используется 70%','th-days')}
-    ${THF('Всё×','Сколько дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
-    ${THF('Без сырья×','Сколько дней хватит ВБ + СГП с учётом выкупаемости — показывает запас без учёта производства','th-days')}
-    ${THF('МСК×','Сколько дней хватит только московского стока с учётом выкупаемости','th-days')}
+    ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
+    ${THF('Мес. потр.','Потребность на 30 дней исходя из среднего темпа заказов за 7 дней','th-need')}
+    ${THF('Доля','Доля размера в заказах за 7 дней (для строк размеров) / доля артикула в общих заказах (для строк артикула)','th-need')}
+    ${TH('def','Дефицит шт','Нехватка товара: потребность на 30 дней минус остаток на ВБ. Минус = в порядке','th-need')}
+    ${THF('Статус','Визуальный индикатор запаса на ВБ: 🔥 <14 дней, ⚠️ 14-30 дней, ✅ 30-90 дней, 💀 >90 дней','th-need')}
+    ${TH('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости. Если нет данных — используется 70%','th-days')}
+    ${THF('Всё×','Дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
+    ${THF('Без сырья×','Дней хватит ВБ + СГП с учётом выкупаемости (без учёта производства в сырье)','th-days')}
+    ${THF('МСК×','Дней хватит только московского стока с учётом выкупаемости','th-days')}
   </tr>`;
 
   const showArts=EXD[n]?artRows:artRows.slice(0,LIM);
@@ -820,14 +832,11 @@ function defTbl(n){
     trs+=`<tr class="ar-row"${onclick}>
       <td>${toggle}<span class="art">${r.art}</span>${brLabel}<span style="font-size:10px;color:var(--ink3);margin-left:5px">${r.name.slice(0,20)}</span></td>
       <td class="${wbC}" style="text-align:center;font-size:14px">${wbStk}</td>
-      <td class="td-ref" style="text-align:center">${mskStk||'—'}</td>
-      <td class="${totC}" style="text-align:center;font-size:14px;font-weight:700">${totalStk}</td>
       <td class="${sgpC}" style="text-align:center">${sgpStk||'—'}</td>
-      <td style="text-align:center;font-size:10px;color:var(--ink3)">—</td>
       <td class="${rawC}" style="text-align:center">${rawStk||'—'}</td>
-      <td style="text-align:center;font-size:10px;color:var(--ink3)">—</td>
-      <td class="td-ref" style="text-align:center">—</td>
       <td class="td-ref" style="text-align:center">${mskStk||'—'}</td>
+      <td class="td-ref" style="text-align:center">—</td>
+      <td class="${totC}" style="text-align:center;font-size:14px;font-weight:700">${totalStk}</td>
       <td style="text-align:center;font-weight:600">${drDay}</td>
       <td style="text-align:center;color:var(--ink2)">${need30||'—'}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${artShare}</td>
@@ -862,14 +871,11 @@ function defTbl(n){
         trs+=`<tr class="sz-row">
           <td style="padding-left:28px;font-weight:600">${sr.sz}</td>
           <td class="${srWbC}" style="text-align:center;font-weight:600">${sr.total}</td>
-          <td class="td-ref" style="text-align:center;font-size:11px">${sr.msk||'—'}</td>
-          <td class="${srTotC}" style="text-align:center;font-weight:600">${srTotal}</td>
           <td class="${srSgpC}" style="text-align:center;font-size:11px;color:var(--sgp)">${srSgp||'—'}</td>
-          <td style="text-align:center;font-size:10px;color:var(--blue)">${srShare}</td>
           <td class="${srRawC}" style="text-align:center;font-size:11px;color:var(--raw)">${srRaw||'—'}</td>
-          <td style="text-align:center;font-size:10px;color:var(--blue)">${srShare}</td>
-          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
           <td class="td-ref" style="text-align:center;font-size:11px">${sr.msk||'—'}</td>
+          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
+          <td class="${srTotC}" style="text-align:center;font-weight:600">${srTotal}</td>
           <td style="text-align:center;font-size:11px">${sr7}</td>
           <td style="text-align:center;font-size:11px">${srNeed||'—'}</td>
           <td style="text-align:center;font-size:11px;color:var(--blue)">${srShare}</td>
