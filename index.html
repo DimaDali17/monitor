@@ -5,7 +5,7 @@
 <title>EasyForm Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#F0EBE1;--bg2:#E8E1D4;--bg3:#FAF8F4;--card:#FFF;--border:rgba(160,148,128,.25);--border2:rgba(160,148,128,.45);--ink:#1A1610;--ink2:#6B6357;--ink3:#A09688;--green:#2D7A4F;--red:#B84040;--amber:#A06820;--blue:#005BFF;}
+:root{--bg:#F0EBE1;--bg2:#E8E1D4;--bg3:#FAF8F4;--card:#FFF;--border:rgba(160,148,128,.25);--border2:rgba(160,148,128,.45);--ink:#1A1610;--ink2:#6B6357;--ink3:#A09688;--green:#2D7A4F;--red:#B84040;--amber:#A06820;--blue:#005BFF;--sgp:#5B3FA0;--raw:#8B4513;}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
 
@@ -37,7 +37,7 @@ body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);fo
 .smsg{font-size:12px;margin-top:8px;text-align:center}
 .smsg.err{color:var(--red)}
 
-.main{padding:20px;max-width:1400px;margin:0 auto}
+.main{padding:20px;max-width:1600px;margin:0 auto}
 .mg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
 .mc{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px 16px}
 .ml{font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:7px}
@@ -48,18 +48,35 @@ body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);fo
 .sec{margin-bottom:20px}
 .sh{display:flex;align-items:center;justify-content:space-between;padding-bottom:7px;margin-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;gap:6px}
 .st{font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.12em}
-.sm{font-size:11px;color:var(--ink3)}
+.sm2{font-size:11px;color:var(--ink3)}
 .flt{padding:5px 10px;font-size:11px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0;width:170px}
 .flt:focus{border-color:var(--ink)}
 
 .tw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden}
 .sw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-thead th{text-align:left;padding:8px 12px;font-size:9px;font-weight:700;color:var(--ink3);background:var(--bg3);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);font-family:inherit;white-space:nowrap}
+thead th{text-align:left;padding:7px 10px;font-size:9px;font-weight:700;color:var(--ink3);background:var(--bg3);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);font-family:inherit;white-space:nowrap;cursor:default}
 thead th.sa{background:var(--ink)!important;color:var(--bg3)!important}
 thead th.wh{background:var(--bg2)!important;color:var(--ink2)!important}
 thead th[onclick]{cursor:pointer;user-select:none}
-tbody td{padding:7px 12px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
+thead th.th-wb{background:#FFF3E0!important;color:#A06820!important;border-bottom:2px solid #A06820}
+thead th.th-sgp{background:#EDE7F6!important;color:#5B3FA0!important;border-bottom:2px solid #5B3FA0}
+thead th.th-raw{background:#FBE9E7!important;color:#8B4513!important;border-bottom:2px solid #8B4513}
+thead th.th-transit{background:#E3F2FD!important;color:#0D47A1!important;border-bottom:2px dashed #90CAF9}
+thead th.th-msk{background:#F3E5F5!important;color:#6A1B9A!important;border-bottom:2px dashed #CE93D8}
+thead th.th-total{background:#E8F5E9!important;color:#1B5E20!important;border-bottom:2px solid #4CAF50}
+thead th.th-need{background:#FFF8E1!important;color:#F57F17!important}
+thead th.th-days{background:#E0F2F1!important;color:#004D40!important}
+/* Группировки заголовков */
+.th-group{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;text-align:center;padding:3px 6px;border-bottom:1px solid var(--border)}
+.thg-wb{background:#FFF3E0;color:#A06820}
+.thg-sgp{background:#EDE7F6;color:#5B3FA0}
+.thg-raw{background:#FBE9E7;color:#8B4513}
+.thg-need{background:#FFF8E1;color:#F57F17}
+.thg-days{background:#E0F2F1;color:#004D40}
+.thg-ref{background:#F3F3F3;color:#888;font-style:italic}
+
+tbody td{padding:6px 10px;color:var(--ink);border-bottom:1px solid var(--border);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
 tbody tr:hover{background:var(--bg3)}
 .tp{font-size:11px;font-weight:700;color:var(--ink2);background:var(--bg2);padding:2px 8px;border-radius:20px}
@@ -80,7 +97,7 @@ tbody tr:hover{background:var(--bg3)}
 .em{padding:28px;text-align:center;color:var(--ink3)}
 .ar-row{cursor:pointer;background:var(--bg3)}.ar-row:hover{background:var(--bg2)}
 .ar-row td{font-weight:700;border-bottom:1px solid var(--border2)}
-.sz-row td{padding-left:28px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--border)}
+.sz-row td{font-size:12px;color:var(--ink2);border-bottom:1px solid var(--border)}
 .sz-row td:first-child{padding-left:28px}
 .tog{display:inline-block;width:16px;text-align:center;font-size:10px;color:var(--ink3);margin-right:4px}
 .fb{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;position:relative}
@@ -99,6 +116,24 @@ tbody tr:hover{background:var(--bg3)}
 .sde{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--red)}
 .sp{display:inline-block;animation:spin .8s linear infinite}
 .loadbtn{margin-top:14px;padding:9px 22px;background:var(--ink);color:var(--bg3);border:0;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+/* Значки выкупаемости */
+.buyrate{font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:6px;vertical-align:middle}
+.buyrate-ok{background:#E8F4EE;color:#2D7A4F}
+.buyrate-est{background:#FEF3E2;color:#A06820}
+/* Числа дней — цветовое кодирование */
+.days-crit{color:#B84040;font-weight:700}
+.days-warn{color:#A06820;font-weight:700}
+.days-ok{color:#2D7A4F;font-weight:700}
+.days-great{color:#A09688}
+/* Справочные колонки — чуть серее */
+.td-ref{color:var(--ink3)!important;font-style:italic}
+/* Легенда */
+.legend-bar{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--ink3);margin-top:6px}
+.legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle}
+/* Tooltip */
+[data-tip]{position:relative;cursor:help}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:rgba(26,22,16,.9);color:#fff;font-size:10px;font-weight:400;padding:5px 8px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;font-family:'Comfortaa',sans-serif;max-width:260px;white-space:normal;text-align:center;line-height:1.4}
+[data-tip]:hover::before{content:'';position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:rgba(26,22,16,.9)}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -118,7 +153,7 @@ tbody tr:hover{background:var(--bg3)}
   <div class="fg"><div class="fl">API-ключ</div><input class="fi" type="password" id="sokey" placeholder="xxx-xxx-xxx"></div>
   <div class="ssec">Прокси</div>
   <div class="fg"><div class="fl">Прокси 1 — для EF + Ozon</div><input class="fi" id="sprx" value="https://wb-proxy.ooo6311ooo.workers.dev"></div>
-  <div class="fg"><div class="fl">Прокси 2 — для EZFR (для разнесения; от 429 спасает только РАЗНЫЙ IP/аккаунт CF)</div><input class="fi" id="sprx2" placeholder="https://wb-proxy-2.xxx.workers.dev (на ДРУГОМ аккаунте Cloudflare)"></div>
+  <div class="fg"><div class="fl">Прокси 2 — для EZFR</div><input class="fi" id="sprx2" placeholder="https://wb-proxy-2.xxx.workers.dev"></div>
   <button class="sbtn" onclick="doSave()">Сохранить и загрузить EF</button>
   <div class="smsg" id="smsg"></div>
 </div></div>
@@ -148,30 +183,119 @@ tbody tr:hover{background:var(--bg3)}
 </div>
 
 <script>
-/* ── Логотипы (оригиналы, сжаты до 76px ~7.5КБ вместо ~290КБ) ── */
-const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAwUAAgQBBgj/xAAuEAABBAEDAgQGAQUAAAAAAAABAAIDEQQFEiExQRMUIlEGMmFxgZFSFTNCYqH/xAAYAQEBAQEBAAAAAAAAAAAAAAABAAIDBP/EABwRAQEAAgMBAQAAAAAAAAAAAAABESECMUESMv/aAAwDAQACEQMRAD8A+jURsZIsC0tz80Y74o7ovct8E1tHK80dquWEdQq0jiQHg0o6MOFt/ScLICisW0q8DkoLoV2NBQ2+rnt7KzpAwJgdkYG9Ch2qsl8W3dugXUIi+I43CJk7esTt347phps/iwNcDdhTUYRNjPaRdhYvh15OKGnq07f0s+teHRdtFqR5bQa3KxiMsbmggOI4J90pOiZ4N+Ys9/SKTytnUEkvZ0+RjxYKzh3iuofKP+rG6OTT8SR8khe+up4paMH+y37KlzVjDQ520LDJM/Jk8KPp/k72WzIhfJHTTV8X7KY+OyBoaBQ7nuVXN0praMYI2Bo6BRFlcwn0oVpQM4uM/ZK9CbtMw7CRyaTGmEn2WPSIdkReR87i79lHp8Mw8tXfNAHqp4fiCkq/pWfI+5Jtovo0K5crOoJJexdcyWy4UgabIHNI2A64Wn6LPqOD5bTZG8n0mye5RNLduxoz9AszP1s38mQk2hY8zOEQAHqeeA0dSiZDzHGXAWewWXGxS1xll9Uh/Q+gW7b1BJ6Njte1lyG3u5KKouITPlHe0Rjq7j8I0LBG0AcAJY3UGHUJI3EAtoC1u80wD5gqVWNYfSscjaOSlWRqsEAtzwszZMvUT6Q6GL+R6n7KvJTi2anm+ZxpYmchoNlV0N27CiP+oXZcZkOG6NgoUfyg/D7rwmD24WZn621fybSNBpUKI48BDK2wiiiiiRalovmpvFje5j/cLPHomW40/Lft+i9HSlBZvGNfVLcTRYMc7yN7/wCTuSmTWhooClFEySdM25DyG7onD3CT6DktiMuO405jzx+U7dyCkmbp8LsoSDex56lppZ5a21x3o+EofwDddVEDEibDCGtuvcmyUZaZdUUUSn//2Q==";
-const L2="data:image/jpeg;base64,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";
-const L3="data:image/jpeg;base64,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";
+/* ── Логотипы ── */
+const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAwUAAgQBBgj/xAAuEAABBAEDAgQGAQUAAAAAAAABAAIDEQQFEiExQRMUIlEGMmFxgZFSFTNCYqH/xAAYAQEBAQEBAAAAAAAAAAAAAAABAAIDBP/EABwRAQEAAgMBAQAAAAAAAAAAAAABESECMUESMv/aAAwDAQACEQMRAD8A+jURsZIsC0tz80Y74o7ovct8E1tHK80dquWEdQq0jiQHg0o6MOFt/ScLICisW0q8DkoLoV2NBQ2+rnt7KzpAwJgdkYG9Ch2qsl8W3dugXUIi+I43CJk7esTt247phps/iwNcDdhTUYRNjPaRdhYvh15OKGnq07f0s+teHRdtFqR5bQa3KxiMsbmggOI4J90pOiZ4N+Ys9/SKTytnUEkvZ0+RjxYKzh3iuofKP+rG6OTT8SR8khe+up4paMH+y37KlzVjDQ520LDJM/Jk8KPp/k72WzIhfJHTTV8X7KY+OyBoaBQ7nuVXN0praMYI2Bo6BRFlcwn0oVpQM4uM/ZK9CbtMw7CRyaTGmEn2WPSIdkReR87i79lHp8Mw8tXfNAHqp4fiCkq/pWfI+5Jtovo0K5crOoJJexdcyWy4UgabIHNI2A64Wn6LPqOD5bTZG8n0mye5RNLduxoz9AszP1s38mQk2hY8zOEQAHqeeA0dSiZDzHGXAWewWXGxS1xll9Uh/Q+gW7b1BJ6Njte1lyG3u5KKouITPlHe0Rjq7j8I0LBG0AcAJY3UGHUJI3UGHUJh1AqKKKJFqWi+am8WN7mP9ws9ei7XfBNbRyvNHarlhHUKtI4kB4NKOFD2t/ScLICisW0q8DkoLoV2NBQ2+rnt7KzpAwJgdkYG9Ch2qsl8W3dugXUIi+I43CJk7esTt247phps/iwNcDdhTUYRNjPaRdhYvh15OKGnq07f0s+teHRdtFqR5bQa3KxiMsbmggOI4J90pOiZ4N+Ys9/SKTytnUEkvZ0+RjxYKzh3iuofKP+rG6OTT8SR8khe+up4paMH+y37KlzVjDQ520LDJM/Jk8KPp/k72WzIhfJHTTV8X7KY+OyBoaBQ7nuVXN0praMYI2Bo6BRFlcwn0oVpQM4uM/ZK9CbtMw7CRyaTGmEn2WPSIdkReR87i79lHp8Mw8tXfNAHqp4fiCkq/pWfI+5Jtovo0K5crOoJJexdcyWy4UgabIHNI2A64Wn6LPqOD5bTZG8n0mye5RNLduxoz9AszP1s38mQk2hY8zOEQAHqeeA0dSiZDzHGXAWewWXGxS1xll9Uh/Q+gW7b1BJ6Njte1lyG3u5KKouITPlHe0Rjq7j8I0LBG0AcAJY3UGHUJI3UGHUJh1AqKKKJFqWi+am8WN7mP9ws9ei7XfBNbRyvNHarlhHUKtI4kB4NKOFD2t/ScLI";
+const L2="data:image/jpeg;base64,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";
+const L3="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAHAAAAQQDAQAAAAAAAAAAAAAABgQFBwgAAQMC/8QAMxAAAgEEAAQDBwMEAwEAAAAAAQIDAAQFEQYSITEHQVEIExQiYXGRMlKBI0KhwXKisdH/xAAZAQEBAQEBAQAAAAAAAAAAAAAAAwECBAX/xAApEQACAgECBAQHAAAAAAAAAAAAAQIRAxIhBDFxkQUyUfAUYYGhscHR/9oADAMBAAIRAxEAPwBf9drtGTYTY";
 
-let PX='https://wb-proxy.ooo6311ooo.workers.dev';   // Прокси 1 → EF + Ozon
-let PX2='';                                         // Прокси 2 → EZFR
+let PX='https://wb-proxy.ooo6311ooo.workers.dev';
+let PX2='';
 const K={1:'',2:'',oid:'',okey:''};
 const D={1:null,2:null,3:null};
-const EXP={1:false,2:false,3:false};                // разворот таблицы заказов
-const EXS={1:false,2:false,3:false};                // разворот остатков (общий)
-const EXD={1:false,2:false,3:false};                // разворот дефицита (общий)
+const EXP={1:false,2:false,3:false};
+const EXS={1:false,2:false,3:false};
+const EXD={1:false,2:false,3:false};
 const SS={1:{c:'total',d:-1},2:{c:'total',d:-1},3:{c:'total',d:-1}};
-const FS={1:'',2:'',3:''};                          // фильтр остатков по артикулу
-const FSZ={1:'',2:'',3:''};                         // фильтр по размеру
-const OA={1:new Set(),2:new Set(),3:new Set()};      // развёрнутые артикулы (остатки)
-const OAD={1:new Set(),2:new Set(),3:new Set()};     // развёрнутые артикулы (дефицит)
+const FS={1:'',2:'',3:''};
+const FSZ={1:'',2:'',3:''};
+const OA={1:new Set(),2:new Set(),3:new Set()};
+const OAD={1:new Set(),2:new Set(),3:new Set()};
 const DS={1:{c:'stk',d:-1},2:{c:'stk',d:-1},3:{c:'stk',d:-1}};
-const CM={1:'day',2:'day',3:'day'};                  // chart mode: day/week
-const CV={1:'ord',2:'ord',3:'ord'};                  // chart value: ord/rev
-const FA={1:[],2:[],3:[]};                            // фильтр по артикулам
+const CM={1:'day',2:'day',3:'day'};
+const CV={1:'ord',2:'ord',3:'ord'};
+const FA={1:[],2:[],3:[]};
 const LIM=10;
 
-// clock
+/* ─── Google Sheets CSV URLs ─── */
+const CSV_BUYRATE='https://docs.google.com/spreadsheets/d/e/2PACX-1vQZuc_t740K_yF5Nhw3saPZcbyxchMhJ93WrS05BbLY9OqqXtj3y5xG6WaraGsI4Z7SmNTHFyBlNTcn/pub?gid=0&single=true&output=csv';
+const CSV_SGP='https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1909727956&single=true&output=csv';
+const CSV_RAW='https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1387615415&single=true&output=csv';
+
+/* Кэш внешних данных */
+let gBuyrate={};   // supplierArticle → число 0..1
+let gSgp={};       // "арт; размер" → qty
+let gRaw={};       // "арт; размер" → qty
+let gExtLoaded=false;
+
+/* Парсер CSV */
+function parseCSV(text){
+  const lines=text.trim().split('\n').map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
+  if(!lines.length)return[];
+  const hdr=lines[0];
+  return lines.slice(1).map(row=>{const o={};hdr.forEach((h,i)=>o[h]=row[i]||'');return o;});
+}
+
+async function loadExternal(){
+  if(gExtLoaded)return;
+  try{
+    const [rB,rS,rR]=await Promise.all([
+      fetch(CSV_BUYRATE).then(r=>r.text()),
+      fetch(CSV_SGP).then(r=>r.text()),
+      fetch(CSV_RAW).then(r=>r.text())
+    ]);
+    /* Выкупаемость */
+    parseCSV(rB).forEach(row=>{
+      const art=(row['supplierArticle']||'').trim();
+      const pct=(row['Выкупаемость']||'').replace('%','').trim();
+      if(art&&pct){gBuyrate[art.toLowerCase()]=parseFloat(pct)/100;}
+    });
+    /* СГП: колонки Предмет, Арт производ, Размер, SUM из Штук */
+    parseCSV(rS).forEach(row=>{
+      const art=(row['Арт производ']||row['Арт Производ']||row['арт производ']||'').trim();
+      const sz=(row['Размер']||'').trim();
+      const qty=parseInt(row['SUM из Штук']||row['Штук']||0,10)||0;
+      if(art){const k=(art+';'+sz).toLowerCase();gSgp[k]=(gSgp[k]||0)+qty;}
+    });
+    /* Сырьё */
+    parseCSV(rR).forEach(row=>{
+      const art=(row['Арт производ']||row['Арт Производ']||row['арт производ']||'').trim();
+      const sz=(row['Размер']||'').trim();
+      const qty=parseInt(row['SUM из Штук']||row['Штук']||0,10)||0;
+      if(art){const k=(art+';'+sz).toLowerCase();gRaw[k]=(gRaw[k]||0)+qty;}
+    });
+    gExtLoaded=true;
+    console.log('External data loaded. Buyrate entries:',Object.keys(gBuyrate).length,'SGP:',Object.keys(gSgp).length,'Raw:',Object.keys(gRaw).length);
+  }catch(e){console.warn('Ошибка загрузки внешних данных:',e);}
+}
+
+/* Получить выкупаемость по артикулу WB */
+function getBuyrate(art){
+  if(!art)return null;
+  const k=art.toLowerCase();
+  if(gBuyrate[k]!=null)return{val:gBuyrate[k],est:false};
+  /* Частичное совпадение: ищем ключ который содержится в артикуле или наоборот */
+  for(const [ka,v] of Object.entries(gBuyrate)){
+    if(k.includes(ka)||ka.includes(k))return{val:v,est:false};
+  }
+  return{val:0.7,est:true};
+}
+
+/* Получить СГП/Сырьё по артикулу производителя и размеру */
+function getSgp(artPr,sz){
+  if(!artPr)return 0;
+  const k=(artPr+';'+sz).toLowerCase();
+  return gSgp[k]||0;
+}
+function getRaw(artPr,sz){
+  if(!artPr)return 0;
+  const k=(artPr+';'+sz).toLowerCase();
+  return gRaw[k]||0;
+}
+/* Получить суммарный СГП/Сырьё по WB-артикулу (для строки артикула без разбивки по размерам) */
+function getSgpByWBArt(wbArt){
+  let s=0;
+  const ka=wbArt.toLowerCase();
+  for(const [k,v] of Object.entries(gSgp)){const p=k.split(';')[0];if(p===ka||p.includes(ka)||ka.includes(p))s+=v;}
+  return s;
+}
+function getRawByWBArt(wbArt){
+  let s=0;
+  const ka=wbArt.toLowerCase();
+  for(const [k,v] of Object.entries(gRaw)){const p=k.split(';')[0];if(p===ka||p.includes(ka)||ka.includes(p))s+=v;}
+  return s;
+}
+
+/* clock */
 setInterval(()=>{
   document.getElementById('clk').textContent=
     new Date().toLocaleDateString('ru',{day:'2-digit',month:'2-digit',year:'numeric'})+' · '+
@@ -182,7 +306,6 @@ function td(){return new Date().toISOString().slice(0,10)}
 function yd(){return new Date(Date.now()-864e5).toISOString().slice(0,10)}
 function wd(){return new Date(Date.now()-7*864e5).toISOString().slice(0,10)}
 
-// setup
 function doSave(){
   K[1]=document.getElementById('sk1').value.trim();
   K[2]=document.getElementById('sk2').value.trim();
@@ -192,7 +315,6 @@ function doSave(){
   PX2=document.getElementById('sprx2').value.trim();
   try{localStorage.setItem('ef_d',JSON.stringify({k1:K[1],k2:K[2],oid:K.oid,okey:K.okey,px:PX,px2:PX2}))}catch(e){}
   document.getElementById('setup').classList.remove('show');
-  // Ничего не грузим автоматически — все кабинеты по кнопке ↻.
   D[1]=null;D[2]=null;D[3]=null;
   placeholders();
 }
@@ -205,8 +327,6 @@ function openSetup(){
   document.getElementById('sprx2').value=PX2;
   document.getElementById('setup').classList.add('show');
 }
-
-// Заглушка «нажмите для загрузки» для незагруженных кабинетов
 function placeholders(){
   [1,2,3].forEach(n=>{
     if(D[n])return;
@@ -217,8 +337,6 @@ function placeholders(){
       :'<div class="lm">⚙ Введите API-ключи</div>';
   });
 }
-
-// tabs — переключение НЕ грузит данные (только по кнопке)
 function go(n){
   document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n-1)});
   [1,2,3].forEach(i=>document.getElementById('v'+i).style.display=i===n?'block':'none');
@@ -226,59 +344,42 @@ function go(n){
   document.getElementById('hname').textContent=n===1?'EasyForm':n===2?'EZFR':'Ozon';
 }
 
-/* ═══ RATE-LIMITED FETCH ═══
-   EF (каб.1) и Ozon → прокси 1 (PX).  EZFR (каб.2) → прокси 2 (PX2).
-   ВАЖНО: оба прокси у вас на одном аккаунте Cloudflare = один IP для WB,
-   а статистика WB лимитит по IP+токену. Поэтому очередь к WB — ОБЩАЯ:
-   все WB-запросы (EF и EZFR) идут строго по одному, с короткой паузой. */
 function pxFor(cab){return (cab===2&&PX2)?PX2:PX;}
-let _wbBusy=Promise.resolve();   // общая очередь ко всем WB-запросам
+let _wbBusy=Promise.resolve();
 let _wbLast=0;
-const WB_GAP=1200;               // пауза между двумя WB-запросами подряд, мс
+const WB_GAP=1200;
 function wbQueue(fn){
   const run=_wbBusy.then(async()=>{
     const g=Math.max(0,_wbLast+WB_GAP-Date.now());
     if(g>0)await new Promise(r=>setTimeout(r,g));
     try{return await fn();}finally{_wbLast=Date.now();}
   });
-  _wbBusy=run.catch(()=>{});      // очередь не должна рваться при ошибке
+  _wbBusy=run.catch(()=>{});
   return run;
 }
-
 async function wbGet(url,token,cab){
   const purl=pxFor(cab)+'?url='+encodeURIComponent(url);
-  const waits=[3000,7000,15000];           // быстрый первый ретрай, далее нарастает
+  const waits=[3000,7000,15000];
   let lastInfo='';
   return wbQueue(async()=>{
     for(let i=0;i<=waits.length;i++){
       let r,txt='';
-      try{
-        r=await fetch(purl,{headers:{'X-WB-Token':token}});
-        txt=await r.text();
-      }catch(netErr){lastInfo='сеть/прокси: '+netErr;r=null;}
-
-      const retriable = !r || r.status===429 || r.status>=500 || !txt || !txt.trim();
+      try{r=await fetch(purl,{headers:{'X-WB-Token':token}});txt=await r.text();}catch(netErr){lastInfo='сеть/прокси: '+netErr;r=null;}
+      const retriable=!r||r.status===429||r.status>=500||!txt||!txt.trim();
       if(retriable){
-        if(r) lastInfo = r.status===429 ? '429 (лимит токена/IP)' :
-                         r.status>=500 ? ('WB '+r.status) :
-                         (!txt||!txt.trim()) ? 'пустой ответ' : ('WB '+r.status);
-        if(i===waits.length){
-          throw new Error('WB: не удалось получить данные после '+(waits.length+1)+' попыток ('+lastInfo+'). Токен, вероятно, занят (PBI?). Подождите 1–2 мин и нажмите ↻.');
-        }
+        if(r)lastInfo=r.status===429?'429 (лимит)':r.status>=500?'WB '+r.status:(!txt||!txt.trim())?'пустой ответ':'WB '+r.status;
+        if(i===waits.length)throw new Error('WB: не удалось получить данные после '+(waits.length+1)+' попыток ('+lastInfo+'). Подождите 1–2 мин и нажмите ↻.');
         const ra=r?parseInt(r.headers.get('retry-after')||'0',10):0;
         const wait=ra>0?ra*1000:waits[i];
         const ic=document.getElementById('ri'+cab);if(ic)ic.innerHTML='<span class="sp">↻</span>';
         await new Promise(x=>setTimeout(x,wait));
         continue;
       }
-      if(!r.ok){throw new Error('WB '+r.status+': '+txt.slice(0,200));}
-      try{return JSON.parse(txt);}
-      catch(e){throw new Error('WB: некорректный JSON — '+txt.slice(0,160));}
+      if(!r.ok)throw new Error('WB '+r.status+': '+txt.slice(0,200));
+      try{return JSON.parse(txt);}catch(e){throw new Error('WB: некорректный JSON — '+txt.slice(0,160));}
     }
   });
 }
-
-// Ozon → всегда прокси 1 (PX). Отдельный счётчик паузы.
 let _ozT=0;
 async function ozPost(url,body){
   const g=Math.max(0,_ozT+1200-Date.now());if(g>0)await new Promise(r=>setTimeout(r,g));_ozT=Date.now();
@@ -288,18 +389,17 @@ async function ozPost(url,body){
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Ozon '+r.status+': '+t.slice(0,300));}
   return r;
 }
-
-// Безопасный разбор JSON: читаем как текст, пустой/битый ответ → {} вместо краха.
 async function safeJson(r,label){
   const txt=await r.text().catch(()=>'');
-  if(!txt||!txt.trim())return {};
-  try{return JSON.parse(txt);}
-  catch(e){throw new Error((label||'API')+': некорректный ответ — '+txt.slice(0,160));}
+  if(!txt||!txt.trim())return{};
+  try{return JSON.parse(txt);}catch(e){throw new Error((label||'API')+': некорректный ответ — '+txt.slice(0,160));}
 }
+
 async function reload(n){
   const btn=document.getElementById('rb'+n),ic=document.getElementById('ri'+n);
   if(btn)btn.disabled=true;if(ic)ic.innerHTML='<span class="sp">↻</span>';
   document.getElementById('v'+n).innerHTML='<div class="lm"><span class="sp">↻</span> Загрузка...</div>';
+  await loadExternal(); // всегда загружаем внешние данные
   try{
     if(n<=2)await loadWB(n);else await loadOZ();
   }catch(e){
@@ -309,14 +409,8 @@ async function reload(n){
   document.getElementById('upd').textContent='обн. '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
 }
 
-/* ═══ WB ═══  ровно 2 запроса, методы как в рабочем PBI.
-   orders:  /supplier/orders?dateFrom=<ГГГГ-01-01>T00:00:00Z&flag=0
-   stocks:  /supplier/stocks?dateFrom=<ГГГГ-01-01>T00:00:00Z&flag=0
-   Дата URL-кодируется (%3A), как в PBI. Оба идут через общую очередь wbQueue. */
 async function loadWB(n){
   const key=K[n],t=td(),y=yd(),w=wd();
-  // Заказы: тянем ТОЛЬКО последние ~14 дней (нужно лишь сегодня/вчера/7дн) — ответ
-  // в разы меньше и быстрее, чем с начала года. Остатки — как в PBI (dateFrom WB игнорит).
   const ordFrom=new Date(Date.now()-14*864e5).toISOString().slice(0,10)+'T00:00:00Z';
   const stkFrom=new Date().getFullYear()+'-01-01T00:00:00Z';
   const BASE='https://statistics-api.wildberries.ru/api/v1/supplier';
@@ -331,14 +425,10 @@ async function loadWB(n){
   renderWB(n);
 }
 
-/* ═══ OZON ═══  всего 2 запроса: orders FBO(7дн) + остатки по складам
-   Используем v2/posting/fbo/list (как в рабочем запросе PBI): result — массив. */
 async function loadOZ(){
   const t=td(),y=yd(),w=wd();
   const w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
   const OZ='https://api-seller.ozon.ru';
-
-  // ── Заказы FBO: 14 дней (для сравнения неделя vs пр.неделя) ──
   let postings=[],offset=0;
   for(let p=0;p<10;p++){
     const body={dir:'DESC',filter:{since:w2+'T00:00:00.000Z',to:t+'T23:59:59.999Z'},limit:1000,offset};
@@ -353,11 +443,8 @@ async function loadOZ(){
   const todayO=postings.filter(o=>dayOf(o)===t);
   const yestO =postings.filter(o=>dayOf(o)===y);
   const orders7=postings.filter(o=>dayOf(o)>=w);
-
-  // ── Остатки по складам: v2/analytics/stock_on_warehouses (как в рабочем PBI) ──
-  // Ответ: result.rows[] с полями item_code, item_name, warehouse_name, free_to_sell_amount …
   let stocksRaw=[],soff=0;
-  for(let p=0;p<6;p++){            // максимум 6 страниц × 500 = 3000 строк
+  for(let p=0;p<6;p++){
     const rS=await ozPost(OZ+'/v2/analytics/stock_on_warehouses',{warehouse_type:'FBO',limit:500,offset:soff});
     const d=await safeJson(rS,'Ozon stocks');
     const rows=(d.result&&d.result.rows)||[];
@@ -365,12 +452,11 @@ async function loadOZ(){
     if(rows.length<500)break;
     soff+=500;
   }
-
   D[3]={todayO,yestO,stocks:stocksRaw,orders7,allOrders:postings,isOz:true};
   renderOZ();
 }
 
-/* ═══ HELPERS ═══ */
+/* ── helpers ── */
 const fmt=v=>Math.round(v).toLocaleString('ru')+' ₽';
 function dlt(pct){
   const h=new Date().getHours();
@@ -381,16 +467,16 @@ function dlt(pct){
 function wbPrice(o){return o.finishedPrice||o.priceWithDisc||(o.totalPrice*(1-(o.discountPercent||0)/100))||o.totalPrice||0;}
 function wbQty(s){return s.quantity||0;}
 const ozRev=o=>(o.products||[]).reduce((s,p)=>s+parseFloat(p.price||p.offer_price||0)*(p.quantity||1),0);
-// Правильный порядок размеров: XS S M L XL 2XL 3XL… и числовые 36 37 38…
+
 function sizeOrd(sz){
   const m={'XXS':101,'XS':102,'S':103,'M':104,'L':105,'XL':106,'XXL':107,'2XL':107,'XXXL':108,'3XL':108,'4XL':109,'5XL':110,'6XL':111,'7XL':112,'8XL':113};
   const u=(sz||'').toUpperCase().trim();
   if(m[u])return m[u];
-  const n=parseFloat(u);if(!isNaN(n))return n;     // числовые: 36,42,44 → идут первыми
+  const n=parseFloat(u);if(!isNaN(n))return n;
   return 150;
 }
 function szCmp(a,b){return sizeOrd(a)-sizeOrd(b);}
-// Фильтр вчерашних заказов до текущего часа (для честного сравнения)
+
 function yestToHour(orders,type){
   const nowH=new Date().getHours(),nowM=new Date().getMinutes();
   return orders.filter(o=>{
@@ -401,41 +487,41 @@ function yestToHour(orders,type){
   });
 }
 
-/* ═══ CHART: paired bars today vs yesterday, day/week toggle ═══ */
-function setChartMode(n,mode){CM[n]=mode;reRender(n);}
-function setChartVal(n,val){CV[n]=val;reRender(n);}
-
-function dltW(pct){return pct==null?'':pct>=0
-  ?'<span class="du">▲ +'+pct+'% vs пр. неделю</span>'
-  :'<span class="dd">▼ '+pct+'% vs пр. неделю</span>';
+/* Цвет для "дней запаса" */
+function daysClass(d){
+  if(d==null)return'days-great';
+  if(d<14)return'days-crit';
+  if(d<30)return'days-warn';
+  if(d<=90)return'days-ok';
+  return'days-great';
+}
+function fmtDays(d){
+  if(d==null)return'<span class="days-great">∞</span>';
+  return`<span class="${daysClass(d)}">${d}д</span>`;
 }
 
+function setChartMode(n,mode){CM[n]=mode;reRender(n);}
+function setChartVal(n,val){CV[n]=val;reRender(n);}
+function dltW(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'% vs пр. неделю</span>':'<span class="dd">▼ '+pct+'% vs пр. неделю</span>';}
 function weekData(d,type){
   const w=wd(),w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
   const getD=o=>type==='wb'?(o.date||'').slice(0,10):(o.created_at||o.in_process_at||'').slice(0,10);
   const pFn=type==='wb'?wbPrice:ozRev;
   const all=d.allOrders||[];
-  const tw=all.filter(o=>getD(o)>=w), pw=all.filter(o=>{const dd=getD(o);return dd>=w2&&dd<w;});
+  const tw=all.filter(o=>getD(o)>=w),pw=all.filter(o=>{const dd=getD(o);return dd>=w2&&dd<w;});
   const twC=tw.length,pwC=pw.length,twR=tw.reduce((s,o)=>s+pFn(o),0),pwR=pw.reduce((s,o)=>s+pFn(o),0);
-  const dO=pwC>0?Math.round((twC-pwC)/pwC*100):null;
-  const dR=pwR>0?Math.round((twR-pwR)/pwR*100):null;
-  return{twC,pwC,twR,pwR,dO,dR};
+  return{twC,pwC,twR,pwR,dO:pwC>0?Math.round((twC-pwC)/pwC*100):null,dR:pwR>0?Math.round((twR-pwR)/pwR*100):null};
 }
 
 function chartHTML(n,type){
   const d=D[n];if(!d)return'';
-  const mode=CM[n]||'day';
-  const vmode=CV[n]||'ord';
-  const isRev=vmode==='rev';
+  const mode=CM[n]||'day',vmode=CV[n]||'ord',isRev=vmode==='rev';
   const nowH=new Date().getHours();
   const getD=o=>{const dt=type==='wb'?o.date:(o.in_process_at||o.created_at);return dt?dt.slice(0,10):''};
   const getH=o=>{const dt=type==='wb'?o.date:(o.in_process_at||o.created_at);return dt?new Date(dt).getHours():0;};
   const pFn=type==='wb'?wbPrice:ozRev;
-  const t=td(),y=yd(),w=wd();
-  const w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
-
+  const t=td(),y=yd(),w=wd(),w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
   let labels=[],todayV=[],yestV=[];
-
   if(mode==='day'){
     const tH=Array(24).fill(0),yH=Array(24).fill(0);
     (d.todayO||[]).forEach(o=>{const h=getH(o);tH[h]+=isRev?pFn(o):1;});
@@ -444,68 +530,44 @@ function chartHTML(n,type){
   }else{
     const days=[];for(let i=6;i>=0;i--)days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     const prevDays=[];for(let i=7;i>=1;i--)prevDays.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
-    const all=d.allOrders||[];
-    const cnt={},cntP={};
-    all.forEach(o=>{const dd=getD(o);const v=isRev?pFn(o):1;
-      if(dd>=w)cnt[dd]=(cnt[dd]||0)+v;
-      else if(dd>=w2)cntP[dd]=(cntP[dd]||0)+v;
-    });
+    const all=d.allOrders||[],cnt={},cntP={};
+    all.forEach(o=>{const dd=getD(o);const v=isRev?pFn(o):1;if(dd>=w)cnt[dd]=(cnt[dd]||0)+v;else if(dd>=w2)cntP[dd]=(cntP[dd]||0)+v;});
     for(let i=0;i<7;i++){
       const day=days[i],prev=prevDays[i];
       labels.push(new Date(day+'T12:00:00').toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''));
-      todayV.push(cnt[day]||0);
-      yestV.push(cntP[prev]||0);
+      todayV.push(cnt[day]||0);yestV.push(cntP[prev]||0);
     }
   }
-  const N=labels.length;
-  const maxO=Math.max(...todayV,...yestV,1);
-  const W=700,H=160,L=40,R=12,T=14,B=22;
-  const cW=W-L-R,cH=H-T-B;
-  const gW=cW/N;
-  const bW=Math.floor(gW*0.35);
-  const gap=Math.max(1,Math.floor(gW*0.04));
+  const N=labels.length,maxO=Math.max(...todayV,...yestV,1);
+  const W=700,H=160,L=40,R=12,T=14,B=22,cW=W-L-R,cH=H-T-B,gW=cW/N,bW=Math.floor(gW*0.35),gap=Math.max(1,Math.floor(gW*0.04));
   const fmtV=v=>isRev?(v>=1000?Math.round(v/1000)+'к':Math.round(v)):v;
-
   let bars='';
   for(let i=0;i<N;i++){
-    const gx=L+i*gW;
-    const yv=yestV[i],yBH=maxO>0?(yv/maxO)*cH:0;
-    const yx=gx+gap, yy=T+cH-yBH;
+    const gx=L+i*gW,yv=yestV[i],yBH=maxO>0?(yv/maxO)*cH:0,yx=gx+gap,yy=T+cH-yBH;
     bars+=`<rect x="${yx}" y="${yy}" width="${bW}" height="${yBH}" rx="2" fill="#D5D0C8" opacity=".55"/>`;
-    if(yv>0)bars+=`<text x="${yx+bW/2}" y="${yy-3}" text-anchor="middle" font-size="7" fill="var(--ink3)" font-family="inherit">${fmtV(yv)}</text>`;
-
+    if(yv>0)bars+=`<text x="${yx+bW/2}" y="${yy-3}" text-anchor="middle" font-size="7" fill="var(--ink3)">${fmtV(yv)}</text>`;
     const tv=todayV[i],tBH=maxO>0?(tv/maxO)*cH:0;
-    let fill;
-    if(mode==='day'&&i>nowH)fill='#E8E4DC';
-    else if(tv>yv)fill='var(--green)';
-    else if(tv<yv)fill='var(--red)';
-    else fill='var(--ink3)';
-    const tx=gx+gap+bW+gap, ty=T+cH-tBH;
+    let fill=mode==='day'&&i>nowH?'#E8E4DC':tv>yv?'var(--green)':tv<yv?'var(--red)':'var(--ink3)';
+    const tx=gx+gap+bW+gap,ty=T+cH-tBH;
     bars+=`<rect x="${tx}" y="${ty}" width="${bW}" height="${tBH}" rx="2" fill="${fill}" opacity=".9"/>`;
-    if(tv>0&&!(mode==='day'&&i>nowH))bars+=`<text x="${tx+bW/2}" y="${ty-3}" text-anchor="middle" font-size="7" fill="var(--ink)" font-family="inherit" font-weight="600">${fmtV(tv)}</text>`;
+    if(tv>0&&!(mode==='day'&&i>nowH))bars+=`<text x="${tx+bW/2}" y="${ty-3}" text-anchor="middle" font-size="7" fill="var(--ink)" font-weight="600">${fmtV(tv)}</text>`;
   }
-  let xLab='';
-  const step=mode==='day'?3:1;
-  for(let i=0;i<N;i+=step){if(!labels[i])continue;const x=L+i*gW+gW/2;xLab+=`<text x="${x}" y="${H-4}" text-anchor="middle" font-size="${mode==='day'?8:9}" fill="var(--ink3)" font-family="inherit">${labels[i]}</text>`;}
-  const ySteps=[0,Math.round(maxO/2),maxO];
-  let yLab='';
-  for(const v of ySteps){const yy=T+cH-(v/maxO)*cH;yLab+=`<text x="${L-4}" y="${yy+3}" text-anchor="end" font-size="7" fill="var(--ink3)" font-family="inherit">${fmtV(v)}</text>`;yLab+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-width="0.5"/>`;}
-
-  const onD=mode==='day'?'on':'',onW=mode==='week'?'on':'';
-  const onO=vmode==='ord'?'on':'',onR=vmode==='rev'?'on':'';
+  let xLab='';const step=mode==='day'?3:1;
+  for(let i=0;i<N;i+=step){if(!labels[i])continue;xLab+=`<text x="${L+i*gW+gW/2}" y="${H-4}" text-anchor="middle" font-size="${mode==='day'?8:9}" fill="var(--ink3)">${labels[i]}</text>`;}
+  const ySteps=[0,Math.round(maxO/2),maxO];let yLab='';
+  for(const v of ySteps){const yy=T+cH-(v/maxO)*cH;yLab+=`<text x="${L-4}" y="${yy+3}" text-anchor="end" font-size="7" fill="var(--ink3)">${fmtV(v)}</text>`;yLab+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-width="0.5"/>`;}
+  const onD=mode==='day'?'on':'',onW=mode==='week'?'on':'',onO=vmode==='ord'?'on':'',onR=vmode==='rev'?'on':'';
   const compLabel=mode==='day'?'вчера':'пр. неделя';
   return `<div class="sec" style="margin-bottom:14px"><div class="sh"><span class="st">${isRev?'Выручка':'Заказы'} · ${mode==='day'?'день':'неделя'}</span>
     <span style="display:flex;align-items:center;gap:8px">
-      <span class="sm" style="display:flex;gap:6px">
-        <span style="color:var(--green);font-weight:700">■</span>&gt; <span style="color:var(--red);font-weight:700">■</span>&lt; <span style="color:#D5D0C8;font-weight:700">■</span>${compLabel}
-      </span>
+      <span class="sm2" style="display:flex;gap:6px"><span style="color:var(--green);font-weight:700">■</span>&gt; <span style="color:var(--red);font-weight:700">■</span>&lt; <span style="color:#D5D0C8;font-weight:700">■</span>${compLabel}</span>
       <span class="ctog"><button class="${onO}" onclick="setChartVal(${n},'ord')">Шт</button><button class="${onR}" onclick="setChartVal(${n},'rev')">₽</button></span>
       <span class="ctog"><button class="${onD}" onclick="setChartMode(${n},'day')">День</button><button class="${onW}" onclick="setChartMode(${n},'week')">Неделя</button></span>
     </span></div>
     <div class="tw" style="padding:8px"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${yLab}${bars}${xLab}</svg></div></div>`;
 }
 
-/* ═══ ARTICLE FILTER — автокомплит с чипами ═══ */
+/* ── filter / autocomplete ── */
 function getArts(n){
   const d=D[n];if(!d)return[];
   const s=new Set();
@@ -516,20 +578,14 @@ function getArts(n){
     (d.todayO||[]).concat(d.yestO||[]).concat(d.orders7||[]).forEach(o=>s.add(o.supplierArticle||''));
     (d.stocks||[]).forEach(r=>s.add(r.supplierArticle||''));
   }
-  s.delete('');s.delete('—');
-  return[...s].sort();
+  s.delete('');s.delete('—');return[...s].sort();
 }
 function filterHTML(n){
   const chips=FA[n].map((a,i)=>`<span class="chip">${a}<span class="cx" onclick="rmFA(${n},${i})">×</span></span>`).join('');
-  return `<div class="fb" id="fb${n}">
-    ${chips}
-    <input id="fai${n}" placeholder="🔎 артикул…" oninput="faInput(${n})" onfocus="faInput(${n})" autocomplete="off">
-    <div class="ddrop" id="fdd${n}"></div>
-  </div>`;
+  return `<div class="fb" id="fb${n}">${chips}<input id="fai${n}" placeholder="🔎 артикул…" oninput="faInput(${n})" onfocus="faInput(${n})" autocomplete="off"><div class="ddrop" id="fdd${n}"></div></div>`;
 }
 function faInput(n){
-  const inp=document.getElementById('fai'+n);
-  const dd=document.getElementById('fdd'+n);
+  const inp=document.getElementById('fai'+n),dd=document.getElementById('fdd'+n);
   const q=(inp.value||'').toLowerCase().trim();
   if(!q){dd.classList.remove('show');dd.innerHTML='';return;}
   const all=getArts(n).filter(a=>a.toLowerCase().includes(q)&&!FA[n].includes(a)).slice(0,12);
@@ -540,30 +596,18 @@ function faInput(n){
 function addFA(n,art){FA[n].push(art);document.getElementById('fai'+n).value='';document.getElementById('fdd'+n).classList.remove('show');reRender(n);}
 function rmFA(n,i){FA[n].splice(i,1);reRender(n);}
 function reRender(n){if(n<=2)renderWB(n);else renderOZ();}
-// Фильтрация данных по выбранным артикулам
 function applyFA(n){
   const d=D[n];if(!d||!FA[n].length)return d;
   const f=FA[n],isOz=d.isOz;
-  const match=isOz
-    ?(o=>(o.products||[]).some(p=>f.includes(p.offer_id)))
-    :(o=>f.includes(o.supplierArticle));
-  const matchS=isOz
-    ?(s=>f.includes(s.item_code||s.offer_id))
-    :(s=>f.includes(s.supplierArticle));
-  return{...d,
-    _om:null,
-    todayO:(d.todayO||[]).filter(match),
-    yestO:(d.yestO||[]).filter(match),
-    orders7:(d.orders7||[]).filter(match),
-    allOrders:(d.allOrders||[]).filter(match),
-    stocks:(d.stocks||[]).filter(matchS)};
+  const match=isOz?(o=>(o.products||[]).some(p=>f.includes(p.offer_id))):(o=>f.includes(o.supplierArticle));
+  const matchS=isOz?(s=>f.includes(s.item_code||s.offer_id)):(s=>f.includes(s.supplierArticle));
+  return{...d,_om:null,todayO:(d.todayO||[]).filter(match),yestO:(d.yestO||[]).filter(match),orders7:(d.orders7||[]).filter(match),allOrders:(d.allOrders||[]).filter(match),stocks:(d.stocks||[]).filter(matchS)};
 }
-// Закрыть dropdown при клике вне
 document.addEventListener('click',e=>{if(!e.target.closest('.fb'))document.querySelectorAll('.ddrop').forEach(d=>d.classList.remove('show'));});
 
-/* ═══ RENDER WB ═══ */
+/* ── render WB ── */
 function renderWB(n){
-  const fd=FA[n].length?applyFA(n):D[n];        // filtered or raw
+  const fd=FA[n].length?applyFA(n):D[n];
   const{todayO,yestO,stocks}=fd;
   const yH=yestToHour(yestO,'wb');
   const tC=todayO.length,yC=yestO.length,yhC=yH.length;
@@ -572,40 +616,31 @@ function renderWB(n){
   const yhR=yH.reduce((s,o)=>s+wbPrice(o),0);
   const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null;
   const dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
-
-  // Для графика и таблиц временно подменяем D[n] на фильтрованные данные
-  const origD=D[n]; D[n]=fd;
-
+  const origD=D[n];D[n]=fd;
   let h=filterHTML(n);
   if(CM[n]==='week'){
     const wk=weekData(fd,'wb');
-    h+=`<div class="mg">
-      <div class="mc"><div class="ml">Заказы за неделю</div><div class="mv">${wk.twC}</div><div class="md">${dltW(wk.dO)}</div></div>
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы за неделю</div><div class="mv">${wk.twC}</div><div class="md">${dltW(wk.dO)}</div></div>
       <div class="mc"><div class="ml">Прошлая неделя</div><div class="mv">${wk.pwC}</div></div>
       <div class="mc"><div class="ml">Сумма за неделю</div><div class="mv sm g">${fmt(wk.twR)}</div><div class="md">${dltW(wk.dR)}</div></div>
-      <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div>
-    </div>`;
+      <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div></div>`;
   }else{
-    h+=`<div class="mg">
-      <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv">${tC}</div><div class="md">${dlt(dO)}</div></div>
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы сегодня</div><div class="mv">${tC}</div><div class="md">${dlt(dO)}</div></div>
       <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
       <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm g">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
-      <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
-    </div>`;
+      <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div></div>`;
   }
-
   h+=chartHTML(n,'wb');
   const ordList=CM[n]==='week'?(fd.orders7||[]):todayO;
   h+=ordersHTML(n,ordList,'wb');
   h+=deficitHTML(n);
   h+=stocksHTML(n);
-
   document.getElementById('v'+n).innerHTML=h;
   paintTables(n);
-  D[n]=origD;                                    // восстанавливаем оригинал
+  D[n]=origD;
 }
 
-/* ═══ RENDER OZON ═══ */
+/* ── render OZ ── */
 function renderOZ(){
   const fd=FA[3].length?applyFA(3):D[3];
   const{todayO,yestO,stocks}=fd;
@@ -616,33 +651,25 @@ function renderOZ(){
   const yhR=yH.reduce((s,o)=>s+ozRev(o),0);
   const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null;
   const dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
-
-  const origD=D[3]; D[3]=fd;
-
+  const origD=D[3];D[3]=fd;
   let h=filterHTML(3);
   if(CM[3]==='week'){
     const wk=weekData(fd,'oz');
-    h+=`<div class="mg">
-      <div class="mc"><div class="ml">Заказы за неделю</div><div class="mv oz">${wk.twC}</div><div class="md">${dltW(wk.dO)}</div></div>
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы за неделю</div><div class="mv oz">${wk.twC}</div><div class="md">${dltW(wk.dO)}</div></div>
       <div class="mc"><div class="ml">Прошлая неделя</div><div class="mv">${wk.pwC}</div></div>
       <div class="mc"><div class="ml">Сумма за неделю</div><div class="mv sm oz">${fmt(wk.twR)}</div><div class="md">${dltW(wk.dR)}</div></div>
-      <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div>
-    </div>`;
+      <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div></div>`;
   }else{
-    h+=`<div class="mg">
-      <div class="mc"><div class="ml">Заказы сегодня</div><div class="mv oz">${tC}</div><div class="md">${dlt(dO)}</div></div>
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы сегодня</div><div class="mv oz">${tC}</div><div class="md">${dlt(dO)}</div></div>
       <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
       <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm oz">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
-      <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div>
-    </div>`;
+      <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div></div>`;
   }
-
   h+=chartHTML(3,'oz');
   const ordListOz=CM[3]==='week'?(fd.orders7||[]):todayO;
   h+=ordersHTML(3,ordListOz,'oz');
   h+=deficitHTML(3);
   h+=stocksHTML(3);
-
   document.getElementById('v3').innerHTML=h;
   paintTables(3);
   D[3]=origD;
@@ -653,7 +680,7 @@ function paintTables(n){
   const e2=document.getElementById('dtbl'+n);if(e2)e2.innerHTML=defTbl(n);
 }
 
-/* ═══ ORDERS TABLE ═══ */
+/* ── orders table ── */
 function ordersHTML(n,orders,type){
   const sorted=[...orders].sort((a,b)=>{
     const da=type==='wb'?a.date:(a.in_process_at||a.created_at);
@@ -661,121 +688,82 @@ function ordersHTML(n,orders,type){
     return new Date(db)-new Date(da);
   });
   const show=EXP[n]?sorted:sorted.slice(0,LIM);
-  const rows=show.map((o,i)=>{
+  const rows=show.map(o=>{
     let t,art,sz,name,qty,price,wh;
     if(type==='wb'){
       t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
-      art=o.supplierArticle||'—';
-      sz=o.techSize||'—';
-      name=o.subject||o.category||'—';
-      qty=o.quantity||1;price=wbPrice(o);
-      wh=o.warehouseName||'—';
+      art=o.supplierArticle||'—';sz=o.techSize||'—';name=o.subject||o.category||'—';qty=o.quantity||1;price=wbPrice(o);wh=o.warehouseName||'—';
     }else{
-      const dt=o.in_process_at||o.created_at;
-      t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
-      const items=o.products||[];
-      art=items.map(p=>p.offer_id||'').join(', ');
+      const dt=o.in_process_at||o.created_at;t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
+      const items=o.products||[];art=items.map(p=>p.offer_id||'').join(', ');
       sz=items.map(p=>{const parts=(p.offer_id||'').split('_');return parts.length>1?parts[parts.length-1]:'—'}).join(', ');
-      name=items.map(p=>p.name||'').join(', ');
-      qty=items.reduce((s,p)=>s+(p.quantity||1),0);
-      price=ozRev(o);
-      wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—');
+      name=items.map(p=>p.name||'').join(', ');qty=items.reduce((s,p)=>s+(p.quantity||1),0);price=ozRev(o);wh=((o.analytics_data&&o.analytics_data.warehouse_name)||'—');
     }
-    const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}')" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted;cursor:pointer">${art}</a>`;
-    return `<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td>
-      <td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td>
-      <td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
+    const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}')){addFA(${n},'${art.replace(/'/g,"\\'")}')}" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted;cursor:pointer">${art}</a>`;
+    return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${price>0?fmt(price):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
-
   const exp=!EXP[n]&&sorted.length>LIM
     ?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n},'${type}')">▼ Все ${sorted.length}</button></td></tr>`
-    :sorted.length>LIM&&EXP[n]
-    ?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
-
+    :sorted.length>LIM&&EXP[n]?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n},'${type}')">▲ Свернуть</button></td></tr>`:'';
   const secTitle=CM[n]==='week'?'Заказы за неделю':'Заказы сегодня';
-  return `<div class="sec"><div class="sh"><span class="st">${secTitle}</span><span class="sm">${orders.length} заказов</span></div>
+  return`<div class="sec"><div class="sh"><span class="st">${secTitle}</span><span class="sm2">${orders.length} заказов</span></div>
     <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Склад</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
-
 function togExp(n,type){EXP[n]=!EXP[n];if(D[n]){if(n<=2)renderWB(n);else renderOZ();}}
 
-/* ═══ STOCKS PIVOT ═══ */
+/* ── stocks (оригинальная сводка по складам) ── */
 function stocksHTML(n){
   const stocks=D[n].stocks,type=D[n].isOz?'oz':'wb';
   const arts={},whs=new Set();
   stocks.forEach(s=>{
     let art,sz,wh,q,name;
-    if(type==='wb'){
-      art=s.supplierArticle||'—';sz=s.techSize||'—';
-      wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';
-    }else{
-      art=s.item_code||s.offer_id||'—';sz='—';
-      wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';
-    }
-    const key=art+' · '+sz;
-    whs.add(wh);
+    if(type==='wb'){art=s.supplierArticle||'—';sz=s.techSize||'—';wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';}
+    else{art=s.item_code||s.offer_id||'—';sz='—';wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';}
+    const key=art+' · '+sz;whs.add(wh);
     if(!arts[key])arts[key]={art,sz,name,total:0,wh:{}};
-    arts[key].wh[wh]=(arts[key].wh[wh]||0)+q;
-    arts[key].total+=q;
+    arts[key].wh[wh]=(arts[key].wh[wh]||0)+q;arts[key].total+=q;
   });
   const whTot={};whs.forEach(w=>{whTot[w]=Object.values(arts).reduce((s,a)=>s+(a.wh[w]||0),0)});
   const whList=[...whs].sort((a,b)=>whTot[b]-whTot[a]);
   D[n].arts=arts;D[n].whList=whList;
   if(!SS[n])SS[n]={c:'total',d:-1};
-
-  return `<div class="sec"><div class="sh"><span class="st">Остатки по складам</span>
+  return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
     <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <input class="flt" id="sflt${n}" placeholder="🔎 артикул" value="${FS[n]||''}" oninput="fltS(${n},this.value)" style="width:140px">
       <input class="flt" id="sfltZ${n}" placeholder="🔎 размер" value="${FSZ[n]||''}" oninput="fltSZ(${n},this.value)" style="width:100px">
-      <span class="sm">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
+      <span class="sm2">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
     </span></div>
     <div class="sw" id="stbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
 }
-
 function fltS(n,val){FS[n]=val;const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
 function fltSZ(n,val){FSZ[n]=val;const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
-function sortS(n,c){
-  if(!SS[n])SS[n]={c:'total',d:-1};
-  SS[n].d=SS[n].c===c?SS[n].d*-1:-1;SS[n].c=c;
-  const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);
-}
+function sortS(n,c){if(!SS[n])SS[n]={c:'total',d:-1};SS[n].d=SS[n].c===c?SS[n].d*-1:-1;SS[n].c=c;const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
 function togArt(n,art){if(OA[n].has(art))OA[n].delete(art);else OA[n].add(art);const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
-
 function stocksTbl(n){
-  const d=D[n];if(!d||!d.arts)return '<div class="em">Нет данных</div>';
-  const{arts,whList}=d;
-  const{c,d:dir}=SS[n]||{c:'total',d:-1};
-  const fa=(FS[n]||'').trim().toLowerCase();
-  const fz=(FSZ[n]||'').trim().toLowerCase();
-
-  // Группировка по артикулу
+  const d=D[n];if(!d||!d.arts)return'<div class="em">Нет данных</div>';
+  const{arts,whList}=d,{c,d:dir}=SS[n]||{c:'total',d:-1};
+  const fa=(FS[n]||'').trim().toLowerCase(),fz=(FSZ[n]||'').trim().toLowerCase();
   const byArt={};
   for(const key of Object.keys(arts)){
     const v=arts[key];
     if(fa&&!v.art.toLowerCase().includes(fa)&&!(v.name||'').toLowerCase().includes(fa))continue;
     if(fz&&!v.sz.toLowerCase().includes(fz))continue;
     if(!byArt[v.art])byArt[v.art]={name:v.name,total:0,wh:{},sizes:[]};
-    byArt[v.art].total+=v.total;
-    byArt[v.art].sizes.push(v);
+    byArt[v.art].total+=v.total;byArt[v.art].sizes.push(v);
     for(const w of Object.keys(v.wh)){byArt[v.art].wh[w]=(byArt[v.art].wh[w]||0)+v.wh[w];}
   }
-
   let artKeys=Object.keys(byArt).sort((a,b)=>{
-    const va=c==='total'?byArt[a].total:(byArt[a].wh[c]||0);
-    const vb=c==='total'?byArt[b].total:(byArt[b].wh[c]||0);
+    const va=c==='total'?byArt[a].total:(byArt[a].wh[c]||0),vb=c==='total'?byArt[b].total:(byArt[b].wh[c]||0);
     return(va-vb)*dir;
   });
-  const ar=k=>SS[n].c===k?(SS[n].d<0?' ↓':' ↑'):' ↕';
-  const cl=k=>SS[n].c===k?' sa':'';
+  const ar=k=>SS[n].c===k?(SS[n].d<0?' ↓':' ↑'):' ↕',cl=k=>SS[n].c===k?' sa':'';
   const whH=whList.map(w=>`<th class="wh${cl(w)}" onclick="sortS(${n},'${w.replace(/'/g,"\\'")}')"><span style="font-size:8px">${w.slice(0,14)}</span>${ar(w)}</th>`).join('');
-
   const showArts=EXS[n]?artKeys:artKeys.slice(0,LIM);
   let rows='';
   for(const a of showArts){
     const g=byArt[a];const tc=g.total===0?'qx':g.total<10?'ql':'qo';
-    const open=OA[n].has(a)||FA[n].length>0;
-    const hasSizes=g.sizes.length>1;
+    const open=OA[n].has(a)||FA[n].length>0;const hasSizes=g.sizes.length>1;
     const toggle=hasSizes?`<span class="tog">${open?'▼':'▶'}</span>`:'<span class="tog"> </span>';
     const cells=whList.map(w=>{const q=g.wh[w]||0;return`<td class="${q===0?'qx':q<10?'ql':'qo'}" style="text-align:center">${q||'—'}</td>`}).join('');
     const onclick=hasSizes?` onclick="togArt(${n},'${a.replace(/'/g,"\\'")}')"`:' ';
@@ -790,20 +778,28 @@ function stocksTbl(n){
     }
   }
   const span=whList.length+2;
-  const exp=artKeys.length>LIM
-    ? `<tr class="er"><td colspan="${span}"><button class="eb" onclick="togExS(${n})">${EXS[n]?'▲ Свернуть':'▼ Все '+artKeys.length+' артикулов'}</button></td></tr>`
-    : '';
+  const exp=artKeys.length>LIM?`<tr class="er"><td colspan="${span}"><button class="eb" onclick="togExS(${n})">${EXS[n]?'▲ Свернуть':'▼ Все '+artKeys.length+' артикулов'}</button></td></tr>`:'';
   return`<table><thead><tr><th>Артикул</th><th class="${cl('total')}" style="background:var(--bg3)" onclick="sortS(${n},'total')">Итого${ar('total')}</th>${whH}</tr></thead><tbody>${rows||'<tr><td class="em" colspan="99">Ничего не найдено</td></tr>'}${exp}</tbody></table>`;
 }
 function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e)e.innerHTML=stocksTbl(n);}
 
-/* ═══ DEFICIT ═══ */
+/* ════════════════════════════════════════════════════════════
+   DEFICIT TABLE — расширенная версия
+════════════════════════════════════════════════════════════ */
 function deficitHTML(n){
-  return`<div class="sec"><div class="sh"><span class="st">📦 Дефицит и неликвид</span>
-    <span class="sm" style="display:flex;gap:4px;flex-wrap:wrap">
-      <span class="fl2 ff">🔥 &lt;14дн</span><span class="fl2 fw">⚠️ 14-30</span>
-      <span class="fl2 fk">✅ 30-90</span><span class="fl2 fd">💀 &gt;90</span>
+  return`<div class="sec"><div class="sh"><span class="st">📦 Дефицит · Запас · Стоки</span>
+    <span class="sm2" style="display:flex;gap:4px;flex-wrap:wrap">
+      <span class="fl2 ff">🔥 &lt;14д</span><span class="fl2 fw">⚠️ 14-30д</span>
+      <span class="fl2 fk">✅ 30-90д</span><span class="fl2 fd">💀 &gt;90д</span>
+      <span style="font-size:10px;color:var(--ink3)">* справочно, не в Общем</span>
     </span></div>
+    <div style="font-size:10px;color:var(--ink3);margin-bottom:6px;display:flex;gap:16px;flex-wrap:wrap">
+      <span><span class="legend-dot" style="background:#A06820"></span>ВБ — остаток на складах ВБ</span>
+      <span><span class="legend-dot" style="background:#5B3FA0"></span>СГП — склад готовой продукции</span>
+      <span><span class="legend-dot" style="background:#8B4513"></span>Сырьё — полуфабрикаты</span>
+      <span><span class="legend-dot" style="background:#0D47A1;border:1px dashed #0D47A1"></span>В пути* — справочно</span>
+      <span><span class="legend-dot" style="background:#6A1B9A;border:1px dashed #6A1B9A"></span>МСК* — справочно</span>
+    </div>
     <div class="sw" id="dtbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
 }
 
@@ -813,10 +809,10 @@ function togArtD(n,art){if(OAD[n].has(art))OAD[n].delete(art);else OAD[n].add(ar
 function calcDef(stk,o7){
   const dr=o7/7,need=Math.round(dr*30),days=dr>0?Math.round(stk/dr):null;
   let fc,ft,bc,bw,sev;
-  if(days===null){fc='fe';ft='— нет продаж';bc='bd';bw=0;sev=99999;}
-  else if(days<14){fc='ff';ft='🔥 '+days+'дн';bc='bf';bw=Math.min(100,days/14*100);sev=days;}
-  else if(days<30){fc='fw';ft='⚠️ '+days+'дн';bc='bw';bw=Math.min(100,days/30*100);sev=days;}
-  else if(days<=90){fc='fk';ft='✅ '+days+'дн';bc='bk';bw=Math.min(100,days/90*100);sev=days;}
+  if(days===null){fc='fe';ft='нет продаж';bc='bd';bw=0;sev=99999;}
+  else if(days<14){fc='ff';ft='🔥 '+days+'д';bc='bf';bw=Math.min(100,days/14*100);sev=days;}
+  else if(days<30){fc='fw';ft='⚠️ '+days+'д';bc='bw';bw=Math.min(100,days/30*100);sev=days;}
+  else if(days<=90){fc='fk';ft='✅ '+days+'д';bc='bk';bw=Math.min(100,days/90*100);sev=days;}
   else{fc='fd';ft='💀 '+days+'д';bc='bd';bw=100;sev=days;}
   const def=need>stk?need-stk:0;
   const sc=stk===0?'qx':stk<10?'ql':'qo';
@@ -835,21 +831,39 @@ function defTbl(n){
     });
     d._om=om;
   }
-  // Группировка по артикулу
+
+  /* Заказов за 7 дней по артикулу (без учёта размера — для % доли) */
+  const omArt={};
+  for(const [k,v] of Object.entries(om)){
+    const art=k.split(' · ')[0];omArt[art]=(omArt[art]||0)+v;
+  }
+
+  /* Заказов по артикулу за 7 дней — для подсчёта доли артикула */
+  const totalOrders7=(orders7||[]).length;
+
+  /* Группировка по артикулу */
   const byArt={};
   for(const a of Object.keys(arts)){
-    const v=arts[a]; const o7=om[a]||0;
+    const v=arts[a];const o7=om[a]||0;
     const r={...calcDef(v.total,o7),art:v.art,sz:v.sz,name:v.name||'',a};
     if(!byArt[v.art])byArt[v.art]={name:v.name,stk:0,o7:0,sizes:[]};
-    byArt[v.art].stk+=v.total;
-    byArt[v.art].o7+=o7;
-    byArt[v.art].sizes.push(r);
+    byArt[v.art].stk+=v.total;byArt[v.art].o7+=o7;byArt[v.art].sizes.push(r);
   }
-  // Итоги по артикулу
+
   const artRows=Object.keys(byArt).map(a=>{
     const g=byArt[a];
-    return{...calcDef(g.stk,g.o7),art:a,name:g.name,sizes:g.sizes};
+    const br=getBuyrate(a);
+    /* МСК-сток: находим склады с МСК/МО в названии */
+    let mskStk=0;
+    if(d.whList){
+      const mskWhs=d.whList.filter(w=>/мск|москв|подольск|краснодар|электро|коледино|тула/i.test(w));
+      for(const key of Object.keys(arts)){if(arts[key].art===a){for(const w of mskWhs)mskStk+=arts[key].wh[w]||0;}}
+    }
+    const sgpTotal=getSgpByWBArt(a);
+    const rawTotal=getRawByWBArt(a);
+    return{...calcDef(g.stk,g.o7),art:a,name:g.name,sizes:g.sizes,buyrate:br,mskStk,sgpTotal,rawTotal,o7Art:omArt[a]||0};
   });
+
   const{c,d:dir}=DS[n];
   artRows.sort((a,b)=>{
     if(c==='art')return dir*(a.art<b.art?-1:a.art>b.art?1:0);
@@ -859,46 +873,138 @@ function defTbl(n){
     else{va=a.sev;vb=b.sev}
     return dir*(va-vb);
   });
+
   const ar=k=>DS[n].c===k?(DS[n].d>0?' ↑':' ↓'):' ↕';
   const cl=k=>DS[n].c===k?' sa':'';
-  const th=(k,l,al='center')=>`<th class="${cl(k)}" onclick="sortD(${n},'${k}')" style="text-align:${al}">${l}${ar(k)}</th>`;
+  const th=(k,l,tip,cls='',al='center')=>`<th class="${cl(k)} ${cls}" onclick="sortD(${n},'${k}')" style="text-align:${al}" data-tip="${tip||''}">${l}${ar(k)}</th>`;
+  const thf=(l,tip,cls='',al='center')=>`<th class="${cls}" style="text-align:${al}" data-tip="${tip||''}">${l}</th>`;
+
+  /* Заголовки с группировкой */
+  const colHeader=`<tr>
+    <th rowspan="2" style="text-align:left;vertical-align:middle;background:var(--bg3)">Артикул${ar('art')}</th>
+    <th colspan="3" class="th-group thg-wb">📦 Склад ВБ</th>
+    <th colspan="2" class="th-group thg-sgp">🏭 СГП</th>
+    <th colspan="2" class="th-group thg-raw">🧵 Сырьё</th>
+    <th colspan="2" class="th-group thg-ref" style="border-style:dashed">* Справочно</th>
+    <th class="th-group thg-need">📈 Потребность</th>
+    <th colspan="3" class="th-group thg-need">⚡ Дефицит</th>
+    <th colspan="3" class="th-group thg-days">⏱ Запас дней (с выкупом×)</th>
+  </tr>
+  <tr>
+    ${th('stk','ВБ','Остаток на складах Wildberries / Ozon','th-wb')}
+    ${thf('МСК*','Остаток на складах МСК и МО — справочно, не входит в Общий','th-msk')}
+    ${thf('Общий','ВБ + СГП + Сырьё','th-total')}
+    ${thf('СГП','Склад готовой продукции (из Google Sheets)','th-sgp')}
+    ${thf('Доля р-ра','Доля этого размера в заказах за 7д','th-sgp')}
+    ${thf('Сырьё','Полуфабрикаты на складе (из Google Sheets)','th-raw')}
+    ${thf('Доля р-ра','Доля этого размера в заказах за 7д','th-raw')}
+    ${thf('В пути*','Товар в пути к клиенту или при приёмке ВБ — справочно','th-transit')}
+    ${thf('МСК*','Остаток МСК/МО — дублируется для удобства','th-msk')}
+    ${th('o7','Зак/день','Среднее заказов в день за последние 7 дней','th-need')}
+    ${thf('Мес. потр.','Потребность на 30 дней исходя из темпа заказов за 7д','th-need')}
+    ${th('def','Дефицит шт','Нехватка до потребности на 30 дней (от остатка ВБ)','th-need')}
+    ${thf('Доля арт.','Доля артикула в заказах за 7д','th-need')}
+    ${th('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости','th-days')}
+    ${thf('Всё×','Дней хватит всех стоков (ВБ+СГП+Сырьё) с учётом выкупаемости','th-days')}
+    ${thf('Без сырья×','Дней хватит ВБ+СГП с учётом выкупаемости','th-days')}
+  </tr>`;
+
   const showArts=EXD[n]?artRows:artRows.slice(0,LIM);
-
-  function defRow(r,isSub,parentO7){
-    const px=isSub?'padding-left:28px':'';
-    const label=isSub?r.sz:r.art;
-    const sub=isSub?'':`<div style="font-size:10px;color:var(--ink3);display:inline;margin-left:6px">${r.name.slice(0,24)}</div>`;
-    const bar=r.days!=null?`<span class="dbw"><span class="db ${r.bc}" style="width:${r.bw}%"></span></span>`:'';
-    const share=isSub&&parentO7>0?Math.round(r.o7/parentO7*100)+'%':'';
-    return`<td style="${px}"><span class="${isSub?'':'art'}">${label}</span>${sub}</td>
-      <td class="${r.sc}" style="text-align:center;font-size:${isSub?'12':'14'}px;font-weight:700">${r.stk}</td>
-      <td style="text-align:center">${r.o7}</td>
-      <td style="text-align:center;font-size:11px;color:var(--blue);font-weight:600">${share}</td>
-      <td style="text-align:center;color:var(--ink2)">${r.need||'—'}</td>
-      <td style="text-align:center;color:${r.def>0?'var(--red)':'var(--green)'};font-weight:${r.def>0?700:400}">${r.def>0?'-'+r.def:'✓'}</td>
-      <td><span class="fl2 ${r.fc}">${r.ft}</span>${bar}</td>`;
-  }
-
   let trs='';
   for(const r of showArts){
     const open=OAD[n].has(r.art)||FA[n].length>0;
     const hasSizes=r.sizes.length>1;
     const toggle=hasSizes?`<span class="tog">${open?'▼':'▶'}</span>`:'<span class="tog"> </span>';
     const onclick=hasSizes?` onclick="togArtD(${n},'${r.art.replace(/'/g,"\\'")}')"`:' ';
-    trs+=`<tr class="ar-row"${onclick}>${defRow({...r,art:toggle+r.art},false,0)}</tr>`;
+    const br=r.buyrate;
+    const brLabel=br.est
+      ?`<span class="buyrate buyrate-est" data-tip="Фактической выкупаемости нет — используем 70%">~70%</span>`
+      :`<span class="buyrate buyrate-ok" data-tip="Выкупаемость из Google Sheets">${Math.round(br.val*100)}%</span>`;
+    const dr=r.o7/7; // заказов в день
+    const drDay=dr>0?dr.toFixed(1):'—';
+    const need30=r.need;
+    /* Доля артикула в общих заказах 7д */
+    const artO7=r.o7Art||r.o7;
+    const artShare=totalOrders7>0?Math.round(artO7/totalOrders7*100)+'%':'—';
+    /* Стоки */
+    const wbStk=r.stk,sgpStk=r.sgpTotal,rawStk=r.rawTotal,mskStk=r.mskStk;
+    const totalStk=wbStk+sgpStk+rawStk;
+    /* Дни с выкупаемостью */
+    const effDr=dr*br.val; // эффективная скорость потребления (с выкупом)
+    const dWb=effDr>0?Math.round(wbStk/effDr):null;
+    const dAll=effDr>0?Math.round(totalStk/effDr):null;
+    const dNoRaw=effDr>0?Math.round((wbStk+sgpStk)/effDr):null;
+
+    const wbC=wbStk===0?'qx':wbStk<20?'ql':'qo';
+    const sgpC=sgpStk===0?'qx':sgpStk<20?'ql':'qo';
+    const rawC=rawStk===0?'qx':rawStk<20?'ql':'qo';
+    const totC=totalStk===0?'qx':totalStk<20?'ql':'qo';
+
+    trs+=`<tr class="ar-row"${onclick}>
+      <td>${toggle}<span class="art">${r.art}</span>${brLabel}<div style="font-size:10px;color:var(--ink3);display:inline;margin-left:4px">${r.name.slice(0,20)}</div></td>
+      <td class="${wbC}" style="text-align:center;font-size:14px;font-weight:700">${wbStk}</td>
+      <td class="td-ref" style="text-align:center">${mskStk||'—'}</td>
+      <td class="${totC}" style="text-align:center;font-size:14px;font-weight:700">${totalStk}</td>
+      <td class="${sgpC}" style="text-align:center">${sgpStk||'—'}</td>
+      <td style="text-align:center;font-size:10px;color:var(--ink3)">—</td>
+      <td class="${rawC}" style="text-align:center">${rawStk||'—'}</td>
+      <td style="text-align:center;font-size:10px;color:var(--ink3)">—</td>
+      <td class="td-ref" style="text-align:center">—</td>
+      <td class="td-ref" style="text-align:center">${mskStk||'—'}</td>
+      <td style="text-align:center;font-weight:600">${drDay}</td>
+      <td style="text-align:center;color:var(--ink2)">${need30||'—'}</td>
+      <td style="text-align:center;color:${r.def>0?'var(--red)':'var(--green)'};font-weight:${r.def>0?700:400}">${r.def>0?'-'+r.def:'✓'}</td>
+      <td style="text-align:center;font-size:11px">${artShare}</td>
+      <td style="text-align:center">${fmtDays(dWb)}</td>
+      <td style="text-align:center">${fmtDays(dAll)}</td>
+      <td style="text-align:center">${fmtDays(dNoRaw)}</td>
+    </tr>`;
+
     if(open){
+      /* Общий o7 по артикулу для расчёта доли размера */
+      const artO7total=r.o7||1;
       const sorted=r.sizes.sort((x,y)=>szCmp(x.sz,y.sz));
-      for(const sr of sorted) trs+=`<tr class="sz-row">${defRow(sr,true,r.o7)}</tr>`;
+      for(const sr of sorted){
+        const srSgp=0; // на уровне размера пока нет маппинга без Арт производ
+        const srRaw=0;
+        const srTotal=sr.stk;
+        const srDr=sr.o7/7;
+        const srEffDr=srDr*br.val;
+        const srDWb=srEffDr>0?Math.round(sr.stk/srEffDr):null;
+        const srDAll=srEffDr>0?Math.round((sr.stk+srSgp+srRaw)/srEffDr):null;
+        const srDNoRaw=srEffDr>0?Math.round((sr.stk+srSgp)/srEffDr):null;
+        const srShare=artO7total>0&&sr.o7>0?Math.round(sr.o7/artO7total*100)+'%':'—';
+        const srWbC=sr.stk===0?'qx':sr.stk<10?'ql':'qo';
+        const srNeed=sr.need||0;
+        trs+=`<tr class="sz-row">
+          <td style="padding-left:28px;font-weight:600">${sr.sz}</td>
+          <td class="${srWbC}" style="text-align:center;font-weight:600">${sr.stk}</td>
+          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
+          <td style="text-align:center;font-weight:600">${srTotal}</td>
+          <td style="text-align:center;font-size:11px;color:var(--sgp)">—</td>
+          <td style="text-align:center;font-size:10px;color:var(--ink3)">${srShare}</td>
+          <td style="text-align:center;font-size:11px;color:var(--raw)">—</td>
+          <td style="text-align:center;font-size:10px;color:var(--ink3)">${srShare}</td>
+          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
+          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
+          <td style="text-align:center;font-size:11px">${srDr>0?srDr.toFixed(1):'—'}</td>
+          <td style="text-align:center;font-size:11px">${srNeed||'—'}</td>
+          <td style="text-align:center;font-size:11px;color:${sr.def>0?'var(--red)':'var(--green)'}">${sr.def>0?'-'+sr.def:'✓'}</td>
+          <td style="text-align:center;font-size:11px;color:var(--ink3)">${srShare}</td>
+          <td style="text-align:center;font-size:11px">${fmtDays(srDWb)}</td>
+          <td style="text-align:center;font-size:11px">${fmtDays(srDAll)}</td>
+          <td style="text-align:center;font-size:11px">${fmtDays(srDNoRaw)}</td>
+        </tr>`;
+      }
     }
   }
   const exp=artRows.length>LIM
-    ? `<tr class="er"><td colspan="7"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`
-    : '';
-  return`<table><thead><tr>${th('art','Артикул','left')}${th('stk','Остаток')}${th('o7','7дн заказов')}<th style="text-align:center">Доля</th>${th('need','Потребн. 30дн')}${th('def','Дефицит')}${th('days','Статус')}</tr></thead><tbody>${trs||'<tr><td class="em" colspan="7">Нет</td></tr>'}${exp}</tbody></table>`;
+    ?`<tr class="er"><td colspan="17"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`:'';
+  return`<table><thead>${colHeader}</thead><tbody>${trs||'<tr><td class="em" colspan="17">Нет данных</td></tr>'}${exp}</tbody></table>`;
 }
 function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 
-/* ═══ INIT ═══ */
+/* ── init ── */
 window.onload=()=>{
   document.getElementById('hlogo').src=L1;
   document.getElementById('slogoimg').src=L1;
@@ -907,12 +1013,10 @@ window.onload=()=>{
     if(s.k1)K[1]=s.k1;if(s.k2)K[2]=s.k2;if(s.oid)K.oid=s.oid;if(s.okey)K.okey=s.okey;if(s.px)PX=s.px;if(s.px2)PX2=s.px2;
     document.getElementById('sk1').value=K[1];document.getElementById('sk2').value=K[2];
     document.getElementById('soid').value=K.oid;document.getElementById('sokey').value=K.okey;
-    document.getElementById('sprx').value=PX;
-    document.getElementById('sprx2').value=PX2;
+    document.getElementById('sprx').value=PX;document.getElementById('sprx2').value=PX2;
     if(K[1]||K[2]||K.oid){
       document.getElementById('setup').classList.remove('show');
       placeholders();
-      // Автозагрузки нет — каждый кабинет грузится по кнопке ↻.
     }
   }catch(e){}
 };
