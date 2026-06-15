@@ -612,12 +612,12 @@ function ordersHTML(n,orders,type){
     if(type==='wb'){t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';art=o.supplierArticle||'—';sz=o.techSize||'—';name=o.subject||o.category||'—';qty=o.quantity||1;price=wbPrice(o);wh=o.warehouseName||'—';}
     else{const dt=o.in_process_at||o.created_at;t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';const items=o.products||[];art=items.map(p=>p.offer_id||'').join(', ');sz=items.map(p=>{const pp=(p.offer_id||'').split('_');return pp.length>1?pp[pp.length-1]:'—'}).join(', ');name=items.map(p=>p.name||'').join(', ');qty=items.reduce((s,p)=>s+(p.quantity||1),0);price=ozRev(o);wh=(o.analytics_data&&o.analytics_data.warehouse_name)||'—';}
     const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}');" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted">${art}</a>`;
-    const clientPrice=price>0?Math.round(price*0.80):0;
+    const clientPrice=price>0?Math.round(price*1.00):0;
     return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${clientPrice>0?fmt(clientPrice):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
   const exp=!EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▼ Все ${sorted.length}</button></td></tr>`:EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▲ Свернуть</button></td></tr>`:'';
   return`<div class="sec"><div class="sh"><span class="st">${CM[n]==='week'?'Заказы за неделю':'Заказы сегодня'}</span><span class="sm2">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.80 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~20%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice —  цена которую видит покупатель на сайт">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 function togExp(n){EXP[n]=!EXP[n];reRender(n);}
 
