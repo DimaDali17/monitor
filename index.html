@@ -637,7 +637,7 @@ function stocksHTML(n){
   const whList=[...whs].sort((a,b)=>whTot[b]-whTot[a]);
   D[n].arts=arts;D[n].whList=whList;
   /* Определяем МСК-склады по реальным названиям (пользователь уточнит) */
-  D[n].mskWhs=whList.filter(w=>/коледино|электросталь|тула|краснодар/i.test(w));
+  D[n].mskWhs=whList.filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
   if(!SS[n])SS[n]={c:'total',d:-1};
   return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
     <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -735,7 +735,7 @@ function defTbl(n){
   const totalO7=(orders7||[]).reduce((s,o)=>s+(isOz?(o.products||[]).reduce((ss,p)=>ss+(p.quantity||1),0):1),0);
 
   /* МСК-склады */
-  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:whList.filter(w=>/коледино|электросталь|тула|краснодар/i.test(w));
+  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:whList.filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
 
   /* Группируем по артикулу */
   const byArt={};
