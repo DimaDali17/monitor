@@ -617,7 +617,7 @@ function ordersHTML(n,orders,type){
   }).join('');
   const exp=!EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▼ Все ${sorted.length}</button></td></tr>`:EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▲ Свернуть</button></td></tr>`:'';
   return`<div class="sec"><div class="sh"><span class="st">${CM[n]==='week'?'Заказы за неделю':'Заказы сегодня'}</span><span class="sm2">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.75 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~20%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.80 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~20%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 function togExp(n){EXP[n]=!EXP[n];reRender(n);}
 
@@ -688,14 +688,14 @@ function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e
 function deficitHTML(n){
   return`<div class="sec"><div class="sh"><span class="st">📦 Дефицит · Запас · Стоки</span>
     <span class="sm2" style="display:flex;gap:4px;flex-wrap:wrap">
-      <span class="fl2 ff">🔥 &lt;14д</span><span class="fl2 fw">⚠️ 14-30д</span><span class="fl2 fk">✅ 30-90д</span><span class="fl2 fd">💀 &gt;90д</span>
+      <span class="fl2 ff">🔥 &lt;14д × выкуп</span><span class="fl2 fw">⚠️ 14-30д</span><span class="fl2 fk">✅ 30-90д</span><span class="fl2 fd">💀 &gt;90д</span>
       <span style="font-size:10px;color:var(--ink3);margin-left:4px">* справочно, не в Общем</span>
     </span></div>
     <div style="font-size:10px;color:var(--ink3);margin-bottom:8px;display:flex;gap:14px;flex-wrap:wrap">
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#A06820;margin-right:3px;vertical-align:middle"></span>ВБ — остаток на маркетплейсе</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0D47A1;border:1px dashed #90CAF9;margin-right:3px;vertical-align:middle"></span>В пути* — справочно</span>
+      
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск</span>
       <span><span style="font-weight:700;margin-right:2px">×</span>— с учётом выкупаемости</span>
     </div>
@@ -784,7 +784,7 @@ function defTbl(n){
     <th colspan="1" class="th-group thg-wb">📦 Склад ВБ</th>
     <th colspan="1" class="th-group thg-sgp">🏭 СГП</th>
     <th colspan="1" class="th-group thg-raw">🧵 Сырьё</th>
-    <th colspan="2" class="th-group thg-ref" style="border-style:dashed">* Справочно</th>
+    <th colspan="1" class="th-group thg-ref" style="border-style:dashed">* МСК</th>
     <th colspan="1" class="th-group thg-total">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
     <th colspan="2" class="th-group thg-need">⚡ Дефицит</th>
@@ -795,13 +795,13 @@ function defTbl(n){
     ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП, колонка ИТОГО ТЕ)','th-sgp')}
     ${THF('Сырьё','Остаток полуфабрикатов — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
     ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск — справочно, в Общий не входит','th-msk')}
-    ${THF('В пути*','Товар в процессе доставки клиенту или приёмки на склад ВБ — справочно, в расчёты не идёт','th-transit')}
+    
     ${THF('Общий','Суммарный сток: ВБ + СГП + Сырьё. МСК и В пути не включены','th-total')}
     ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
     ${THF('Мес. потр.','Потребность на 30 дней исходя из среднего темпа заказов за 7 дней','th-need')}
     ${THF('Доля','Доля размера в заказах за 7 дней (для строк размеров) / доля артикула в общих заказах (для строк артикула)','th-need')}
-    ${TH('def','Дефицит шт','Нехватка товара: потребность на 30 дней минус ОБЩИЙ сток (ВБ + СГП + Сырьё). Минус = в порядке','th-need')}
-    ${THF('Статус','Визуальный индикатор запаса на ВБ: 🔥 <14 дней, ⚠️ 14-30 дней, ✅ 30-90 дней, 💀 >90 дней','th-need')}
+    ${TH('def','Дефицит шт','Нехватка штук до потребности 30 дней: потребность − (ВБ + СГП + Сырьё). Отрицательное = нехватка, ✓ = запас достаточен','th-need')}
+    ${THF('Статус','Запас дней на ВБ С учётом выкупаемости: 🔥 <14 дней (критично), ⚠️ 14-30 дней (внимание), ✅ 30-90 дней (норма), 💀 >90 дней (избыток)','th-need')}
     ${TH('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости. Если нет данных — используется 70%','th-days')}
     ${THF('Всё×','Дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
     ${THF('Без сырья×','Дней хватит ВБ + СГП с учётом выкупаемости (без учёта производства в сырье)','th-days')}
@@ -822,7 +822,7 @@ function defTbl(n){
       :`<span class="buyrate buyrate-ok" data-tip="Выкупаемость из Google Sheets: ${Math.round(br.val*100)}%">${Math.round(br.val*100)}%</span>`;
 
     const dr=r.o7/7;
-    const drDay=Math.round(dr); // ЦЕЛОЕ
+    const drDay=Math.round(dr);
     const need30=r.need;
     const artShare=totalO7>0&&r.o7Art>0?Math.round(r.o7Art/totalO7*100)+'%':'—';
     const wbStk=r.stk,sgpStk=r.sgp,rawStk=r.raw,mskStk=r.msk;
@@ -832,6 +832,14 @@ function defTbl(n){
     const dAll=effDr>0?Math.round(totalStk/effDr):null;
     const dNoRaw=effDr>0?Math.round((wbStk+sgpStk)/effDr):null;
     const dMsk=effDr>0?Math.round(mskStk/effDr):null;
+    /* Статус — по дням ВБ С учётом выкупаемости (dWb) */
+    const statusDays=dWb;
+    let sfc,sbc,sbw,sft;
+    if(statusDays===null){sfc='fe';sbc='bd';sbw=0;sft='нет продаж';}
+    else if(statusDays<14){sfc='ff';sbc='bf';sbw=Math.min(100,statusDays/14*100);sft='🔥 '+statusDays+'д';}
+    else if(statusDays<30){sfc='fw';sbc='bw';sbw=Math.min(100,statusDays/30*100);sft='⚠️ '+statusDays+'д';}
+    else if(statusDays<=90){sfc='fk';sbc='bk';sbw=Math.min(100,statusDays/90*100);sft='✅ '+statusDays+'д';}
+    else{sfc='fd';sbc='bd';sbw=100;sft='💀 '+statusDays+'д';}
     const wbC=wbStk===0?'qx':wbStk<20?'ql':'qo';
     const sgpC=sgpStk===0?'qx':sgpStk<20?'ql':'qo';
     const rawC=rawStk===0?'qx':rawStk<20?'ql':'qo';
@@ -843,13 +851,12 @@ function defTbl(n){
       <td class="${sgpC}" style="text-align:center">${sgpStk||'—'}</td>
       <td class="${rawC}" style="text-align:center">${rawStk||'—'}</td>
       <td class="td-ref" style="text-align:center">${mskStk||'—'}</td>
-      <td class="td-ref" style="text-align:center">—</td>
       <td class="${totC}" style="text-align:center;font-size:14px;font-weight:700">${totalStk}</td>
       <td style="text-align:center;font-weight:600">${drDay}</td>
       <td style="text-align:center;color:var(--ink2)">${need30||'—'}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${artShare}</td>
       <td style="text-align:center;color:${r.def>0?'var(--red)':'var(--green)'};font-weight:700">${r.def>0?'−'+r.def:'✓'}</td>
-      <td><span class="fl2 ${r.fc}">${r.ft}</span><span class="dbw"><span class="db ${r.bc}" style="width:${r.bw}%"></span></span></td>
+      <td><span class="fl2 ${sfc}">${sft}</span><span class="dbw"><span class="db ${sbc}" style="width:${sbw}%"></span></span></td>
       <td style="text-align:center">${fmtDays(dWb)}</td>
       <td style="text-align:center">${fmtDays(dAll)}</td>
       <td style="text-align:center">${fmtDays(dNoRaw)}</td>
@@ -882,7 +889,6 @@ function defTbl(n){
           <td class="${srSgpC}" style="text-align:center;font-size:11px;color:var(--sgp)">${srSgp||'—'}</td>
           <td class="${srRawC}" style="text-align:center;font-size:11px;color:var(--raw)">${srRaw||'—'}</td>
           <td class="td-ref" style="text-align:center;font-size:11px">${sr.msk||'—'}</td>
-          <td class="td-ref" style="text-align:center;font-size:11px">—</td>
           <td class="${srTotC}" style="text-align:center;font-weight:600">${srTotal}</td>
           <td style="text-align:center;font-size:11px">${sr7}</td>
           <td style="text-align:center;font-size:11px">${srNeed||'—'}</td>
@@ -898,8 +904,8 @@ function defTbl(n){
     }
   }
 
-  const exp=artRows.length>LIM?`<tr class="er"><td colspan="19"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`:'';
-  return`<table><thead>${hdr}</thead><tbody>${trs||'<tr><td class="em" colspan="19">Нет данных</td></tr>'}${exp}</tbody></table>`;
+  const exp=artRows.length>LIM?`<tr class="er"><td colspan="18"><button class="eb" onclick="togExD(${n})">${EXD[n]?'▲ Свернуть':'▼ Все '+artRows.length+' артикулов'}</button></td></tr>`:'';
+  return`<table><thead>${hdr}</thead><tbody>${trs||'<tr><td class="em" colspan="18">Нет данных</td></tr>'}${exp}</tbody></table>`;
 }
 function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
 
