@@ -100,12 +100,11 @@ tbody tr:hover{background:var(--bg3)}
 .buyrate-ok{background:#E8F4EE;color:#2D7A4F}.buyrate-est{background:#FEF3E2;color:#A06820}
 .days-crit{color:#B84040;font-weight:700}.days-warn{color:#A06820;font-weight:700}.days-ok{color:#2D7A4F;font-weight:700}.days-na{color:var(--ink3)}
 .td-ref{color:var(--ink3)!important}
-/* Tooltip */
+/* Tooltip — fixed position чтобы не обрезался overflow */
 [data-tip]{position:relative}
-[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:rgba(26,22,16,.92);color:#fff;font-size:11px;font-weight:500;padding:6px 10px;border-radius:8px;white-space:normal;z-index:9999;pointer-events:none;font-family:'Comfortaa',sans-serif;width:220px;text-align:center;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.25)}
-[data-tip]:hover::before{content:'';position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:rgba(26,22,16,.92);z-index:9999}
 thead th[data-tip]{cursor:help}
 thead th[onclick][data-tip]{cursor:pointer}
+#tip-box{position:fixed;background:rgba(26,22,16,.93);color:#fff;font-size:11px;font-weight:500;padding:7px 11px;border-radius:9px;white-space:normal;z-index:99999;pointer-events:none;font-family:'Comfortaa',sans-serif;width:240px;text-align:center;line-height:1.55;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -151,9 +150,9 @@ thead th[onclick][data-tip]{cursor:pointer}
 </div>
 
 <script>
-const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAGwAAAgMBAQEAAAAAAAAAAAAAAwUAAgQBBgj/xAAuEAABBAEDAgQGAQUAAAAAAAABAAIDEQQFEiExQRMUIlEGMmFxgZFSFTNCYqH/xAAYAQEBAQEBAAAAAAAAAAAAAAABAAIDBP/EABwRAQEAAgMBAQAAAAAAAAAAAAABESECMUESMv/aAAwDAQACEQMRAD8A+jURsZIsC0tz80Y74o7ovct8E1tHK80dquWEdQq0jiQHg0o6MOFt/ScLICisW0q8DkoLoV2NBQ2+rnt7KzpAwJgdkYG9Ch2qsl8W3dugXUIi+I43CJk7esTt247phps/iwNcDdhTUYRNjPaRdhYvh15OKGnq07f0s+teHRdtFqR5bQa3KxiMsbmggOI4J90pOiZ4N+Ys9/SKTytnUEkvZ0+RjxYKzh3iuofKP+rG6OTT8SR8khe+up4paMH+y37KlzVjDQ520LDJM/Jk8KPp/k72WzIhfJHTTV8X7KY+OyBoaBQ7nuVXN0praMYI2Bo6BRFlcwn0oVpQM4uM/ZK9CbtMw7CRyaTGmEn2WPSIdkReR87i79lHp8Mw8tXfNAHqp4fiCkq/pWfI+5Jtovo0K5crOoJJexdcyWy4UgabIHNI2A64Wn6LPqOD5bTZG8n0mye5RNLduxoz9AszP1s38mQk2hY8zOEQAHqeeA0dSiZDzHGXAWewWXGxS1xll9Uh/Q+gW7b1BJ6Njte1lyG3u5KKouITPlHe0Rjq7j8I0LBG0AcAJY3UGHUJI3UGHUJh1AqKKKJFqWi+am8WN7mP9ws9ei7XfBNbRyvNHarlhHUKtI4kB4NKOFD2t/ScLI";
-const L2="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCABMAEwDASIAAhEBAxEB/8QAHAAAAQQDAQAAAAAAAAAAAAAABgQFBwgAAQMC/8QAMxAAAgEEAAQDBwMEAwEAAAAAAQIDAAQFEQYSITEHQVEIExQiYXGRMlKBI0KhwXKisdH/xAAZAQEBAQEBAQAAAAAAAAAAAAAAAwECBAX/xAApEQACAgECBAQHAAAAAAAAAAAAAQIRAxIhBDFxkQUyUfAUYYGhscHR/9oADAMBAAIRAxEAPwBf9drtGTYTY";
-const L3="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH";
+const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAGgAAAgMBAQAAAAAAAAAAAAAAAgQAAwUBB//EACwQAAEEAQQBAwMDBQAAAAAAAAEAAgMRBAUSITFBEzJRIkJxI1JhYoGRodH/xAAXAQEBAQEAAAAAAAAAAAAAAAABAAID/8QAGREBAQEBAQEAAAAAAAAAAAAAAAERQSEx/9oADAMBAAIRAxEAPwD1qwOyrWMDh7lk52V6c8Ud9m1oQSW0FcZXRe6IgfP4QUrGSUjIa8ccFaChcREUuIKALobZpc/gItwaFIL2lpooEW/fZQqTE12MiNszRzGd3/U/p0m+Fpu+F3OjEkLgfISehk+gGn7eP8LPTxsXwhGQ1rqtWsaHCisybR8p0znx5fBNgHwE22fFMavqMkbYPKqc/naO0rj4suKC6eQuNccUF3CeZQZD9xtWrDXQS8kpe/02d+f4V8zXGP6e1zHhbGKHZ7J8qoQN2tAHhRWSbft/uq0pTOLYVnaQKdKPh5WlN7Sk9LjoPd+5xKz08aYNBCcgNPLkbW7uEhLpc753OdO7YTwG8cJts+KYYysgSQuAN0EvpJvGZ+Ew/EEOKQ3queeUpo5/QA+CR/tHu+rjVa/aEvkZIZwOXHoDyimJawkCz4VEMG1xe/6nnz8JoWx7ttv9x7RKLikoyDbdo7PCsgjDGgBZ8uYG5/pvNDbYTrchlXuCoTQdS6ZqHaz5s+KMcuCpa6fLPAMcfyeyrVhybI9UOazkDspPRzxIPh5TYjbHFtaKCS0o1NO3+so6uNZwsBCUR6QFaCLiiiEy8/T25RDuQ4dEeEtHpU107Jkr8rbpQBGQ6SxtOhhO6tzv3O5KeaABwoonMGuP9pWRjSiDUZWPNbqcFsFI5WHBO8GRtkdEGkUw+yQPH0m6XSq4Y2xRhrBQCNIRRRRKf//Z";
+const L2="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//Z";
+const L3="data:image/jpeg;base64,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";
 
 let PX='https://wb-proxy.ooo6311ooo.workers.dev';
 let PX2='';
@@ -278,12 +277,6 @@ function getStocksForSz(wbArt,wbSz){
     sgp+=gSgp[kp]||0;
     raw+=gRaw[kp]||0;
   });
-  /* Если маппинга нет — fallback: ищем по артикулу без размера (суммируем все размеры) */
-  if(!mappings.length){
-    const ka=wbArt.toLowerCase();
-    for(const [kk,v] of Object.entries(gSgp)){const p=kk.split(';')[0];if(p.includes(ka)||ka.includes(p))sgp+=v;}
-    for(const [kk,v] of Object.entries(gRaw)){const p=kk.split(';')[0];if(p.includes(ka)||ka.includes(p))raw+=v;}
-  }
   return{sgp,raw};
 }
 
@@ -298,10 +291,11 @@ function getStocksForArt(wbArt){
       if(!seen.has(kp)){seen.add(kp);sgp+=gSgp[kp]||0;raw+=gRaw[kp]||0;}
     });
   }
-  /* fallback если нет маппинга совсем */
+  /* fallback только если вообще нет маппинга в gMap для этого артикула */
   if(!seen.size){
-    for(const [kk,v] of Object.entries(gSgp)){const p=kk.split(';')[0];if(p.includes(ka)||ka.includes(p))sgp+=v;}
-    for(const [kk,v] of Object.entries(gRaw)){const p=kk.split(';')[0];if(p.includes(ka)||ka.includes(p))raw+=v;}
+    /* точное совпадение только */
+    for(const [kk,v] of Object.entries(gSgp)){const p=kk.split(';')[0];if(p===ka)sgp+=v;}
+    for(const [kk,v] of Object.entries(gRaw)){const p=kk.split(';')[0];if(p===ka)raw+=v;}
   }
   return{sgp,raw};
 }
@@ -629,7 +623,7 @@ function stocksHTML(n){
   const whList=[...whs].sort((a,b)=>whTot[b]-whTot[a]);
   D[n].arts=arts;D[n].whList=whList;
   /* Определяем МСК-склады по реальным названиям (пользователь уточнит) */
-  D[n].mskWhs=whList.filter(w=>/коледино|электросталь|подольск|москв|мск|тула|краснодар/i.test(w));
+  D[n].mskWhs=whList.filter(w=>/коледино|электросталь|тула|краснодар/i.test(w));
   if(!SS[n])SS[n]={c:'total',d:-1};
   return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
     <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -722,7 +716,7 @@ function defTbl(n){
   const totalO7=(orders7||[]).reduce((s,o)=>s+(isOz?(o.products||[]).reduce((ss,p)=>ss+(p.quantity||1),0):1),0);
 
   /* МСК-склады */
-  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:[];
+  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:whList.filter(w=>/коледино|электросталь|тула|краснодар/i.test(w));
 
   /* Группируем по артикулу */
   const byArt={};
@@ -907,5 +901,27 @@ window.onload=()=>{
     if(K[1]||K[2]||K.oid){document.getElementById('setup').classList.remove('show');placeholders();}
   }catch(e){}
 };
+
+/* ── Global tooltip (fixed, not clipped) ── */
+(function(){
+  const box=document.createElement('div');
+  box.id='tip-box';document.body.appendChild(box);
+  let cur=null;
+  document.addEventListener('mouseover',e=>{
+    const el=e.target.closest('[data-tip]');
+    if(el&&el.dataset.tip){cur=el;box.textContent=el.dataset.tip;box.style.display='block';move(e);}
+    else{box.style.display='none';cur=null;}
+  });
+  document.addEventListener('mousemove',e=>{if(cur)move(e);});
+  document.addEventListener('mouseout',e=>{if(cur&&!cur.contains(e.relatedTarget)){box.style.display='none';cur=null;}});
+  function move(e){
+    const bw=box.offsetWidth||240,bh=box.offsetHeight||50;
+    let x=e.clientX-bw/2,y=e.clientY-bh-12;
+    x=Math.max(6,Math.min(x,window.innerWidth-bw-6));
+    y=Math.max(6,y);
+    box.style.left=x+'px';box.style.top=y+'px';
+  }
+})();
+
 </script>
 </body></html>
