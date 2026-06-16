@@ -135,6 +135,7 @@ thead th[onclick][data-tip]{cursor:pointer}
       <button class="tab on" onclick="go(1)">Easyform</button>
       <button class="tab" onclick="go(2)">EZFR</button>
       <button class="tab ozon" onclick="go(3)">Ozon</button>
+      <button class="tab" onclick="go(4)" style="background:linear-gradient(135deg,#1A1610 60%,#2D7A4F);color:#FAF8F4">📊 Консо</button>
     </div>
     <button class="b" id="rb1" onclick="reload(1)"><span id="ri1">↻</span> EF</button>
     <button class="b" id="rb2" onclick="reload(2)"><span id="ri2">↻</span> EZFR</button>
@@ -148,6 +149,7 @@ thead th[onclick][data-tip]{cursor:pointer}
   <div id="v1"><div class="lm">⚙ Введите API-ключи</div></div>
   <div id="v2" style="display:none"><div class="lm">⚙ Введите API-ключи</div></div>
   <div id="v3" style="display:none"><div class="lm">⚙ Введите API-ключи</div></div>
+  <div id="v4" style="display:none"><div class="lm">Загрузите кабинеты и нажмите 📊 Консо</div></div>
 </div>
 
 <script>
@@ -349,9 +351,10 @@ function placeholders(){
 }
 function go(n){
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',i===n-1));
-  [1,2,3].forEach(i=>document.getElementById('v'+i).style.display=i===n?'block':'none');
-  document.getElementById('hlogo').src=n===1?L1:n===2?L2:L3;
-  document.getElementById('hname').textContent=n===1?'EasyForm':n===2?'EZFR':'Ozon';
+  [1,2,3,4].forEach(i=>document.getElementById('v'+i).style.display=i===n?'block':'none');
+  document.getElementById('hlogo').src=n===1?L1:n===2?L2:n===3?L3:L1;
+  document.getElementById('hname').textContent=n===1?'EasyForm':n===2?'EZFR':n===3?'Ozon':'Консолидация';
+  if(n===4)renderConso();
 }
 
 /* ── WB fetch ── */
@@ -612,12 +615,12 @@ function ordersHTML(n,orders,type){
     if(type==='wb'){t=o.date?new Date(o.date).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';art=o.supplierArticle||'—';sz=o.techSize||'—';name=o.subject||o.category||'—';qty=o.quantity||1;price=wbPrice(o);wh=o.warehouseName||'—';}
     else{const dt=o.in_process_at||o.created_at;t=dt?new Date(dt).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';const items=o.products||[];art=items.map(p=>p.offer_id||'').join(', ');sz=items.map(p=>{const pp=(p.offer_id||'').split('_');return pp.length>1?pp[pp.length-1]:'—'}).join(', ');name=items.map(p=>p.name||'').join(', ');qty=items.reduce((s,p)=>s+(p.quantity||1),0);price=ozRev(o);wh=(o.analytics_data&&o.analytics_data.warehouse_name)||'—';}
     const artClick=art.includes(',')?art:`<a href="#" onclick="event.preventDefault();if(!FA[${n}].includes('${art.replace(/'/g,"\\'")}'))addFA(${n},'${art.replace(/'/g,"\\'")}');" style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted">${art}</a>`;
-    const clientPrice=price>0?Math.round(price*1.00):0;
+    const clientPrice=price>0?Math.round(price*0.80):0;
     return`<tr><td><span class="tp">${t}</span></td><td><span class="art">${artClick}</span></td><td>${sz}</td><td>${name}</td><td>${qty}</td><td><span class="pr">${clientPrice>0?fmt(clientPrice):'—'}</span></td><td style="font-size:11px;color:var(--ink3)">${wh}</td></tr>`;
   }).join('');
   const exp=!EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▼ Все ${sorted.length}</button></td></tr>`:EXP[n]&&sorted.length>LIM?`<tr class="er"><td colspan="7"><button class="eb" onclick="togExp(${n})">▲ Свернуть</button></td></tr>`:'';
   return`<div class="sec"><div class="sh"><span class="st">${CM[n]==='week'?'Заказы за неделю':'Заказы сегодня'}</span><span class="sm2">${orders.length} заказов</span></div>
-    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice —  цена которую видит покупатель на сайт">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
+    <div class="tw"><table><thead><tr><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th><th data-tip="finishedPrice × 0.80 — приблизительная цена которую видит покупатель на сайте с учётом среднего СПП ~20%">Цена на сайте</th><th>Склад</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 function togExp(n){EXP[n]=!EXP[n];reRender(n);}
 
@@ -638,7 +641,7 @@ function stocksHTML(n){
   D[n].arts=arts;D[n].whList=whList;
   /* МСК-склады по точному списку из PBI */
   D[n].mskWhs=type==='wb'
-    ? whList.filter(w=>/коледино|рязань|электросталь|тула|подольск/i.test(w))
+    ? whList.filter(w=>/коледино|электросталь|тула|подольск/i.test(w))
     : []; /* У Ozon своя логика — не применяем WB-склады */
   if(!SS[n])SS[n]={c:'total',d:-1};
   return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
@@ -646,7 +649,7 @@ function stocksHTML(n){
       <input class="flt" id="sflt${n}" placeholder="🔎 артикул" value="${FS[n]||''}" oninput="fltS(${n},this.value)" style="width:140px">
       <input class="flt" id="sfltZ${n}" placeholder="🔎 размер" value="${FSZ[n]||''}" oninput="fltSZ(${n},this.value)" style="width:100px">
       <span class="sm2">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
-      ${D[n].mskWhs.length?`<span class="sm2" style="color:var(--sgp)">МСК-склады: ${D[n].mskWhs.join(', ')}</span>`:'<span class="sm2" style="color:var(--red)">МСК-склады не найдены (Коледино/Рязань/Тула/Электросталь/Подольск)</span>'}
+      ${D[n].mskWhs.length?`<span class="sm2" style="color:var(--sgp)">МСК-склады: ${D[n].mskWhs.join(', ')}</span>`:'<span class="sm2" style="color:var(--red)">МСК-склады не найдены (Коледино/Тула/Электросталь/Подольск)</span>'}
     </span></div>
     <div class="sw" id="stbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
 }
@@ -696,7 +699,7 @@ function deficitHTML(n){
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Рязань, Тула, Электросталь, Подольск</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск</span>
       <span><span style="font-weight:700;margin-right:2px">×</span>— с учётом выкупаемости</span>
     </div>
     <div class="sw" id="dtbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
@@ -737,7 +740,7 @@ function defTbl(n){
   const totalO7=(orders7||[]).reduce((s,o)=>s+(isOz?(o.products||[]).reduce((ss,p)=>ss+(p.quantity||1),0):1),0);
 
   /* МСК-склады */
-  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:(d.whList||[]).filter(w=>/коледино|рязань|электросталь|тула|подольск/i.test(w));
+  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:(d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
 
   /* Группируем по артикулу */
   const byArt={};
@@ -794,7 +797,7 @@ function defTbl(n){
     ${TH('stk','ВБ','Остаток на складах Wildberries или Ozon на сегодня','th-wb')}
     ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП, колонка ИТОГО ТЕ)','th-sgp')}
     ${THF('Сырьё','Остаток полуфабрикатов — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
-    ${THF('МСК*','Остаток на московских складах: Коледино, Рязань, Тула, Электросталь, Подольск — справочно, в Общий не входит','th-msk')}
+    ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск — справочно, в Общий не входит','th-msk')}
     
     ${THF('Общий','Суммарный сток: ВБ + СГП + Сырьё. МСК и В пути не включены','th-total')}
     ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
@@ -805,7 +808,7 @@ function defTbl(n){
     ${TH('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости. Если нет данных — используется 70%','th-days')}
     ${THF('Всё×','Дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
     ${THF('Без сырья×','Дней хватит ВБ + СГП с учётом выкупаемости (без учёта производства в сырье)','th-days')}
-    ${THF('МСК×','Дней хватит только московского стока (Коледино, Рязань, Тула, Электросталь, Подольск) с учётом выкупаемости','th-days')}
+    ${THF('МСК×','Дней хватит только московского стока (Коледино, Тула, Электросталь, Подольск) с учётом выкупаемости','th-days')}
   </tr>`;
 
   const showArts=EXD[n]?artRows:artRows.slice(0,LIM);
@@ -908,6 +911,364 @@ function defTbl(n){
   return`<table><thead>${hdr}</thead><tbody>${trs||'<tr><td class="em" colspan="18">Нет данных</td></tr>'}${exp}</tbody></table>`;
 }
 function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e)e.innerHTML=defTbl(n);}
+
+
+/* ════════════════════════════════════════════════════════
+   КОНСОЛИДАЦИЯ
+════════════════════════════════════════════════════════ */
+
+/* Ozon: парсим артикул вида "Pantal.SK.bejnew.02_XL" → {baseArt, ozSz}
+   Затем через gMap ищем: szPr=XL → wbSz (Размер ВБ)
+   gMap ключ: "wbArt_lower;wbSz_lower" → [{artPr, szPr}]
+   Нам нужен обратный маппинг: artPr_lower+szPr_lower → wbSz */
+let gRevMap={}; // "baseArtLower;szPrLower" → wbSz
+
+function buildRevMap(){
+  gRevMap={};
+  for(const [k,mappings] of Object.entries(gMap)){
+    const wbSz=k.split(';')[1]||'';
+    mappings.forEach(({artPr,szPr})=>{
+      const rk=artPr.toLowerCase()+';'+szPr.toLowerCase();
+      if(!gRevMap[rk])gRevMap[rk]=wbSz;
+    });
+  }
+}
+
+function parseOzonArt(offerID){
+  /* "Pantal.SK.bejnew.02_XL" → baseArt="Pantal.SK.bejnew.02", ozSz="XL" */
+  const last=offerID.lastIndexOf('_');
+  if(last<0)return{baseArt:offerID,ozSz:'',wbSz:''};
+  const baseArt=offerID.slice(0,last);
+  const ozSz=offerID.slice(last+1);
+  /* Найдём WB-размер через обратный маппинг */
+  /* Ищем по всем ключам gRevMap где artPr содержит baseArt */
+  const rk=baseArt.toLowerCase()+';'+ozSz.toLowerCase();
+  const wbSz=gRevMap[rk]||ozSz; /* fallback: используем Ozon-размер как есть */
+  return{baseArt,ozSz,wbSz};
+}
+
+/* Структура консолидации:
+   consoData[wbArt][wbSz] = {
+     stk:  {ef:0, ezfr:0, oz:0},
+     o7:   {ef:0, ezfr:0, oz:0},
+     msk:  {ef:0, ezfr:0}
+   }
+*/
+function buildConsoData(){
+  buildRevMap();
+  const data={};
+
+  function ensureSz(art,sz){
+    if(!data[art])data[art]={};
+    if(!data[art][sz])data[art][sz]={
+      stk:{ef:0,ezfr:0,oz:0},
+      o7:{ef:0,ezfr:0,oz:0},
+      msk:{ef:0,ezfr:0}
+    };
+    return data[art][sz];
+  }
+
+  /* ── WB кабинеты (1=EF, 2=EZFR) ── */
+  [1,2].forEach(n=>{
+    const d=D[n];if(!d)return;
+    const cab=n===1?'ef':'ezfr';
+    const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:
+      (d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
+
+    /* Стоки */
+    (d.stocks||[]).forEach(s=>{
+      const art=s.supplierArticle||'';
+      const sz=s.techSize||'—';
+      const q=s.quantity||0;
+      if(!art)return;
+      const r=ensureSz(art,sz);
+      r.stk[cab]+=q;
+      /* МСК */
+      const wh=s.warehouseName||'';
+      if(mskWhs.some(m=>wh.toLowerCase().includes(m.toLowerCase())))r.msk[cab]+=q;
+    });
+
+    /* Заказы за 7 дней */
+    (d.orders7||[]).forEach(o=>{
+      const art=o.supplierArticle||'';
+      const sz=o.techSize||'—';
+      if(!art)return;
+      ensureSz(art,sz).o7[cab]+=(o.quantity||1);
+    });
+  });
+
+  /* ── Ozon (кабинет 3) ── */
+  const dOz=D[3];
+  if(dOz){
+    /* Стоки Ozon */
+    (dOz.stocks||[]).forEach(s=>{
+      const offerID=s.item_code||s.offer_id||'';
+      if(!offerID)return;
+      const{baseArt,wbSz}=parseOzonArt(offerID);
+      const q=s.free_to_sell_amount||s.quantity||0;
+      ensureSz(baseArt,wbSz).stk.oz+=q;
+    });
+
+    /* Заказы Ozon за 7 дней */
+    (dOz.orders7||[]).forEach(o=>{
+      (o.products||[]).forEach(p=>{
+        const offerID=p.offer_id||'';
+        if(!offerID)return;
+        const{baseArt,wbSz}=parseOzonArt(offerID);
+        ensureSz(baseArt,wbSz).o7.oz+=(p.quantity||1);
+      });
+    });
+  }
+
+  return data;
+}
+
+/* ── Render Консо ── */
+const CONSO_LOG=[];
+function logConso(msg){
+  CONSO_LOG.push(new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' '+msg);
+  const el=document.getElementById('consoLog');
+  if(el)el.innerHTML=CONSO_LOG.slice(-8).map(l=>`<div>${l}</div>`).join('');
+}
+
+function renderConso(){
+  const el=document.getElementById('v4');if(!el)return;
+  const loaded=[D[1]&&'EF',D[2]&&'EZFR',D[3]&&'Ozon'].filter(Boolean);
+
+  /* Step-by-step loader panel */
+  const steps=[
+    {n:1,label:'EF (Easyform)',color:'var(--ink)'},
+    {n:2,label:'EZFR',color:'var(--ink)'},
+    {n:3,label:'Ozon',color:'var(--blue)'},
+  ];
+  const stepsHTML=steps.map(s=>{
+    const done=!!D[s.n];
+    const loading=`<span id="cri${s.n}">↻</span>`;
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${done?'#E8F5E9':'var(--bg3)'};border:1px solid ${done?'#4CAF50':'var(--border2)'};border-radius:9px;margin-bottom:6px">
+      <span style="font-size:18px">${done?'✅':'⏳'}</span>
+      <span style="font-weight:700;flex:1">${s.label}</span>
+      ${done
+        ?`<span style="font-size:11px;color:var(--green)">загружен · ${(D[s.n].stocks||[]).length} позиций стока · ${(D[s.n].orders7||[]).length} заказов за 7д</span>`
+        :`<button class="loadbtn" style="margin:0;padding:6px 16px;font-size:11px" onclick="reloadForConso(${s.n})">↻ Загрузить ${s.label}</button>`
+      }
+    </div>`;
+  }).join('');
+
+  const logHTML=`<div id="consoLog" style="font-size:10px;color:var(--ink3);margin-top:8px;font-family:monospace;line-height:1.8">${CONSO_LOG.slice(-8).map(l=>`<div>${l}</div>`).join('')||'<div>— лог загрузки —</div>'}</div>`;
+
+  if(!loaded.length){
+    el.innerHTML=`<div style="max-width:480px;margin:40px auto">
+      <div class="sh"><span class="st">📊 Консолидация — загрузка данных</span></div>
+      ${stepsHTML}${logHTML}
+    </div>`;
+    return;
+  }
+
+  /* Build data */
+  const data=buildConsoData();
+  const hasEF=!!D[1],hasEZFR=!!D[2],hasOZ=!!D[3];
+
+  /* Collect all arts and sizes */
+  const artList=Object.keys(data).sort();
+
+  /* Summary cards */
+  const totalStk={ef:0,ezfr:0,oz:0};
+  const totalO7={ef:0,ezfr:0,oz:0};
+  for(const art of artList){
+    for(const sz of Object.keys(data[art])){
+      const r=data[art][sz];
+      ['ef','ezfr','oz'].forEach(c=>{totalStk[c]+=r.stk[c];totalO7[c]+=r.o7[c];});
+    }
+  }
+  const totStkAll=totalStk.ef+totalStk.ezfr+totalStk.oz;
+  const totO7All=totalO7.ef+totalO7.ezfr+totalO7.oz;
+
+  const cards=`<div class="mg" style="grid-template-columns:repeat(5,1fr)">
+    <div class="mc" style="border-top:3px solid var(--ink)"><div class="ml">Общий сток</div><div class="mv">${totStkAll.toLocaleString('ru')}</div><div class="md" style="font-size:10px;color:var(--ink3)">${hasEF?'EF: '+totalStk.ef:''} ${hasEZFR?'· EZFR: '+totalStk.ezfr:''} ${hasOZ?'· OZ: '+totalStk.oz:''}</div></div>
+    <div class="mc" style="border-top:3px solid var(--green)"><div class="ml">Зак/день (7д) всего</div><div class="mv g">${Math.round(totO7All/7)}</div><div class="md" style="font-size:10px;color:var(--ink3)">${hasEF?'EF: '+Math.round(totalO7.ef/7):''} ${hasEZFR?'· EZFR: '+Math.round(totalO7.ezfr/7):''} ${hasOZ?'· OZ: '+Math.round(totalO7.oz/7):''}</div></div>
+    <div class="mc" style="border-top:3px solid var(--amber)"><div class="ml">Потребность 30д</div><div class="mv a">${Math.round(totO7All/7*30).toLocaleString('ru')}</div></div>
+    <div class="mc" style="border-top:3px solid var(--red)"><div class="ml">Дефицит (Общий−Потр.)</div>
+      ${(()=>{const sgpRaw=Object.keys(data).reduce((s,a)=>{const ss=getStocksForArt(a);return{sgp:s.sgp+ss.sgp,raw:s.raw+ss.raw};},{sgp:0,raw:0});
+      const tot=totStkAll+sgpRaw.sgp+sgpRaw.raw;const need=Math.round(totO7All/7*30);const def=need-tot;
+      return`<div class="mv" style="color:${def>0?'var(--red)':'var(--green)'}">${def>0?'−'+def.toLocaleString('ru'):'✓ '+Math.abs(def).toLocaleString('ru')}</div>`;})()}
+    </div>
+    <div class="mc" style="border-top:3px solid #5B3FA0"><div class="ml">Кабинеты загружены</div><div class="mv" style="font-size:18px">${loaded.join(' · ')}</div></div>
+  </div>`;
+
+  /* Main table */
+  /* Column headers depend on which cabinets are loaded */
+  const cabCols=[];
+  if(hasEF)cabCols.push({key:'ef',label:'EF',color:'#FFF8F0',accent:'#E65100'});
+  if(hasEZFR)cabCols.push({key:'ezfr',label:'EZFR',color:'#F0F4FF',accent:'#1565C0'});
+  if(hasOZ)cabCols.push({key:'oz',label:'Ozon',color:'#F0F0FF',accent:'var(--blue)'});
+
+  const colCount=1 + cabCols.length*2 + 3 + 4 + 4; /* art + (stk+o7)*cabs + sgp+raw+общий_сток + потр+доля+деф+статус + дни */
+
+  /* Group header */
+  const grpHdr=`<tr style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">
+    <th rowspan="2" style="text-align:left;background:var(--bg3);vertical-align:middle">Артикул / Размер</th>
+    ${cabCols.map(c=>`<th colspan="2" style="text-align:center;background:${c.color};color:${c.accent};border-bottom:2px solid ${c.accent}">${c.label}</th>`).join('')}
+    <th colspan="1" style="text-align:center;background:#EDE7F6;color:#5B3FA0;border-bottom:2px solid #5B3FA0">🏭 СГП</th>
+    <th colspan="1" style="text-align:center;background:#FBE9E7;color:#8B4513;border-bottom:2px solid #8B4513">🧵 Сырьё</th>
+    <th colspan="1" style="text-align:center;background:#E8F5E9;color:#1B5E20;border-bottom:2px solid #4CAF50;font-weight:900">📊 Общий</th>
+    <th colspan="4" style="text-align:center;background:#FFF8E1;color:#F57F17;border-bottom:2px solid #FFC107">📈 Потребность и дефицит</th>
+    <th colspan="3" style="text-align:center;background:#E0F2F1;color:#004D40;border-bottom:2px solid #26A69A">⏱ Запас дней ×выкуп</th>
+  </tr>
+  <tr style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em">
+    ${cabCols.map(c=>`
+      <th style="text-align:center;background:${c.color};color:${c.accent}" data-tip="Остаток на складах ${c.label}">Сток</th>
+      <th style="text-align:center;background:${c.color};color:${c.accent}" data-tip="Заказов в день за 7 дней — кабинет ${c.label}">Зак/д</th>
+    `).join('')}
+    <th style="text-align:center;background:#EDE7F6;color:#5B3FA0" data-tip="Остаток готовой продукции на вашем складе">СГП</th>
+    <th style="text-align:center;background:#FBE9E7;color:#8B4513" data-tip="Полуфабрикаты на складе (nobrand суммируется)">Сырьё</th>
+    <th style="text-align:center;background:#E8F5E9;color:#1B5E20;font-weight:900" data-tip="ВБ(EF+EZFR) + Ozon + СГП + Сырьё">ИТОГО</th>
+    <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Суммарных заказов в день по всем кабинетам">Зак/д ∑</th>
+    <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Потребность на 30 дней по всем кабинетам">Мес.</th>
+    <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Доля размера в заказах по этому артикулу (все кабинеты)">Доля</th>
+    <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Нехватка: потребность − общий сток">Дефицит</th>
+    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит всего стока ВБ (EF+EZFR) с учётом выкупаемости">ВБ×</th>
+    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит всего (ВБ+Ozon+СГП+Сырьё) с учётом выкупаемости">Всё×</th>
+    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Статус запаса по общему стоку с учётом выкупаемости">Статус</th>
+  </tr>`;
+
+  const OAC=window._OAC||(window._OAC=new Set()); /* открытые артикулы в консо */
+
+  let rows='';
+  for(const art of artList){
+    const szMap=data[art];
+    const szList=Object.keys(szMap).sort((a,b)=>szCmp(a,b));
+    const br=getBuyrate(art);
+    const{sgp:artSgp,raw:artRaw}=getStocksForArt(art);
+
+    /* Суммы по артикулу */
+    const artStk={ef:0,ezfr:0,oz:0},artO7={ef:0,ezfr:0,oz:0};
+    szList.forEach(sz=>{
+      ['ef','ezfr','oz'].forEach(c=>{artStk[c]+=szMap[sz].stk[c];artO7[c]+=szMap[sz].o7[c];});
+    });
+    const artWbStk=artStk.ef+artStk.ezfr;
+    const artOzStk=artStk.oz;
+    const artTotalStk=artWbStk+artOzStk+artSgp+artRaw;
+    const artTotalO7=artO7.ef+artO7.ezfr+artO7.oz;
+    const artDr=artTotalO7/7;
+    const artNeed=Math.round(artDr*30);
+    const artDef=artNeed-artTotalStk;
+    const effDr=artDr*br.val;
+    const dWb=effDr>0?Math.round(artWbStk/effDr):null;
+    const dAll=effDr>0?Math.round(artTotalStk/effDr):null;
+
+    /* Status by dAll */
+    const sd=dAll;
+    const sfc=sd===null?'fe':sd<14?'ff':sd<30?'fw':sd<=90?'fk':'fd';
+    const sft=sd===null?'∞':sd+'д';
+
+    const wbC=artWbStk===0?'qx':artWbStk<20?'ql':'qo';
+    const totC=artTotalStk===0?'qx':artTotalStk<30?'ql':'qo';
+    const defC=artDef>0?'var(--red)':'var(--green)';
+    const open=OAC.has(art);
+    const hasSz=szList.length>1;
+    const tog=hasSz?`<span class="tog" onclick="event.stopPropagation();togConsoArt('${art.replace(/'/g,"\\'")}',this)">${open?'▼':'▶'}</span>`:'<span class="tog"> </span>';
+
+    rows+=`<tr class="ar-row" ${hasSz?`onclick="togConsoArt('${art.replace(/'/g,"\\'")}',null)"`:''} id="car_${art.replace(/[^a-z0-9]/gi,'_')}">
+      <td>${tog}<span class="art">${art}</span><span class="buyrate ${br.est?'buyrate-est':'buyrate-ok'}">${Math.round(br.val*100)}%${br.est?'~':''}</span></td>
+      ${cabCols.map(c=>{
+        const s=artStk[c.key],o=Math.round(artO7[c.key]/7);
+        const sc=s===0?'qx':s<20?'ql':'qo';
+        return`<td class="${sc}" style="text-align:center;background:${c.color}">${s||'—'}</td><td style="text-align:center;background:${c.color};font-size:11px">${o||'—'}</td>`;
+      }).join('')}
+      <td style="text-align:center;color:#5B3FA0">${artSgp||'—'}</td>
+      <td style="text-align:center;color:#8B4513">${artRaw||'—'}</td>
+      <td class="${totC}" style="text-align:center;font-weight:900;font-size:14px">${artTotalStk}</td>
+      <td style="text-align:center;font-weight:600">${Math.round(artDr)}</td>
+      <td style="text-align:center">${artNeed||'—'}</td>
+      <td style="text-align:center;font-size:11px;color:var(--blue)">—</td>
+      <td style="text-align:center;font-weight:700;color:${defC}">${artDef>0?'−'+artDef:'✓'}</td>
+      <td style="text-align:center">${fmtDays(dWb)}</td>
+      <td style="text-align:center">${fmtDays(dAll)}</td>
+      <td><span class="fl2 ${sfc}" style="font-size:10px">${sft}</span></td>
+    </tr>`;
+
+    if(open){
+      /* Общий о7 по артикулу для доли */
+      szList.forEach(sz=>{
+        const r=szMap[sz];
+        const szO7=r.o7.ef+r.o7.ezfr+r.o7.oz;
+        const szWbStk=r.stk.ef+r.stk.ezfr;
+        const szOzStk=r.stk.oz;
+        const{sgp:szSgp,raw:szRaw}=getStocksForSz(art,sz);
+        const szTotalStk=szWbStk+szOzStk+szSgp+szRaw;
+        const szDr=szO7/7;
+        const szNeed=Math.round(szDr*30);
+        const szDef=szNeed-szTotalStk;
+        const szEffDr=szDr*br.val;
+        const szDWb=szEffDr>0?Math.round(szWbStk/szEffDr):null;
+        const szDAll=szEffDr>0?Math.round(szTotalStk/szEffDr):null;
+        const szShare=artTotalO7>0&&szO7>0?Math.round(szO7/artTotalO7*100)+'%':'—';
+        const szSfc=szDAll===null?'fe':szDAll<14?'ff':szDAll<30?'fw':szDAll<=90?'fk':'fd';
+        const szSft=szDAll===null?'∞':szDAll+'д';
+        const szWbC=szWbStk===0?'qx':szWbStk<10?'ql':'qo';
+        const szTotC=szTotalStk===0?'qx':szTotalStk<15?'ql':'qo';
+
+        rows+=`<tr class="sz-row">
+          <td style="padding-left:28px;font-weight:600">${sz}</td>
+          ${cabCols.map(c=>{
+            const s=r.stk[c.key],o=Math.round(r.o7[c.key]/7);
+            const sc=s===0?'qx':s<10?'ql':'qo';
+            return`<td class="${sc}" style="text-align:center;background:${c.color};font-size:11px">${s||'—'}</td><td style="text-align:center;background:${c.color};font-size:10px;color:var(--ink3)">${o||'—'}</td>`;
+          }).join('')}
+          <td style="text-align:center;font-size:11px;color:#5B3FA0">${szSgp||'—'}</td>
+          <td style="text-align:center;font-size:11px;color:#8B4513">${szRaw||'—'}</td>
+          <td class="${szTotC}" style="text-align:center;font-weight:700">${szTotalStk}</td>
+          <td style="text-align:center;font-size:11px">${Math.round(szDr)}</td>
+          <td style="text-align:center;font-size:11px">${szNeed||'—'}</td>
+          <td style="text-align:center;font-size:11px;color:var(--blue)">${szShare}</td>
+          <td style="text-align:center;font-size:11px;font-weight:700;color:${szDef>0?'var(--red)':'var(--green)'}">${szDef>0?'−'+szDef:'✓'}</td>
+          <td style="text-align:center;font-size:11px">${fmtDays(szDWb)}</td>
+          <td style="text-align:center;font-size:11px">${fmtDays(szDAll)}</td>
+          <td><span class="fl2 ${szSfc}" style="font-size:9px">${szSft}</span></td>
+        </tr>`;
+      });
+    }
+  }
+
+  const tbl=`<div class="sw"><table><thead>${grpHdr}</thead><tbody>${rows||'<tr><td class="em" colspan="20">Нет данных — загрузите кабинеты</td></tr>'}</tbody></table></div>`;
+
+  el.innerHTML=`
+    <div style="max-width:480px;margin:0 0 16px">
+      ${stepsHTML}
+      ${logHTML}
+    </div>
+    ${cards}
+    <div class="sec">
+      <div class="sh"><span class="st">📊 Консолидированный дефицит · ${loaded.join(' + ')}</span><span class="sm2">${artList.length} артикулов</span></div>
+      ${tbl}
+    </div>`;
+}
+
+function togConsoArt(art,togEl){
+  const id='car_'+art.replace(/[^a-z0-9]/gi,'_');
+  /* Toggle open state */
+  const allTr=document.querySelectorAll('#v4 tr');
+  /* Just re-render */
+  const OAC_global=window._OAC||(window._OAC=new Set());
+  if(OAC_global.has(art))OAC_global.delete(art);else OAC_global.add(art);
+  renderConso();
+}
+
+async function reloadForConso(n){
+  logConso(`⏳ Загружаю ${n===1?'EF':n===2?'EZFR':'Ozon'}...`);
+  renderConso(); /* update UI to show loading state */
+  const btn=document.getElementById('rb'+n),ic=document.getElementById('ri'+n);
+  if(btn)btn.disabled=true;if(ic)ic.innerHTML='<span class="sp">↻</span>';
+  await loadExternal();
+  try{
+    if(n<=2)await loadWB(n);else await loadOZ();
+    logConso(`✅ ${n===1?'EF':n===2?'EZFR':'Ozon'} загружен`);
+  }catch(e){
+    logConso(`❌ Ошибка: ${e.message.slice(0,60)}`);
+  }
+  if(btn)btn.disabled=false;if(ic)ic.textContent='↻';
+  renderConso();
+}
 
 /* ── init ── */
 window.onload=()=>{
