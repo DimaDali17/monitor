@@ -46,6 +46,8 @@ body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);fo
 .flt:focus{border-color:var(--ink)}
 .tw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden}
 .sw{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow-x:auto}
+.sw-sticky{max-height:70vh;overflow-y:auto}
+.sw-sticky thead th{position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--border2)}
 table{width:100%;border-collapse:collapse}
 thead th{text-align:left;padding:6px 9px;font-size:9px;font-weight:700;color:var(--ink3);background:var(--bg3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border);font-family:inherit;white-space:nowrap}
 thead th.sa{background:var(--ink)!important;color:var(--bg3)!important}
@@ -926,9 +928,11 @@ let gRevMap={}; // "baseArtLower;szPrLower" → wbSz
 function buildRevMap(){
   gRevMap={};
   for(const [k,mappings] of Object.entries(gMap)){
-    const wbSz=k.split(';')[1]||'';
-    mappings.forEach(({artPr,szPr})=>{
-      const rk=artPr.toLowerCase()+';'+szPr.toLowerCase();
+    const parts=k.split(';');
+    const wbArt=parts[0]||'',wbSz=parts[1]||'';
+    mappings.forEach(({szPr})=>{
+      /* Ключ: wbArt + произв.размер (то что используется в Ozon-артикуле) → wbSz */
+      const rk=wbArt+';'+szPr.toLowerCase();
       if(!gRevMap[rk])gRevMap[rk]=wbSz;
     });
   }
@@ -940,10 +944,10 @@ function parseOzonArt(offerID){
   if(last<0)return{baseArt:offerID,ozSz:'',wbSz:''};
   const baseArt=offerID.slice(0,last);
   const ozSz=offerID.slice(last+1);
-  /* Найдём WB-размер через обратный маппинг */
-  /* Ищем по всем ключам gRevMap где artPr содержит baseArt */
+  /* gRevMap ключ: wbArt_lower + ';' + szPr_lower → wbSz
+     baseArt тот же что Арт ВБ, ozSz это и есть Размер произв (S-Kaifei.../XL) */
   const rk=baseArt.toLowerCase()+';'+ozSz.toLowerCase();
-  const wbSz=gRevMap[rk]||ozSz; /* fallback: используем Ozon-размер как есть */
+  const wbSz=gRevMap[rk]||ozSz; /* fallback: используем Ozon-размер как есть, если маппинг не нашёлся */
   return{baseArt,ozSz,wbSz};
 }
 
@@ -1126,12 +1130,20 @@ function renderConso(){
     <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Потребность на 30 дней по всем кабинетам">Мес.</th>
     <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Доля размера в заказах по этому артикулу (все кабинеты)">Доля</th>
     <th style="text-align:center;background:#FFF8E1;color:#F57F17" data-tip="Нехватка: потребность − общий сток">Дефицит</th>
-    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит всего стока ВБ (EF+EZFR) с учётом выкупаемости">ВБ×</th>
-    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит всего (ВБ+Ozon+СГП+Сырьё) с учётом выкупаемости">Всё×</th>
-    
+    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит стока ВБ+Ozon (EF+EZFR+Ozon) с учётом выкупаемости">ВБ/ОЗ×</th>
+    <th style="text-align:center;background:#E0F2F1;color:#004D40" data-tip="Дней хватит всего: ВБ+Ozon+СГП+Сырьё, с учётом выкупаемости">Всё×</th>
   </tr>`;
 
   const OAC=window._OAC||(window._OAC=new Set()); /* открытые артикулы в консо */
+
+  /* Общая сумма заказов по ВСЕМ артикулам — для доли артикула */
+  let grandTotalO7=0;
+  for(const a2 of artList){
+    for(const sz2 of Object.keys(data[a2])){
+      const rr=data[a2][sz2];
+      grandTotalO7+=rr.o7.ef+rr.o7.ezfr+rr.o7.oz;
+    }
+  }
 
   let rows='';
   for(const art of artList){
@@ -1147,13 +1159,14 @@ function renderConso(){
     });
     const artWbStk=artStk.ef+artStk.ezfr;
     const artOzStk=artStk.oz;
-    const artTotalStk=artWbStk+artOzStk+artSgp+artRaw;
+    const artWbOzStk=artWbStk+artOzStk; /* ВБ/ОЗ — маркетплейсы без своего склада */
+    const artTotalStk=artWbOzStk+artSgp+artRaw;
     const artTotalO7=artO7.ef+artO7.ezfr+artO7.oz;
     const artDr=artTotalO7/7;
     const artNeed=Math.round(artDr*30);
     const artDef=artNeed-artTotalStk;
     const effDr=artDr*br.val;
-    const dWb=effDr>0?Math.round(artWbStk/effDr):null;
+    const dWb=effDr>0?Math.round(artWbOzStk/effDr):null;
     const dAll=effDr>0?Math.round(artTotalStk/effDr):null;
 
     /* Status by dAll */
@@ -1180,11 +1193,10 @@ function renderConso(){
       <td class="${totC}" style="text-align:center;font-weight:900;font-size:14px">${artTotalStk}</td>
       <td style="text-align:center;font-weight:600">${Math.round(artDr)}</td>
       <td style="text-align:center">${artNeed||'—'}</td>
-      <td style="text-align:center;font-size:11px;color:var(--blue)">—</td>
+      <td style="text-align:center;font-size:11px;color:var(--blue)">${grandTotalO7>0&&artTotalO7>0?Math.round(artTotalO7/grandTotalO7*100)+'%':'—'}</td>
       <td style="text-align:center;font-weight:700;color:${defC}">${artDef>0?'−'+artDef:'✓'}</td>
       <td style="text-align:center">${fmtDays(dWb)}</td>
       <td style="text-align:center">${fmtDays(dAll)}</td>
-      
     </tr>`;
 
     if(open){
@@ -1194,13 +1206,14 @@ function renderConso(){
         const szO7=r.o7.ef+r.o7.ezfr+r.o7.oz;
         const szWbStk=r.stk.ef+r.stk.ezfr;
         const szOzStk=r.stk.oz;
+        const szWbOzStk=szWbStk+szOzStk;
         const{sgp:szSgp,raw:szRaw}=getStocksForSz(art,sz);
-        const szTotalStk=szWbStk+szOzStk+szSgp+szRaw;
+        const szTotalStk=szWbOzStk+szSgp+szRaw;
         const szDr=szO7/7;
         const szNeed=Math.round(szDr*30);
         const szDef=szNeed-szTotalStk;
         const szEffDr=szDr*br.val;
-        const szDWb=szEffDr>0?Math.round(szWbStk/szEffDr):null;
+        const szDWb=szEffDr>0?Math.round(szWbOzStk/szEffDr):null;
         const szDAll=szEffDr>0?Math.round(szTotalStk/szEffDr):null;
         const szShare=artTotalO7>0&&szO7>0?Math.round(szO7/artTotalO7*100)+'%':'—';
         const szSfc=szDAll===null?'fe':szDAll<14?'ff':szDAll<30?'fw':szDAll<=90?'fk':'fd';
@@ -1224,13 +1237,12 @@ function renderConso(){
           <td style="text-align:center;font-size:11px;font-weight:700;color:${szDef>0?'var(--red)':'var(--green)'}">${szDef>0?'−'+szDef:'✓'}</td>
           <td style="text-align:center;font-size:11px">${fmtDays(szDWb)}</td>
           <td style="text-align:center;font-size:11px">${fmtDays(szDAll)}</td>
-         
         </tr>`;
       });
     }
   }
 
-  const tbl=`<div class="sw"><table><thead>${grpHdr}</thead><tbody>${rows||'<tr><td class="em" colspan="20">Нет данных — загрузите кабинеты</td></tr>'}</tbody></table></div>`;
+  const tbl=`<div class="sw sw-sticky"><table><thead>${grpHdr}</thead><tbody>${rows||'<tr><td class="em" colspan="20">Нет данных — загрузите кабинеты</td></tr>'}</tbody></table></div>`;
 
   el.innerHTML=`
     <div style="max-width:480px;margin:0 0 16px">
