@@ -16,6 +16,8 @@ body{font-family:'Comfortaa',sans-serif;background:var(--bg);color:var(--ink);fo
 .tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px}
 .tab{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:0;color:var(--ink3);font-family:inherit;white-space:nowrap}
 .tab.on{background:var(--ink);color:var(--bg3)}.tab.ozon.on{background:var(--blue);color:#fff}
+.tab.conso{background:linear-gradient(135deg,#5B3FA0,#7C5BC4);color:#FAF8F4}
+.tab.conso.on{background:linear-gradient(135deg,#5B3FA0,#7C5BC4);color:#FAF8F4;box-shadow:0 0 0 2px #5B3FA0 inset}
 .b{padding:5px 10px;background:0;border:1px solid var(--border2);border-radius:7px;font-size:11px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .b:hover{background:var(--ink);color:var(--bg3);border-color:var(--ink)}.b:disabled{opacity:.4;cursor:default}
 .upd{font-size:10px;color:var(--ink3)}
@@ -141,7 +143,7 @@ thead th[onclick][data-tip]{cursor:pointer}
       <button class="tab on" onclick="go(1)">Easyform</button>
       <button class="tab" onclick="go(2)">EZFR</button>
       <button class="tab ozon" onclick="go(3)">Ozon</button>
-      <button class="tab" onclick="go(4)" style="background:linear-gradient(135deg,#1A1610 60%,#2D7A4F);color:#FAF8F4">📊 Консо</button>
+      <button class="tab conso" onclick="go(4)">📊 Консо</button>
     </div>
     <button class="b" id="rb1" onclick="reload(1)"><span id="ri1">↻</span> EF</button>
     <button class="b" id="rb2" onclick="reload(2)"><span id="ri2">↻</span> EZFR</button>
@@ -804,7 +806,7 @@ function deficitHTML(n){
   </div>`:'';
   return`<div class="sec">${cardsHTML}<div class="sh"><span class="st">📦 Дефицит · Запас · Стоки</span>
     <span class="sm2" style="display:flex;gap:4px;flex-wrap:wrap">
-      <span class="fl2 ff">🔥 &lt;14д × выкуп</span><span class="fl2 fw">⚠️ 14-30д</span><span class="fl2 fk">✅ 30-90д</span><span class="fl2 fd">💀 &gt;90д</span>
+      <span class="fl2 ff" data-tip="Менее 14 дней с учётом выкупаемости">🔥 горит</span><span class="fl2 fw" data-tip="14-30 дней">⚠️ скоро</span><span class="fl2 fk" data-tip="30-90 дней">✅ норма</span><span class="fl2 fd" data-tip="Более 90 дней">💀 избыток</span>
       <span style="font-size:10px;color:var(--ink3);margin-left:4px">* справочно, не в Общем</span>
     </span></div>
     <div style="font-size:10px;color:var(--ink3);margin-bottom:8px;display:flex;gap:14px;flex-wrap:wrap">
@@ -833,7 +835,7 @@ function calcDef(stk,o7,totalStk){
   else if(days<30){fc='fw';bc='bw';bw=Math.min(100,days/30*100);sev=days;}
   else if(days<=90){fc='fk';bc='bk';bw=Math.min(100,days/90*100);sev=days;}
   else{fc='fd';bc='bd';bw=100;sev=days;}
-  const ft=days===null?'нет продаж':(days<14?'🔥 ':days<30?'⚠️ ':days<=90?'✅ ':'💀 ')+days+'д';
+  const ft=days===null?'нет продаж':days<14?'🔥 горит':days<30?'⚠️ скоро':days<=90?'✅ норма':'💀 избыток';
   const def=Math.max(0,need-ts);
   return{stk,o7,need,days,def,fc,ft,bc,bw,sev,sc:stk===0?'qx':stk<10?'ql':'qo'};
 }
@@ -1151,6 +1153,8 @@ function buildConsoData(){
 
 
 /* ── Консо: объединённая лента заказов по всем кабинетам ── */
+let EXPC=false; /* развёрнут ли список заказов в Консо */
+function togExpC(){EXPC=!EXPC;renderConso();}
 function consoOrdersHTML(){
   const all=[];
   [1,2].forEach(n=>{
@@ -1168,16 +1172,20 @@ function consoOrdersHTML(){
     });
   }
   all.sort((a,b)=>new Date(b.t)-new Date(a.t));
-  const show=all.slice(0,15);
+  const LIM_C=15;
+  const show=EXPC?all:all.slice(0,LIM_C);
   const rows=show.map(o=>{
     const tt=o.t?new Date(o.t).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
     const clientPrice=o.price>0?Math.round(o.price*0.80):0;
     const cabColor=o.cab==='Easyform'?'#E65100':o.cab==='EZFR'?'#1565C0':'var(--blue)';
     return`<tr><td><span class="tp">${tt}</span></td><td><span class="fl2" style="background:${cabColor}22;color:${cabColor}">${o.cab}</span></td><td><span class="art">${o.art}</span></td><td>${o.sz}</td><td>${o.qty}</td><td>${clientPrice>0?fmt(clientPrice):'—'}</td></tr>`;
   }).join('');
+  const exp=all.length>LIM_C
+    ?`<tr class="er"><td colspan="6"><button class="eb" onclick="togExpC()">${EXPC?'▲ Свернуть':'▼ Все '+all.length}</button></td></tr>`
+    :'';
   return`<div class="sec"><div class="sh"><span class="st">🛒 Заказы сегодня · все кабинеты</span><span class="sm2">${all.length} заказов</span></div>
     <div class="tw"><table><thead><tr><th>Время</th><th>Кабинет</th><th>Артикул</th><th>Размер</th><th>Кол-во</th><th>Цена на сайте</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="6" class="em">Нет заказов</td></tr>'}</tbody></table></div></div>`;
+    <tbody>${rows||'<tr><td colspan="6" class="em">Нет заказов</td></tr>'}${exp}</tbody></table></div></div>`;
 }
 
 /* ── Консо: остатки по складам — детально по каждому кабинету ── */
@@ -1228,18 +1236,17 @@ function renderConso(){
     {n:2,label:'EZFR',color:'var(--ink)'},
     {n:3,label:'Ozon',color:'var(--blue)'},
   ];
-  const stepsHTML=steps.map(s=>{
+  const stepsHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">${steps.map(s=>{
     const done=!!D[s.n];
-    const loading=`<span id="cri${s.n}">↻</span>`;
-    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${done?'#E8F5E9':'var(--bg3)'};border:1px solid ${done?'#4CAF50':'var(--border2)'};border-radius:9px;margin-bottom:6px">
-      <span style="font-size:18px">${done?'✅':'⏳'}</span>
-      <span style="font-weight:700;flex:1">${s.label}</span>
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${done?'#E8F5E9':'var(--bg3)'};border:1px solid ${done?'#4CAF50':'var(--border2)'};border-radius:9px;flex:1;min-width:200px">
+      <span style="font-size:16px">${done?'✅':'⏳'}</span>
+      <span style="font-weight:700;font-size:12px">${s.label}</span>
       ${done
-        ?`<span style="font-size:11px;color:var(--green)">загружен · ${(D[s.n].stocks||[]).length} позиций стока · ${(D[s.n].orders7||[]).length} заказов за 7д</span>`
-        :`<button class="loadbtn" style="margin:0;padding:6px 16px;font-size:11px" onclick="reloadForConso(${s.n})">↻ Загрузить ${s.label}</button>`
+        ?`<span style="font-size:10px;color:var(--green)">· ${(D[s.n].stocks||[]).length} стока · ${(D[s.n].orders7||[]).length} зак/7д</span>`
+        :`<button class="loadbtn" style="margin:0;padding:5px 12px;font-size:10px" onclick="reloadForConso(${s.n})">↻ Загрузить</button>`
       }
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 
   const logHTML=`<div id="consoLog" style="font-size:10px;color:var(--ink3);margin-top:8px;font-family:monospace;line-height:1.8">${CONSO_LOG.slice(-8).map(l=>`<div>${l}</div>`).join('')||'<div>— лог загрузки —</div>'}</div>`;
 
@@ -1267,18 +1274,21 @@ function renderConso(){
       ['ef','ezfr','oz'].forEach(c=>{totalStk[c]+=r.stk[c];totalO7[c]+=r.o7[c];});
     }
   }
-  const totStkAll=totalStk.ef+totalStk.ezfr+totalStk.oz;
+  /* СГП + Сырьё по всем артикулам — считаем один раз, используем и в карточке, и в дефиците */
+  const sgpRawTotal=artList.reduce((s,a)=>{const ss=getStocksForArt(a);return{sgp:s.sgp+ss.sgp,raw:s.raw+ss.raw};},{sgp:0,raw:0});
+  const totWbOz=totalStk.ef+totalStk.ezfr+totalStk.oz;
+  const totStkAll=totWbOz+sgpRawTotal.sgp+sgpRawTotal.raw; /* теперь включает СГП+Сырьё */
   const totO7All=totalO7.ef+totalO7.ezfr+totalO7.oz;
 
   const cards=`<div class="mg" style="grid-template-columns:repeat(5,1fr)">
-    <div class="mc" style="border-top:3px solid var(--ink)"><div class="ml">Общий сток</div><div class="mv">${totStkAll.toLocaleString('ru')}</div><div class="md" style="font-size:10px;color:var(--ink3)">${hasEF?'EF: '+totalStk.ef:''} ${hasEZFR?'· EZFR: '+totalStk.ezfr:''} ${hasOZ?'· OZ: '+totalStk.oz:''}</div></div>
+    <div class="mc" style="border-top:3px solid var(--ink)"><div class="ml">Общий сток</div><div class="mv">${totStkAll.toLocaleString('ru')}</div><div class="md" style="font-size:10px;color:var(--ink3)">${hasEF?'EF: '+totalStk.ef:''} ${hasEZFR?'· EZFR: '+totalStk.ezfr:''} ${hasOZ?'· OZ: '+totalStk.oz:''} · СГП: ${sgpRawTotal.sgp} · Сырьё: ${sgpRawTotal.raw}</div></div>
     <div class="mc" style="border-top:3px solid var(--green)"><div class="ml">Зак/день (7д) всего</div><div class="mv g">${Math.round(totO7All/7)}</div><div class="md" style="font-size:10px;color:var(--ink3)">${hasEF?'EF: '+Math.round(totalO7.ef/7):''} ${hasEZFR?'· EZFR: '+Math.round(totalO7.ezfr/7):''} ${hasOZ?'· OZ: '+Math.round(totalO7.oz/7):''}</div></div>
     <div class="mc" style="border-top:3px solid var(--amber)"><div class="ml">Потребность 30д</div><div class="mv a">${Math.round(totO7All/7*30).toLocaleString('ru')}</div></div>
     <div class="mc" style="border-top:3px solid var(--red)"><div class="ml">Дефицит (Общий−Потр.)</div>
-      ${(()=>{const sgpRaw=Object.keys(data).reduce((s,a)=>{const ss=getStocksForArt(a);return{sgp:s.sgp+ss.sgp,raw:s.raw+ss.raw};},{sgp:0,raw:0});
-      const tot=totStkAll+sgpRaw.sgp+sgpRaw.raw;const need=Math.round(totO7All/7*30);
-      /* Дефицит = Общий сток минус Потребность. Отрицательное = нехватка (дефицит), положительное = запас сверху */
-      const balance=tot-need;
+      ${(()=>{const need=Math.round(totO7All/7*30);
+      /* totStkAll уже включает СГП+Сырьё. Дефицит = Общий сток минус Потребность.
+         Отрицательное = нехватка, положительное = профицит (запас сверху) */
+      const balance=totStkAll-need;
       return balance<0
         ?`<div class="mv" style="color:var(--red)">−${Math.abs(balance).toLocaleString('ru')}</div>`
         :`<div class="mv" style="color:var(--green)">✓ +${balance.toLocaleString('ru')}</div>`;})()}
@@ -1381,7 +1391,7 @@ function renderConso(){
       <td style="text-align:center;font-weight:600">${Math.round(artDr)}</td>
       <td style="text-align:center">${artNeed||'—'}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${grandTotalO7>0&&artTotalO7>0?Math.round(artTotalO7/grandTotalO7*100)+'%':'—'}</td>
-      <td style="text-align:center;font-weight:700;color:${defC}">${artDef>0?'−'+artDef:'✓'}</td>
+      <td style="text-align:center;font-weight:700;color:${defC}">${artDef>0?'−'+artDef.toLocaleString('ru'):'✓ +'+Math.abs(artDef).toLocaleString('ru')}</td>
       <td style="text-align:center">${fmtDays(dWb)}</td>
       <td style="text-align:center">${fmtDays(dAll)}</td>
     </tr>`;
@@ -1421,7 +1431,7 @@ function renderConso(){
           <td style="text-align:center;font-size:11px">${Math.round(szDr)}</td>
           <td style="text-align:center;font-size:11px">${szNeed||'—'}</td>
           <td style="text-align:center;font-size:11px;color:var(--blue)">${szShare}</td>
-          <td style="text-align:center;font-size:11px;font-weight:700;color:${szDef>0?'var(--red)':'var(--green)'}">${szDef>0?'−'+szDef:'✓'}</td>
+          <td style="text-align:center;font-size:11px;font-weight:700;color:${szDef>0?'var(--red)':'var(--green)'}">${szDef>0?'−'+szDef.toLocaleString('ru'):'✓ +'+Math.abs(szDef).toLocaleString('ru')}</td>
           <td style="text-align:center;font-size:11px">${fmtDays(szDWb)}</td>
           <td style="text-align:center;font-size:11px">${fmtDays(szDAll)}</td>
         </tr>`;
