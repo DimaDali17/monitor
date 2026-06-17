@@ -697,8 +697,63 @@ function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e
 /* ════════════════════════════════════════
    DEFICIT TABLE
 ════════════════════════════════════════ */
+/* Сводка для карточек над блоком Дефицит: считает по D[n].arts (которые строит stocksHTML).
+   Если arts ещё не построены — строим временно из stocks. */
+function ensureArts(n){
+  if(D[n].arts)return;
+  const stocks=D[n].stocks||[],type=D[n].isOz?'oz':'wb';
+  const arts={},whs=new Set();
+  stocks.forEach(s=>{
+    let art,sz,wh,q,name;
+    if(type==='wb'){art=s.supplierArticle||'—';sz=s.techSize||'—';wh=s.warehouseName||'—';q=wbQty(s);name=s.subject||s.category||'';}
+    else{art=s.item_code||s.offer_id||'—';sz='—';wh=s.warehouse_name||'—';q=s.free_to_sell_amount||s.quantity||0;name=s.item_name||'';}
+    const key=art+' · '+sz;whs.add(wh);
+    if(!arts[key])arts[key]={art,sz,name,total:0,wh:{}};
+    arts[key].wh[wh]=(arts[key].wh[wh]||0)+q;arts[key].total+=q;
+  });
+  D[n].arts=arts;
+  D[n].whList=[...whs];
+  D[n].mskWhs=type==='wb'?[...whs].filter(w=>/коледино|электросталь|тула|подольск/i.test(w)):[];
+}
+
+function deficitSummary(n){
+  ensureArts(n);
+  const{arts,orders7,isOz}=D[n];
+  if(!arts)return null;
+  /* Заказы за 7д по ключу арт·размер */
+  const om={};
+  (orders7||[]).forEach(o=>{
+    if(isOz)(o.products||[]).forEach(p=>{const key=(p.offer_id||'—')+' · —';om[key]=(om[key]||0)+(p.quantity||1);});
+    else{const key=(o.supplierArticle||'—')+' · '+(o.techSize||'—');om[key]=(om[key]||0)+(o.quantity||1);}
+  });
+  let totalWb=0,totalSgp=0,totalRaw=0,totalO7=0;
+  const seenArts=new Set();
+  for(const key of Object.keys(arts)){
+    const v=arts[key];
+    totalWb+=v.total;
+    totalO7+=om[key]||0;
+    if(!seenArts.has(v.art)){
+      seenArts.add(v.art);
+      const{sgp,raw}=getStocksForArt(v.art);
+      totalSgp+=sgp;totalRaw+=raw;
+    }
+  }
+  const totalStk=totalWb+totalSgp+totalRaw;
+  const dr=totalO7/7;
+  const need30=Math.round(dr*30);
+  const balance=totalStk-need30;
+  return{totalWb,totalSgp,totalRaw,totalStk,drDay:Math.round(dr),need30,balance};
+}
+
 function deficitHTML(n){
-  return`<div class="sec"><div class="sh"><span class="st">📦 Дефицит · Запас · Стоки</span>
+  const sm=deficitSummary(n);
+  const cardsHTML=sm?`<div class="mg" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
+    <div class="mc" style="border-top:3px solid var(--ink)"><div class="ml">Общий сток</div><div class="mv">${sm.totalStk.toLocaleString('ru')}</div><div class="md" style="font-size:10px;color:var(--ink3)">ВБ ${sm.totalWb} · СГП ${sm.totalSgp} · Сырьё ${sm.totalRaw}</div></div>
+    <div class="mc" style="border-top:3px solid var(--green)"><div class="ml">Зак/день (7д)</div><div class="mv g">${sm.drDay}</div></div>
+    <div class="mc" style="border-top:3px solid var(--amber)"><div class="ml">Потребность 30д</div><div class="mv a">${sm.need30.toLocaleString('ru')}</div></div>
+    <div class="mc" style="border-top:3px solid var(--red)"><div class="ml">Баланс (Общий−Потр.)</div><div class="mv" style="color:${sm.balance<0?'var(--red)':'var(--green)'}">${sm.balance<0?'−'+Math.abs(sm.balance).toLocaleString('ru'):'✓ +'+sm.balance.toLocaleString('ru')}</div></div>
+  </div>`:'';
+  return`<div class="sec">${cardsHTML}<div class="sh"><span class="st">📦 Дефицит · Запас · Стоки</span>
     <span class="sm2" style="display:flex;gap:4px;flex-wrap:wrap">
       <span class="fl2 ff">🔥 &lt;14д × выкуп</span><span class="fl2 fw">⚠️ 14-30д</span><span class="fl2 fk">✅ 30-90д</span><span class="fl2 fd">💀 &gt;90д</span>
       <span style="font-size:10px;color:var(--ink3);margin-left:4px">* справочно, не в Общем</span>
@@ -1045,6 +1100,67 @@ function buildConsoData(){
   return data;
 }
 
+
+/* ── Консо: объединённая лента заказов по всем кабинетам ── */
+function consoOrdersHTML(){
+  const all=[];
+  [1,2].forEach(n=>{
+    const d=D[n];if(!d)return;
+    const label=n===1?'Easyform':'EZFR';
+    (d.todayO||[]).forEach(o=>all.push({t:o.date,art:o.supplierArticle||'—',sz:o.techSize||'—',qty:o.quantity||1,price:wbPrice(o),cab:label}));
+  });
+  const dOz=D[3];
+  if(dOz){
+    (dOz.todayO||[]).forEach(o=>{
+      (o.products||[]).forEach(p=>{
+        const{baseArt,wbSz}=parseOzonArt(p.offer_id||'');
+        all.push({t:o.in_process_at||o.created_at,art:baseArt,sz:wbSz,qty:p.quantity||1,price:parseFloat(p.price||p.offer_price||0),cab:'Ozon'});
+      });
+    });
+  }
+  all.sort((a,b)=>new Date(b.t)-new Date(a.t));
+  const show=all.slice(0,15);
+  const rows=show.map(o=>{
+    const tt=o.t?new Date(o.t).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'—';
+    const clientPrice=o.price>0?Math.round(o.price*0.80):0;
+    const cabColor=o.cab==='Easyform'?'#E65100':o.cab==='EZFR'?'#1565C0':'var(--blue)';
+    return`<tr><td><span class="tp">${tt}</span></td><td><span class="fl2" style="background:${cabColor}22;color:${cabColor}">${o.cab}</span></td><td><span class="art">${o.art}</span></td><td>${o.sz}</td><td>${o.qty}</td><td>${clientPrice>0?fmt(clientPrice):'—'}</td></tr>`;
+  }).join('');
+  return`<div class="sec"><div class="sh"><span class="st">🛒 Заказы сегодня · все кабинеты</span><span class="sm2">${all.length} заказов</span></div>
+    <div class="tw"><table><thead><tr><th>Время</th><th>Кабинет</th><th>Артикул</th><th>Размер</th><th>Кол-во</th><th>Цена на сайте</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6" class="em">Нет заказов</td></tr>'}</tbody></table></div></div>`;
+}
+
+/* ── Консо: остатки по складам — детально по каждому кабинету ── */
+function consoStocksHTML(){
+  let sections='';
+  [1,2].forEach(n=>{
+    const d=D[n];if(!d)return;
+    ensureArts(n);
+    const label=n===1?'Easyform':'EZFR';
+    const whList=d.whList||[];
+    const artsArr=Object.values(d.arts||{});
+    const totalByWh={};
+    whList.forEach(w=>{totalByWh[w]=artsArr.reduce((s,a)=>s+(a.wh[w]||0),0);});
+    const topWh=[...whList].sort((a,b)=>totalByWh[b]-totalByWh[a]).slice(0,8);
+    const grandTotal=artsArr.reduce((s,a)=>s+a.total,0);
+    sections+=`<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:6px">${label} — всего ${grandTotal.toLocaleString('ru')} шт на ${whList.length} складах</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${topWh.map(w=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px"><span style="color:var(--ink3)">${w.slice(0,18)}</span><br><b>${totalByWh[w].toLocaleString('ru')}</b></div>`).join('')}
+      </div>
+    </div>`;
+  });
+  const dOz=D[3];
+  if(dOz){
+    const total=(dOz.stocks||[]).reduce((s,r)=>s+(r.free_to_sell_amount||r.quantity||0),0);
+    sections+=`<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">Ozon — всего ${total.toLocaleString('ru')} шт (FBO)</div>
+    </div>`;
+  }
+  return`<div class="sec"><div class="sh"><span class="st">📦 Остатки по складам · сводно</span></div>${sections||'<div class="em">Нет данных</div>'}</div>`;
+}
+
 /* ── Render Консо ── */
 const CONSO_LOG=[];
 function logConso(msg){
@@ -1111,8 +1227,12 @@ function renderConso(){
     <div class="mc" style="border-top:3px solid var(--amber)"><div class="ml">Потребность 30д</div><div class="mv a">${Math.round(totO7All/7*30).toLocaleString('ru')}</div></div>
     <div class="mc" style="border-top:3px solid var(--red)"><div class="ml">Дефицит (Общий−Потр.)</div>
       ${(()=>{const sgpRaw=Object.keys(data).reduce((s,a)=>{const ss=getStocksForArt(a);return{sgp:s.sgp+ss.sgp,raw:s.raw+ss.raw};},{sgp:0,raw:0});
-      const tot=totStkAll+sgpRaw.sgp+sgpRaw.raw;const need=Math.round(totO7All/7*30);const def=need-tot;
-      return`<div class="mv" style="color:${def>0?'var(--red)':'var(--green)'}">${def>0?'−'+def.toLocaleString('ru'):'✓ '+Math.abs(def).toLocaleString('ru')}</div>`;})()}
+      const tot=totStkAll+sgpRaw.sgp+sgpRaw.raw;const need=Math.round(totO7All/7*30);
+      /* Дефицит = Общий сток минус Потребность. Отрицательное = нехватка (дефицит), положительное = запас сверху */
+      const balance=tot-need;
+      return balance<0
+        ?`<div class="mv" style="color:var(--red)">−${Math.abs(balance).toLocaleString('ru')}</div>`
+        :`<div class="mv" style="color:var(--green)">✓ +${balance.toLocaleString('ru')}</div>`;})()}
     </div>
     <div class="mc" style="border-top:3px solid #5B3FA0"><div class="ml">Кабинеты загружены</div><div class="mv" style="font-size:18px">${loaded.join(' · ')}</div></div>
   </div>`;
@@ -1268,10 +1388,12 @@ function renderConso(){
       ${logHTML}
     </div>
     ${cards}
+    ${consoOrdersHTML()}
     <div class="sec">
       <div class="sh"><span class="st">📊 Консолидированный дефицит · ${loaded.join(' + ')}</span><span class="sm2">${artList.length} артикулов</span></div>
       ${tbl}
-    </div>`;
+    </div>
+    ${consoStocksHTML()}`;
 }
 
 function togConsoArt(art,togEl){
