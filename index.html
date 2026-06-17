@@ -87,6 +87,10 @@ tbody tr:hover{background:var(--bg3)}
 .fb{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;position:relative}
 .fb input{flex:1;min-width:160px;padding:7px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0}
 .fb input:focus{border-color:var(--ink)}
+.filter-bar{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.filter-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.filter-row:last-of-type{margin-bottom:0}
+.filter-label{font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;padding-top:7px;min-width:90px}
 .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:var(--ink);color:var(--bg3);border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
 .chip .cx{cursor:pointer;opacity:.7;font-size:13px;line-height:1}.chip .cx:hover{opacity:1}
 .ddrop{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.1);display:none}
@@ -175,6 +179,7 @@ const DS={1:{c:'stk',d:-1},2:{c:'stk',d:-1},3:{c:'stk',d:-1}};
 const CM={1:'day',2:'day',3:'day'};
 const CV={1:'ord',2:'ord',3:'ord'};
 const FA={1:[],2:[],3:[]};
+const FP={1:[],2:[],3:[]}; // выбранные Предметы (subject) для фильтра
 const LIM=10;
 
 /* ── Google Sheets CSVs ── */
@@ -535,6 +540,12 @@ function chartHTML(n,type){
 }
 
 /* ── filter chips ── */
+function getSubjects(n){
+  const d=D[n];if(!d)return[];const s=new Set();
+  if(d.isOz){(d.todayO||[]).concat(d.yestO||[]).concat(d.orders7||[]).forEach(o=>(o.products||[]).forEach(p=>{if(p.name)s.add(p.name.split(' ')[0]||p.name);}));}
+  else{(d.todayO||[]).concat(d.yestO||[]).concat(d.orders7||[]).forEach(o=>s.add(o.subject||o.category||''));(d.stocks||[]).forEach(r=>s.add(r.subject||r.category||''));}
+  s.delete('');return[...s].sort();
+}
 function getArts(n){
   const d=D[n];if(!d)return[];const s=new Set();
   if(d.isOz){(d.todayO||[]).concat(d.yestO||[]).concat(d.orders7||[]).forEach(o=>(o.products||[]).forEach(p=>s.add(p.offer_id||'')));(d.stocks||[]).forEach(r=>s.add(r.item_code||r.offer_id||''));}
@@ -542,8 +553,40 @@ function getArts(n){
   s.delete('');s.delete('—');return[...s].sort();
 }
 function filterHTML(n){
-  return`<div class="fb" id="fb${n}">${FA[n].map((a,i)=>`<span class="chip">${a}<span class="cx" onclick="rmFA(${n},${i})">×</span></span>`).join('')}<input id="fai${n}" placeholder="🔎 артикул…" oninput="faInput(${n})" onfocus="faInput(${n})" autocomplete="off"><div class="ddrop" id="fdd${n}"></div></div>`;
+  const subjOptions=getSubjects(n);
+  const subjChips=FP[n].map((s,i)=>`<span class="chip" style="background:var(--blue)">${s}<span class="cx" onclick="rmFP(${n},${i})">×</span></span>`).join('');
+  const artChips=FA[n].map((a,i)=>`<span class="chip">${a}<span class="cx" onclick="rmFA(${n},${i})">×</span></span>`).join('');
+  return`<div class="filter-bar" id="fbwrap${n}">
+    <div class="filter-row">
+      <span class="filter-label">📁 Предмет</span>
+      <div class="fb" id="fbP${n}" style="flex:1">
+        ${subjChips}
+        <input id="fpi${n}" placeholder="${FP[n].length?'+ ещё предмет…':'все предметы…'}" oninput="fpInput(${n})" onfocus="fpInput(${n})" autocomplete="off">
+        <div class="ddrop" id="fpdd${n}"></div>
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">🔖 Артикул</span>
+      <div class="fb" id="fb${n}" style="flex:1">
+        ${artChips}
+        <input id="fai${n}" placeholder="${FA[n].length?'+ ещё артикул…':'все артикулы…'}" oninput="faInput(${n})" onfocus="faInput(${n})" autocomplete="off">
+        <div class="ddrop" id="fdd${n}"></div>
+      </div>
+    </div>
+    ${(FA[n].length||FP[n].length)?`<button class="eb" style="margin-top:4px" onclick="clearFilters(${n})">✕ Очистить все фильтры</button>`:''}
+  </div>`;
 }
+function fpInput(n){
+  const inp=document.getElementById('fpi'+n),dd=document.getElementById('fpdd'+n);
+  const q=(inp.value||'').toLowerCase().trim();
+  if(!q){dd.classList.remove('show');dd.innerHTML='';return;}
+  const all=getSubjects(n).filter(a=>a.toLowerCase().includes(q)&&!FP[n].includes(a)).slice(0,12);
+  if(!all.length){dd.classList.remove('show');return;}
+  dd.innerHTML=all.map(a=>`<div onclick="addFP(${n},'${a.replace(/'/g,"\\'")}')">${a}</div>`).join('');dd.classList.add('show');
+}
+function addFP(n,s){FP[n].push(s);document.getElementById('fpi'+n).value='';document.getElementById('fpdd'+n).classList.remove('show');reRender(n);}
+function rmFP(n,i){FP[n].splice(i,1);reRender(n);}
+function clearFilters(n){FA[n]=[];FP[n]=[];reRender(n);}
 function faInput(n){
   const inp=document.getElementById('fai'+n),dd=document.getElementById('fdd'+n);
   const q=(inp.value||'').toLowerCase().trim();
@@ -556,16 +599,22 @@ function addFA(n,art){FA[n].push(art);document.getElementById('fai'+n).value='';
 function rmFA(n,i){FA[n].splice(i,1);reRender(n);}
 function reRender(n){if(n<=2)renderWB(n);else renderOZ();}
 function applyFA(n){
-  const d=D[n];if(!d||!FA[n].length)return d;const f=FA[n],isOz=d.isOz;
-  const match=isOz?(o=>(o.products||[]).some(p=>f.includes(p.offer_id))):(o=>f.includes(o.supplierArticle));
-  const matchS=isOz?(s=>f.includes(s.item_code||s.offer_id)):(s=>f.includes(s.supplierArticle));
+  const d=D[n];if(!d)return d;
+  const f=FA[n],p=FP[n],isOz=d.isOz;
+  if(!f.length&&!p.length)return d;
+  const matchArt=isOz?(o=>!f.length||(o.products||[]).some(pp=>f.includes(pp.offer_id))):(o=>!f.length||f.includes(o.supplierArticle));
+  const matchArtS=isOz?(s=>!f.length||f.includes(s.item_code||s.offer_id)):(s=>!f.length||f.includes(s.supplierArticle));
+  const matchSubj=isOz?(o=>!p.length||(o.products||[]).some(pp=>p.some(ps=>(pp.name||'').startsWith(ps)))):(o=>!p.length||p.includes(o.subject||o.category||''));
+  const matchSubjS=isOz?(s=>true):(s=>!p.length||p.includes(s.subject||s.category||''));
+  const match=o=>matchArt(o)&&matchSubj(o);
+  const matchS=s=>matchArtS(s)&&matchSubjS(s);
   return{...d,_om:null,todayO:(d.todayO||[]).filter(match),yestO:(d.yestO||[]).filter(match),orders7:(d.orders7||[]).filter(match),allOrders:(d.allOrders||[]).filter(match),stocks:(d.stocks||[]).filter(matchS)};
 }
 document.addEventListener('click',e=>{if(!e.target.closest('.fb'))document.querySelectorAll('.ddrop').forEach(d=>d.classList.remove('show'));});
 
 /* ── render WB ── */
 function renderWB(n){
-  const fd=FA[n].length?applyFA(n):D[n];
+  const fd=(FA[n].length||FP[n].length)?applyFA(n):D[n];
   const{todayO,yestO}=fd;
   const yH=yestToHour(yestO,'wb');
   const tC=todayO.length,yhC=yH.length,yC=yestO.length;
@@ -588,7 +637,7 @@ function renderWB(n){
   document.getElementById('v'+n).innerHTML=h;paintTables(n);D[n]=origD;
 }
 function renderOZ(){
-  const fd=FA[3].length?applyFA(3):D[3];
+  const fd=(FA[3].length||FP[3].length)?applyFA(3):D[3];
   const{todayO,yestO}=fd;
   const yH=yestToHour(yestO,'oz');
   const tC=todayO.length,yhC=yH.length,yC=yestO.length;
