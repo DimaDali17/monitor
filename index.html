@@ -189,6 +189,7 @@ let gRaw={};          // "artPr_lower;szPr_lower" → qty (nobrand тоже)
 // Маппинг: "wbArt_lower;wbSz_lower" → [{artPr, szPr}]
 let gMap={};
 let gExtLoaded=false;
+let _gExtPromise=null; // защита от повторного параллельного вызова (race condition)
 
 function parseCSV(text){
   const lines=text.trim().split('\n');
@@ -202,7 +203,11 @@ function parseCSV(text){
 
 async function loadExternal(){
   if(gExtLoaded)return;
+  if(_gExtPromise)return _gExtPromise; /* уже идёт загрузка — ждём ту же промис, не запускаем вторую */
+  _gExtPromise=(async()=>{
   try{
+    /* Очищаем перед загрузкой — защита от повторного накопления */
+    gBuyrate={};gSgp={};gRaw={};gMap={};
     const [rB,rS,rR,rM]=await Promise.all([
       fetch(CSV_BUYRATE).then(r=>r.text()),
       fetch(CSV_SGP).then(r=>r.text()),
@@ -262,6 +267,8 @@ async function loadExternal(){
     gExtLoaded=true;
     console.log('Ext loaded: buyrate='+Object.keys(gBuyrate).length+' sgp='+Object.keys(gSgp).length+' raw='+Object.keys(gRaw).length+' map='+Object.keys(gMap).length);
   }catch(e){console.warn('Ошибка внешних данных:',e);}
+  })();
+  return _gExtPromise;
 }
 
 function getBuyrate(art){
