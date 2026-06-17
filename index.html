@@ -87,7 +87,7 @@ tbody tr:hover{background:var(--bg3)}
 .fb{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;position:relative}
 .fb input{flex:1;min-width:160px;padding:7px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0}
 .fb input:focus{border-color:var(--ink)}
-.filter-bar{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.filter-bar{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04);max-width:50%;min-width:380px}
 .filter-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
 .filter-row:last-of-type{margin-bottom:0}
 .filter-label{font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;padding-top:7px;min-width:90px}
@@ -608,7 +608,7 @@ function applyFA(n){
   const matchSubjS=isOz?(s=>true):(s=>!p.length||p.includes(s.subject||s.category||''));
   const match=o=>matchArt(o)&&matchSubj(o);
   const matchS=s=>matchArtS(s)&&matchSubjS(s);
-  return{...d,_om:null,todayO:(d.todayO||[]).filter(match),yestO:(d.yestO||[]).filter(match),orders7:(d.orders7||[]).filter(match),allOrders:(d.allOrders||[]).filter(match),stocks:(d.stocks||[]).filter(matchS)};
+  return{...d,_om:null,arts:null,whList:null,mskWhs:null,todayO:(d.todayO||[]).filter(match),yestO:(d.yestO||[]).filter(match),orders7:(d.orders7||[]).filter(match),allOrders:(d.allOrders||[]).filter(match),stocks:(d.stocks||[]).filter(matchS)};
 }
 document.addEventListener('click',e=>{if(!e.target.closest('.fb'))document.querySelectorAll('.ddrop').forEach(d=>d.classList.remove('show'));});
 
@@ -704,8 +704,6 @@ function stocksHTML(n){
   if(!SS[n])SS[n]={c:'total',d:-1};
   return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
     <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <input class="flt" id="sflt${n}" placeholder="🔎 артикул" value="${FS[n]||''}" oninput="fltS(${n},this.value)" style="width:140px">
-      <input class="flt" id="sfltZ${n}" placeholder="🔎 размер" value="${FSZ[n]||''}" oninput="fltSZ(${n},this.value)" style="width:100px">
       <span class="sm2">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
       ${D[n].mskWhs.length?`<span class="sm2" style="color:var(--sgp)">МСК-склады: ${D[n].mskWhs.join(', ')}</span>`:'<span class="sm2" style="color:var(--red)">МСК-склады не найдены (Коледино/Тула/Электросталь/Подольск)</span>'}
     </span></div>
@@ -749,7 +747,9 @@ function togExS(n){EXS[n]=!EXS[n];const e=document.getElementById('stbl'+n);if(e
 /* Сводка для карточек над блоком Дефицит: считает по D[n].arts (которые строит stocksHTML).
    Если arts ещё не построены — строим временно из stocks. */
 function ensureArts(n){
-  if(D[n].arts)return;
+  /* ВСЕГДА перестраиваем arts из текущих D[n].stocks — без кэша.
+     Кэш ломал фильтры: при spread {...d} ссылка на старый arts "утекала"
+     в новый объект fd, и ensureArts пропускал пересчёт на отфильтрованных данных. */
   const stocks=D[n].stocks||[],type=D[n].isOz?'oz':'wb';
   const arts={},whs=new Set();
   stocks.forEach(s=>{
