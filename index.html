@@ -925,14 +925,25 @@ function togExD(n){EXD[n]=!EXD[n];const e=document.getElementById('dtbl'+n);if(e
    Нам нужен обратный маппинг: artPr_lower+szPr_lower → wbSz */
 let gRevMap={}; // "baseArtLower;szPrLower" → wbSz
 
+/* Нормализация обозначений размеров: 2XL≡XXL, 3XL≡XXXL, 4XL≡XXXXL и т.д.
+   Используется и при построении gRevMap, и при поиске ozSz */
+function normSz(sz){
+  let s=(sz||'').toUpperCase().trim();
+  /* NXL → N раз "X" + L, например 2XL → XXL, 5XL → XXXXXL */
+  const m=s.match(/^(\d+)XL$/);
+  if(m){const n=parseInt(m[1],10);return 'X'.repeat(n)+'L';}
+  return s;
+}
+
 function buildRevMap(){
   gRevMap={};
   for(const [k,mappings] of Object.entries(gMap)){
     const parts=k.split(';');
     const wbArt=parts[0]||'',wbSz=parts[1]||'';
     mappings.forEach(({szPr})=>{
-      /* Ключ: wbArt + произв.размер (то что используется в Ozon-артикуле) → wbSz */
-      const rk=wbArt+';'+szPr.toLowerCase();
+      /* Ключ: wbArt + НОРМАЛИЗОВАННЫЙ произв.размер → wbSz
+         normSz сводит XXL/2XL, XXXL/3XL и т.д. к одному виду */
+      const rk=wbArt+';'+normSz(szPr).toLowerCase();
       if(!gRevMap[rk])gRevMap[rk]=wbSz;
     });
   }
@@ -944,9 +955,9 @@ function parseOzonArt(offerID){
   if(last<0)return{baseArt:offerID,ozSz:'',wbSz:''};
   const baseArt=offerID.slice(0,last);
   const ozSz=offerID.slice(last+1);
-  /* gRevMap ключ: wbArt_lower + ';' + szPr_lower → wbSz
-     baseArt тот же что Арт ВБ, ozSz это и есть Размер произв (S-Kaifei.../XL) */
-  const rk=baseArt.toLowerCase()+';'+ozSz.toLowerCase();
+  /* gRevMap ключ: wbArt_lower + ';' + нормализованный szPr_lower → wbSz
+     Нормализация сводит 2XL/XXL, 3XL/XXXL и т.д. к одному виду перед поиском */
+  const rk=baseArt.toLowerCase()+';'+normSz(ozSz).toLowerCase();
   const wbSz=gRevMap[rk]||ozSz; /* fallback: используем Ozon-размер как есть, если маппинг не нашёлся */
   return{baseArt,ozSz,wbSz};
 }
