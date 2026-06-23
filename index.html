@@ -701,13 +701,13 @@ function stocksHTML(n){
   D[n].arts=arts;D[n].whList=whList;
   /* МСК-склады по точному списку из PBI */
   D[n].mskWhs=type==='wb'
-    ? whList.filter(w=>/коледино|электросталь|тула|подольск/i.test(w))
+    ? whList.filter(w=>/коледино|электросталь|тула|подольск|рязань/i.test(w))
     : []; /* У Ozon своя логика — не применяем WB-склады */
   if(!SS[n])SS[n]={c:'total',d:-1};
   return`<div class="sec"><div class="sh"><span class="st">Остатки по складам ВБ</span>
     <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <span class="sm2">${Object.keys(arts).length} позиций · ${whList.length} складов</span>
-      ${D[n].mskWhs.length?`<span class="sm2" style="color:var(--sgp)">МСК-склады: ${D[n].mskWhs.join(', ')}</span>`:'<span class="sm2" style="color:var(--red)">МСК-склады не найдены (Коледино/Тула/Электросталь/Подольск)</span>'}
+      ${D[n].mskWhs.length?`<span class="sm2" style="color:var(--sgp)">МСК-склады: ${D[n].mskWhs.join(', ')}</span>`:'<span class="sm2" style="color:var(--red)">МСК-склады не найдены (Коледино/Тула/Электросталь/Подольск/Рязань)</span>'}
     </span></div>
     <div class="sw" id="stbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
 }
@@ -764,7 +764,7 @@ function ensureArts(n){
   });
   D[n].arts=arts;
   D[n].whList=[...whs];
-  D[n].mskWhs=type==='wb'?[...whs].filter(w=>/коледино|электросталь|тула|подольск/i.test(w)):[];
+  D[n].mskWhs=type==='wb'?[...whs].filter(w=>/коледино|электросталь|тула|подольск|рязань/i.test(w)):[];
 }
 
 function deficitSummary(n){
@@ -814,7 +814,7 @@ function deficitHTML(n){
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск, Рязань</span>
       <span><span style="font-weight:700;margin-right:2px">×</span>— с учётом выкупаемости</span>
     </div>
     <div class="sw" id="dtbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
@@ -855,7 +855,7 @@ function defTbl(n){
   const totalO7=(orders7||[]).reduce((s,o)=>s+(isOz?(o.products||[]).reduce((ss,p)=>ss+(p.quantity||1),0):1),0);
 
   /* МСК-склады */
-  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:(d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
+  const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:(d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск|рязань/i.test(w));
 
   /* Группируем по артикулу */
   const byArt={};
@@ -912,7 +912,7 @@ function defTbl(n){
     ${TH('stk','ВБ','Остаток на складах Wildberries или Ozon на сегодня','th-wb')}
     ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП, колонка ИТОГО ТЕ)','th-sgp')}
     ${THF('Сырьё','Остаток полуфабрикатов — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
-    ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск — справочно, в Общий не входит','th-msk')}
+    ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск, Рязань — справочно, в Общий не входит','th-msk')}
     
     ${THF('Общий','Суммарный сток: ВБ + СГП + Сырьё. МСК и В пути не включены','th-total')}
     ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
@@ -923,7 +923,7 @@ function defTbl(n){
     ${TH('days','ВБ×','Дней хватит остатка ВБ с учётом выкупаемости. Если нет данных — используется 70%','th-days')}
     ${THF('Всё×','Дней хватит всех стоков (ВБ + СГП + Сырьё) с учётом выкупаемости','th-days')}
     ${THF('Без сырья×','Дней хватит ВБ + СГП с учётом выкупаемости (без учёта производства в сырье)','th-days')}
-    ${THF('МСК×','Дней хватит только московского стока (Коледино, Тула, Электросталь, Подольск) с учётом выкупаемости','th-days')}
+    ${THF('МСК×','Дней хватит только московского стока (Коледино, Тула, Электросталь, Подольск, Рязань) с учётом выкупаемости','th-days')}
   </tr>`;
 
   const showArts=EXD[n]?artRows:artRows.slice(0,LIM);
@@ -1101,7 +1101,7 @@ function buildConsoData(){
     const d=D[n];if(!d)return;
     const cab=n===1?'ef':'ezfr';
     const mskWhs=(d.mskWhs&&d.mskWhs.length)?d.mskWhs:
-      (d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск/i.test(w));
+      (d.whList||[]).filter(w=>/коледино|электросталь|тула|подольск|рязань/i.test(w));
 
     /* Стоки */
     (d.stocks||[]).forEach(s=>{
