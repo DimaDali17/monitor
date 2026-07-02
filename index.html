@@ -261,12 +261,14 @@ async function loadExternal(){
       const sz=(row['Размер']||'').trim();
       const qty=parseInt(row['SUM из Штук']||0,10)||0;
       if(!art)return;
-      const k=art.toLowerCase()+';'+sz.toLowerCase();
+      /* normSz: 3XL→XXXL, 2XL→XXL — чтобы совпадало с gMap при поиске */
+      const szNorm=normSz(sz).toLowerCase();
+      const k=art.toLowerCase()+';'+szNorm;
       gRaw[k]=(gRaw[k]||0)+qty;
       /* Если артикул содержит " nobrand" — также записываем без него */
       if(art.toLowerCase().includes(' nobrand')){
         const artClean=art.toLowerCase().replace(' nobrand','').trim();
-        const k2=artClean+';'+sz.toLowerCase();
+        const k2=artClean+';'+szNorm;
         gRaw[k2]=(gRaw[k2]||0)+qty;
       }
     });
@@ -428,7 +430,7 @@ async function reload(n){
 
 async function loadWB(n){
   const key=K[n],t=td(),y=yd(),w=wd();
-  const ordFrom=new Date(Date.now()-14*864e5).toISOString().slice(0,10)+'T00:00:00Z';
+  const ordFrom=new Date(Date.now()-15*864e5).toISOString().slice(0,10)+'T00:00:00Z'; /* 15 дней для надёжного сравнения 2 недель */
   const stkFrom=new Date().getFullYear()+'-01-01T00:00:00Z';
   const BASE='https://statistics-api.wildberries.ru/api/v1/supplier';
   const [allOrdersR,stocksR]=await Promise.all([
@@ -509,7 +511,7 @@ function chartHTML(n,type){
     for(let i=0;i<24;i++){labels.push(i%3===0?(i+':00'):'');todayV.push(tH[i]);yestV.push(yH[i]);}
   }else{
     const days=[],prev=[];for(let i=6;i>=0;i--)days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
-    for(let i=7;i>=1;i--)prev.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+    for(let i=13;i>=7;i--)prev.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     const all=d.allOrders||[],cnt={},cntP={};
     all.forEach(o=>{const dd=getD(o);const v=isRev?pFn(o):1;if(dd>=w)cnt[dd]=(cnt[dd]||0)+v;else if(dd>=w2)cntP[dd]=(cntP[dd]||0)+v;});
     for(let i=0;i<7;i++){labels.push(new Date(days[i]+'T12:00:00').toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''));todayV.push(cnt[days[i]]||0);yestV.push(cntP[prev[i]]||0);}
@@ -814,7 +816,7 @@ function deficitHTML(n){
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск, Рязань</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК* — справочно: Коледино, Тула, Электросталь, Подольск</span>
       <span><span style="font-weight:700;margin-right:2px">×</span>— с учётом выкупаемости</span>
     </div>
     <div class="sw" id="dtbl${n}"><div class="lm"><span class="sp">↻</span></div></div></div>`;
@@ -912,7 +914,7 @@ function defTbl(n){
     ${TH('stk','ВБ','Остаток на складах Wildberries или Ozon на сегодня','th-wb')}
     ${THF('СГП','Остаток готовой продукции на вашем складе — из Google Sheets (лист СГП, колонка ИТОГО ТЕ)','th-sgp')}
     ${THF('Сырьё','Остаток полуфабрикатов — из Google Sheets (лист Остатки сводная). Nobrand суммируется с основным артикулом','th-raw')}
-    ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск, Рязань — справочно, в Общий не входит','th-msk')}
+    ${THF('МСК*','Остаток на московских складах: Коледино, Тула, Электросталь, Подольск — справочно, в Общий не входит','th-msk')}
     
     ${THF('Общий','Суммарный сток: ВБ + СГП + Сырьё. МСК и В пути не включены','th-total')}
     ${TH('o7','Зак/день','Среднее количество заказов в день за последние 7 дней (не включая сегодня)','th-need')}
