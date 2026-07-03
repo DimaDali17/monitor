@@ -296,12 +296,12 @@ function getStocksForSz(wbArt,wbSz){
   const ka=wbArt.toLowerCase(),kz=wbSz.toLowerCase();
   /* SGP — прямой поиск */
   const sgp=gSgp[ka+';'+kz]||0;
-  /* RAW — через маппинг */
+  /* RAW — через маппинг, нормализуем szPr чтобы совпадало с ключами gRaw */
   const mapKey=ka+';'+kz;
   const mappings=gMap[mapKey]||[];
   let raw=0;
   mappings.forEach(({artPr,szPr})=>{
-    const kp=artPr.toLowerCase()+';'+szPr.toLowerCase();
+    const kp=artPr.toLowerCase()+';'+normSz(szPr).toLowerCase();
     raw+=gRaw[kp]||0;
   });
   return{sgp,raw};
@@ -322,7 +322,7 @@ function getStocksForArt(wbArt){
   for(const [k,mappings] of Object.entries(gMap)){
     if(!k.startsWith(ka+';'))continue;
     mappings.forEach(({artPr,szPr})=>{
-      const kp=artPr.toLowerCase()+';'+szPr.toLowerCase();
+      const kp=artPr.toLowerCase()+';'+normSz(szPr).toLowerCase();
       if(!seen.has(kp)){seen.add(kp);raw+=gRaw[kp]||0;}
     });
   }
