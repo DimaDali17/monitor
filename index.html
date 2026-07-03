@@ -115,6 +115,11 @@ thead th[data-tip]{cursor:help}
 thead th[onclick][data-tip]{cursor:pointer}
 #tip-box{position:fixed;background:rgba(26,22,16,.93);color:#fff;font-size:11px;font-weight:500;padding:7px 11px;border-radius:9px;white-space:normal;z-index:99999;pointer-events:none;font-family:'Comfortaa',sans-serif;width:240px;text-align:center;line-height:1.55;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+.ver-badge{font-size:10px;padding:3px 8px;border-radius:20px;cursor:pointer;font-weight:600;white-space:nowrap;border:none;font-family:inherit}
+.ver-ok{background:#E8F4EE;color:#2D7A4F}
+.ver-old{background:#FEE8E8;color:#B84040;animation:pulse 2s infinite}
+.ver-check{background:var(--bg3);color:var(--ink3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 </style>
 </head>
 <body>
@@ -139,6 +144,7 @@ thead th[onclick][data-tip]{cursor:pointer}
   <div><div class="bname" id="hname">EasyForm</div><div class="bsub">Dashboard</div></div>
   <div class="hright">
     <div class="clock" id="clk"></div>
+    <button class="ver-badge ver-check" id="verBtn" onclick="checkVersion()" data-tip="Нажмите для проверки версии. Проверяется автоматически каждые 60 сек">⟳ версия</button>
     <div class="tabs">
       <button class="tab on" onclick="go(1)">Easyform</button>
       <button class="tab" onclick="go(2)">EZFR</button>
@@ -1518,6 +1524,40 @@ async function reloadForConso(n){
   if(btn)btn.disabled=false;if(ic)ic.textContent='↻';
   renderConso();
 }
+
+/* ── Version checker ── */
+function checkVersion(){
+  const btn=document.getElementById('verBtn');
+  if(btn){btn.className='ver-badge ver-check';btn.textContent='⟳ проверка...';}
+  fetch(location.pathname+'?v='+Date.now())
+    .then(r=>r.text())
+    .then(t=>{
+      const m=t.match(/VERSION="([^"]+)"/);
+      const serverVer=m?m[1]:null;
+      const btn=document.getElementById('verBtn');
+      if(!btn)return;
+      if(!serverVer){
+        btn.className='ver-badge ver-check';
+        btn.textContent='? версия';
+        btn.setAttribute('data-tip','Версия на сервере не определена');
+      } else if(serverVer===VERSION){
+        btn.className='ver-badge ver-ok';
+        btn.textContent='✓ актуально';
+        btn.setAttribute('data-tip','Версия актуальна: '+VERSION);
+      } else {
+        btn.className='ver-badge ver-old';
+        btn.textContent='↑ обновить F5';
+        btn.setAttribute('data-tip','На сервере новая версия: '+serverVer+'. Нажмите F5 для обновления');
+      }
+    })
+    .catch(()=>{
+      const btn=document.getElementById('verBtn');
+      if(btn){btn.className='ver-badge ver-check';btn.textContent='? нет связи';}
+    });
+}
+/* Проверяем сразу при загрузке и затем каждые 60 секунд */
+setTimeout(checkVersion, 3000);
+setInterval(checkVersion, 60000);
 
 /* ── init ── */
 window.onload=()=>{
