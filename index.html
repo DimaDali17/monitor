@@ -881,6 +881,29 @@ function defTbl(n){
     byArt[v.art].sizes.push({...v,o7,msk:mskQ});
   }
 
+  /* Добавляем размеры из gMap у которых есть СГП/Сырьё но нет строки в WB-стоках.
+     Например "42-44" есть в маппинге (есть Сырьё), но WB присылает только "42  44" */
+  for(const [mapKey,mappings] of Object.entries(gMap)){
+    const parts=mapKey.split(';');
+    const wbArt=parts[0]||'',wbSz=parts[1]||'';
+    /* Найдём artName из byArt если артикул уже есть */
+    const artName=Object.keys(byArt).find(a=>a.toLowerCase()===wbArt);
+    /* Проверим есть ли уже эта строка в sizes */
+    const artEntry=artName?byArt[artName]:null;
+    if(artEntry){
+      const alreadyHasSz=artEntry.sizes.some(s=>(s.sz||'').toLowerCase()===wbSz);
+      if(!alreadyHasSz){
+        /* Этого размера нет в WB — проверим есть ли СГП/Сырьё */
+        const{sgp:szSgp,raw:szRaw}=getStocksForSz(artName,wbSz);
+        if(szSgp>0||szRaw>0){
+          /* Добавляем виртуальную строку с ВБ=0 */
+          const fakeSz={art:artName,sz:wbSz,name:artEntry.name||'',total:0,wh:{},o7:0,msk:0};
+          artEntry.sizes.push(fakeSz);
+        }
+      }
+    }
+  }
+
   const artRows=Object.keys(byArt).map(a=>{
     const g=byArt[a];
     const br=getBuyrate(a);
