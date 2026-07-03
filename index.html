@@ -484,13 +484,18 @@ function fmtDays(d,msk=false){
 }
 function dltW(pct){return pct==null?'':pct>=0?'<span class="du">▲ +'+pct+'%</span>':'<span class="dd">▼ '+pct+'%</span>';}
 function weekData(d,type){
-  const w=wd(),w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
   const getD=o=>type==='wb'?(o.date||'').slice(0,10):(o.created_at||o.in_process_at||'').slice(0,10);
   const pFn=type==='wb'?wbPrice:ozRev,all=d.allOrders||[];
-  const tw=all.filter(o=>getD(o)>=w),pw=all.filter(o=>{const dd=getD(o);return dd>=w2&&dd<w;});
-  return{twC:tw.length,pwC:pw.length,twR:tw.reduce((s,o)=>s+pFn(o),0),pwR:pw.reduce((s,o)=>s+pFn(o),0),
+  /* Строим точные наборы дат: эта неделя (last 7 days incl today) и прошлая (7 days before that) */
+  const thisWeekDates=new Set(),prevWeekDates=new Set();
+  for(let i=0;i<=6;i++)thisWeekDates.add(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+  for(let i=7;i<=13;i++)prevWeekDates.add(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+  const tw=all.filter(o=>thisWeekDates.has(getD(o)));
+  const pw=all.filter(o=>prevWeekDates.has(getD(o)));
+  const twR=tw.reduce((s,o)=>s+pFn(o),0),pwR=pw.reduce((s,o)=>s+pFn(o),0);
+  return{twC:tw.length,pwC:pw.length,twR,pwR,
     dO:pw.length>0?Math.round((tw.length-pw.length)/pw.length*100):null,
-    dR:pw.reduce((s,o)=>s+pFn(o),0)>0?Math.round((tw.reduce((s,o)=>s+pFn(o),0)-pw.reduce((s,o)=>s+pFn(o),0))/pw.reduce((s,o)=>s+pFn(o),0)*100):null};
+    dR:pwR>0?Math.round((twR-pwR)/pwR*100):null};
 }
 
 /* ── Chart ── */
@@ -513,7 +518,12 @@ function chartHTML(n,type){
     const days=[],prev=[];for(let i=6;i>=0;i--)days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     for(let i=13;i>=7;i--)prev.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     const all=d.allOrders||[],cnt={},cntP={};
-    all.forEach(o=>{const dd=getD(o);const v=isRev?pFn(o):1;if(dd>=w)cnt[dd]=(cnt[dd]||0)+v;else if(dd>=w2)cntP[dd]=(cntP[dd]||0)+v;});
+    /* Заполняем cnt и cntP напрямую по known датам — без риска граничных ошибок */
+    const daysSet=new Set(days),prevSet=new Set(prev);
+    all.forEach(o=>{const dd=getD(o);if(!dd)return;const v=isRev?pFn(o):1;
+      if(daysSet.has(dd))cnt[dd]=(cnt[dd]||0)+v;
+      if(prevSet.has(dd))cntP[dd]=(cntP[dd]||0)+v;
+    });
     for(let i=0;i<7;i++){labels.push(new Date(days[i]+'T12:00:00').toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''));todayV.push(cnt[days[i]]||0);yestV.push(cntP[prev[i]]||0);}
   }
   const N=labels.length,maxO=Math.max(...todayV,...yestV,1);
