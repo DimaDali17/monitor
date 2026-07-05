@@ -167,7 +167,7 @@ thead th[onclick][data-tip]{cursor:pointer}
 </div>
 
 <script>
-const VERSION="2026-07-05 07:47";
+const VERSION="2026-07-05 08:16";
 console.log("📦 Dashboard version:", VERSION);
 
 const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAGgAAAgMBAQAAAAAAAAAAAAAAAgQAAwUBB//EACwQAAEEAQQBAwMDBQAAAAAAAAEAAgMRBAUSITFBEzJRIkJxI1JhYoGRodH/xAAXAQEBAQEAAAAAAAAAAAAAAAABAAID/8QAGREBAQEBAQEAAAAAAAAAAAAAAAERQSEx/9oADAMBAAIRAxEAPwD1qwOyrWMDh7lk52V6c8Ud9m1oQSW0FcZXRe6IgfP4QUrGSUjIa8ccFaChcREUuIKALobZpc/gItwaFIL2lpooEW/fZQqTE12MiNszRzGd3/U/p0m+Fpu+F3OjEkLgfISehk+gGn7eP8LPTxsXwhGQ1rqtWsaHCisybR8p0znx5fBNgHwE22fFMavqMkbYPKqc/naO0rj4suKC6eQuNccUF3CeZQZD9xtWrDXQS8kpe/02d+f4V8zXGP6e1zHhbGKHZ7J8qoQN2tAHhRWSbft/uq0pTOLYVnaQKdKPh5WlN7Sk9LjoPd+5xKz08aYNBCcgNPLkbW7uEhLpc753OdO7YTwG8cJts+KYYysgSQuAN0EvpJvGZ+Ew/EEOKQ3queeUpo5/QA+CR/tHu+rjVa/aEvkZIZwOXHoDyimJawkCz4VEMG1xe/6nnz8JoWx7ttv9x7RKLikoyDbdo7PCsgjDGgBZ8uYG5/pvNDbYTrchlXuCoTQdS6ZqHaz5s+KMcuCpa6fLPAMcfyeyrVhybI9UOazkDspPRzxIPh5TYjbHFtaKCS0o1NO3+so6uNZwsBCUR6QFaCLiiiEy8/T25RDuQ4dEeEtHpU107Jkr8rbpQBGQ6SxtOhhO6tzv3O5KeaABwoonMGuP9pWRjSiDUZWPNbqcFsFI5WHBO8GRtkdEGkUw+yQPH0m6XSq4Y2xRhrBQCNIRRRRKf//Z";
@@ -453,7 +453,7 @@ async function loadWB(n){
 }
 
 async function loadOZ(){
-  const t=td(),y=yd(),w=wd(),w2=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
+  const t=td(),y=yd(),w=wd(),w2=new Date(Date.now()-62*864e5).toISOString().slice(0,10); /* 62 дня для режимов неделя/месяц */
   const OZ='https://api-seller.ozon.ru';
   let postings=[],offset=0;
   for(let p=0;p<10;p++){
