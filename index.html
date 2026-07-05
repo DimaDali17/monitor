@@ -167,7 +167,7 @@ thead th[onclick][data-tip]{cursor:pointer}
 </div>
 
 <script>
-const VERSION="2026-07-05 06:26";
+const VERSION="2026-07-05 07:47";
 console.log("📦 Dashboard version:", VERSION);
 
 const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAGgAAAgMBAQAAAAAAAAAAAAAAAgQAAwUBB//EACwQAAEEAQQBAwMDBQAAAAAAAAEAAgMRBAUSITFBEzJRIkJxI1JhYoGRodH/xAAXAQEBAQEAAAAAAAAAAAAAAAABAAID/8QAGREBAQEBAQEAAAAAAAAAAAAAAAERQSEx/9oADAMBAAIRAxEAPwD1qwOyrWMDh7lk52V6c8Ud9m1oQSW0FcZXRe6IgfP4QUrGSUjIa8ccFaChcREUuIKALobZpc/gItwaFIL2lpooEW/fZQqTE12MiNszRzGd3/U/p0m+Fpu+F3OjEkLgfISehk+gGn7eP8LPTxsXwhGQ1rqtWsaHCisybR8p0znx5fBNgHwE22fFMavqMkbYPKqc/naO0rj4suKC6eQuNccUF3CeZQZD9xtWrDXQS8kpe/02d+f4V8zXGP6e1zHhbGKHZ7J8qoQN2tAHhRWSbft/uq0pTOLYVnaQKdKPh5WlN7Sk9LjoPd+5xKz08aYNBCcgNPLkbW7uEhLpc753OdO7YTwG8cJts+KYYysgSQuAN0EvpJvGZ+Ew/EEOKQ3queeUpo5/QA+CR/tHu+rjVa/aEvkZIZwOXHoDyimJawkCz4VEMG1xe/6nnz8JoWx7ttv9x7RKLikoyDbdo7PCsgjDGgBZ8uYG5/pvNDbYTrchlXuCoTQdS6ZqHaz5s+KMcuCpa6fLPAMcfyeyrVhybI9UOazkDspPRzxIPh5TYjbHFtaKCS0o1NO3+so6uNZwsBCUR6QFaCLiiiEy8/T25RDuQ4dEeEtHpU107Jkr8rbpQBGQ6SxtOhhO6tzv3O5KeaABwoonMGuP9pWRjSiDUZWPNbqcFsFI5WHBO8GRtkdEGkUw+yQPH0m6XSq4Y2xRhrBQCNIRRRRKf//Z";
@@ -570,16 +570,19 @@ function chartHTML(n,type){
   let bars='';
   for(let i=0;i<N;i++){
     const gx=L+i*gW,yv=yestV[i],yBH=maxO>0?(yv/maxO)*cH:0;
+    /* В режиме месяца подписи только каждые 3 столбца, шрифт мельче */
+    const showLbl=mode==='month'?(i%3===0):true;
+    const lblFs=mode==='month'?'6':'7';
     bars+=`<rect x="${gx+gap}" y="${T+cH-yBH}" width="${bW}" height="${yBH}" rx="2" fill="#D5D0C8" opacity=".55"/>`;
-    if(yv>0)bars+=`<text x="${gx+gap+bW/2}" y="${T+cH-yBH-3}" text-anchor="middle" font-size="7" fill="var(--ink3)">${fmtV(yv)}</text>`;
+    if(yv>0&&showLbl)bars+=`<text x="${gx+gap+bW/2}" y="${T+cH-yBH-3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink3)">${fmtV(yv)}</text>`;
     const tv=todayV[i],tBH=maxO>0?(tv/maxO)*cH:0;
     const fill=mode==='day'&&i>nowH?'#E8E4DC':tv>yv?'var(--green)':tv<yv?'var(--red)':'var(--ink3)';
     const tx=gx+gap+bW+gap,ty=T+cH-tBH;
     bars+=`<rect x="${tx}" y="${ty}" width="${bW}" height="${tBH}" rx="2" fill="${fill}" opacity=".9"/>`;
-    if(tv>0&&!(mode==='day'&&i>nowH))bars+=`<text x="${tx+bW/2}" y="${ty-3}" text-anchor="middle" font-size="7" fill="var(--ink)" font-weight="600">${fmtV(tv)}</text>`;
+    if(tv>0&&!(mode==='day'&&i>nowH)&&showLbl)bars+=`<text x="${tx+bW/2}" y="${ty-3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fmtV(tv)}</text>`;
   }
   let xLab='';const step=mode==='day'?3:1;
-  for(let i=0;i<N;i+=step)if(labels[i])xLab+=`<text x="${L+i*gW+gW/2}" y="${H-4}" text-anchor="middle" font-size="${mode==='day'?8:9}" fill="var(--ink3)">${labels[i]}</text>`;
+  for(let i=0;i<N;i+=step)if(labels[i])xLab+=`<text x="${L+i*gW+gW/2}" y="${H-4}" text-anchor="middle" font-size="${mode==='day'?8:mode==='month'?7:9}" fill="var(--ink3)">${labels[i]}</text>`;
   let yLab='';[0,Math.round(maxO/2),maxO].forEach(v=>{const yy=T+cH-(v/maxO)*cH;yLab+=`<text x="${L-3}" y="${yy+3}" text-anchor="end" font-size="7" fill="var(--ink3)">${fmtV(v)}</text><line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-width="0.5"/>`;});
   const onD=mode==='day'?'on':'',onW=mode==='week'?'on':'',onM=mode==='month'?'on':'',onO=CV[n]==='ord'?'on':'',onR=CV[n]==='rev'?'on':'';
   return`<div class="sec" style="margin-bottom:14px"><div class="sh"><span class="st">${isRev?'Выручка':'Заказы'} · ${mode==='day'?'день':mode==='week'?'неделя':'месяц'}</span>
