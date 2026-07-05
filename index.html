@@ -167,7 +167,7 @@ thead th[onclick][data-tip]{cursor:pointer}
 </div>
 
 <script>
-const VERSION="2026-07-03 07:54";
+const VERSION="2026-07-05 06:26";
 console.log("📦 Dashboard version:", VERSION);
 
 const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAGgAAAgMBAQAAAAAAAAAAAAAAAgQAAwUBB//EACwQAAEEAQQBAwMDBQAAAAAAAAEAAgMRBAUSITFBEzJRIkJxI1JhYoGRodH/xAAXAQEBAQEAAAAAAAAAAAAAAAABAAID/8QAGREBAQEBAQEAAAAAAAAAAAAAAAERQSEx/9oADAMBAAIRAxEAPwD1qwOyrWMDh7lk52V6c8Ud9m1oQSW0FcZXRe6IgfP4QUrGSUjIa8ccFaChcREUuIKALobZpc/gItwaFIL2lpooEW/fZQqTE12MiNszRzGd3/U/p0m+Fpu+F3OjEkLgfISehk+gGn7eP8LPTxsXwhGQ1rqtWsaHCisybR8p0znx5fBNgHwE22fFMavqMkbYPKqc/naO0rj4suKC6eQuNccUF3CeZQZD9xtWrDXQS8kpe/02d+f4V8zXGP6e1zHhbGKHZ7J8qoQN2tAHhRWSbft/uq0pTOLYVnaQKdKPh5WlN7Sk9LjoPd+5xKz08aYNBCcgNPLkbW7uEhLpc753OdO7YTwG8cJts+KYYysgSQuAN0EvpJvGZ+Ew/EEOKQ3queeUpo5/QA+CR/tHu+rjVa/aEvkZIZwOXHoDyimJawkCz4VEMG1xe/6nnz8JoWx7ttv9x7RKLikoyDbdo7PCsgjDGgBZ8uYG5/pvNDbYTrchlXuCoTQdS6ZqHaz5s+KMcuCpa6fLPAMcfyeyrVhybI9UOazkDspPRzxIPh5TYjbHFtaKCS0o1NO3+so6uNZwsBCUR6QFaCLiiiEy8/T25RDuQ4dEeEtHpU107Jkr8rbpQBGQ6SxtOhhO6tzv3O5KeaABwoonMGuP9pWRjSiDUZWPNbqcFsFI5WHBO8GRtkdEGkUw+yQPH0m6XSq4Y2xRhrBQCNIRRRRKf//Z";
@@ -439,7 +439,7 @@ async function reload(n){
 
 async function loadWB(n){
   const key=K[n],t=td(),y=yd(),w=wd();
-  const ordFrom=new Date(Date.now()-15*864e5).toISOString().slice(0,10)+'T00:00:00Z'; /* 15 дней для надёжного сравнения 2 недель */
+  const ordFrom=new Date(Date.now()-62*864e5).toISOString().slice(0,10)+'T00:00:00Z'; /* 62 дня для режимов день/неделя/месяц */
   const stkFrom=new Date().getFullYear()+'-01-01T00:00:00Z';
   const BASE='https://statistics-api.wildberries.ru/api/v1/supplier';
   const [allOrdersR,stocksR]=await Promise.all([
@@ -508,6 +508,19 @@ function weekData(d,type){
 }
 
 /* ── Chart ── */
+function monthData(d,type){
+  const getD=o=>type==='wb'?(o.date||'').slice(0,10):(o.created_at||o.in_process_at||'').slice(0,10);
+  const pFn=type==='wb'?wbPrice:ozRev,all=d.allOrders||[];
+  const thisMonthDates=new Set(),prevMonthDates=new Set();
+  for(let i=0;i<=29;i++)thisMonthDates.add(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+  for(let i=30;i<=59;i++)prevMonthDates.add(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+  const tw=all.filter(o=>thisMonthDates.has(getD(o)));
+  const pw=all.filter(o=>prevMonthDates.has(getD(o)));
+  const twR=tw.reduce((s,o)=>s+pFn(o),0),pwR=pw.reduce((s,o)=>s+pFn(o),0);
+  return{twC:tw.length,pwC:pw.length,twR,pwR,
+    dO:pw.length>0?Math.round((tw.length-pw.length)/pw.length*100):null,
+    dR:pwR>0?Math.round((twR-pwR)/pwR*100):null};
+}
 function setChartMode(n,m){CM[n]=m;reRender(n);}
 function setChartVal(n,v){CV[n]=v;reRender(n);}
 function chartHTML(n,type){
@@ -523,17 +536,33 @@ function chartHTML(n,type){
     (d.todayO||[]).forEach(o=>{const h=getH(o);tH[h]+=isRev?pFn(o):1;});
     (d.yestO||[]).forEach(o=>{const h=getH(o);yH[h]+=isRev?pFn(o):1;});
     for(let i=0;i<24;i++){labels.push(i%3===0?(i+':00'):'');todayV.push(tH[i]);yestV.push(yH[i]);}
-  }else{
+  }else if(mode==='week'){
     const days=[],prev=[];for(let i=6;i>=0;i--)days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     for(let i=13;i>=7;i--)prev.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
     const all=d.allOrders||[],cnt={},cntP={};
-    /* Заполняем cnt и cntP напрямую по known датам — без риска граничных ошибок */
     const daysSet=new Set(days),prevSet=new Set(prev);
     all.forEach(o=>{const dd=getD(o);if(!dd)return;const v=isRev?pFn(o):1;
       if(daysSet.has(dd))cnt[dd]=(cnt[dd]||0)+v;
       if(prevSet.has(dd))cntP[dd]=(cntP[dd]||0)+v;
     });
     for(let i=0;i<7;i++){labels.push(new Date(days[i]+'T12:00:00').toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''));todayV.push(cnt[days[i]]||0);yestV.push(cntP[prev[i]]||0);}
+  }else{
+    /* Месяц: последние 30 дней по дням, сравниваем с предыдущими 30 днями */
+    const days=[],prev=[];
+    for(let i=29;i>=0;i--)days.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+    for(let i=59;i>=30;i--)prev.push(new Date(Date.now()-i*864e5).toISOString().slice(0,10));
+    const all=d.allOrders||[],cnt={},cntP={};
+    const daysSet=new Set(days),prevSet=new Set(prev);
+    all.forEach(o=>{const dd=getD(o);if(!dd)return;const v=isRev?pFn(o):1;
+      if(daysSet.has(dd))cnt[dd]=(cnt[dd]||0)+v;
+      if(prevSet.has(dd))cntP[dd]=(cntP[dd]||0)+v;
+    });
+    /* Показываем только каждый 3й день чтобы не перегружать */
+    for(let i=0;i<30;i++){
+      labels.push(i%3===0?new Date(days[i]+'T12:00:00').toLocaleDateString('ru',{day:'numeric',month:'short'}).replace('.',''):'');
+      todayV.push(cnt[days[i]]||0);
+      yestV.push(cntP[prev[i]]||0);
+    }
   }
   const N=labels.length,maxO=Math.max(...todayV,...yestV,1);
   const W=700,H=155,L=38,R=10,T=13,B=20,cW=W-L-R,cH=H-T-B,gW=cW/N,bW=Math.floor(gW*0.35),gap=Math.max(1,Math.floor(gW*0.04));
@@ -552,12 +581,12 @@ function chartHTML(n,type){
   let xLab='';const step=mode==='day'?3:1;
   for(let i=0;i<N;i+=step)if(labels[i])xLab+=`<text x="${L+i*gW+gW/2}" y="${H-4}" text-anchor="middle" font-size="${mode==='day'?8:9}" fill="var(--ink3)">${labels[i]}</text>`;
   let yLab='';[0,Math.round(maxO/2),maxO].forEach(v=>{const yy=T+cH-(v/maxO)*cH;yLab+=`<text x="${L-3}" y="${yy+3}" text-anchor="end" font-size="7" fill="var(--ink3)">${fmtV(v)}</text><line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-width="0.5"/>`;});
-  const onD=mode==='day'?'on':'',onW=mode==='week'?'on':'',onO=CV[n]==='ord'?'on':'',onR=CV[n]==='rev'?'on':'';
-  return`<div class="sec" style="margin-bottom:14px"><div class="sh"><span class="st">${isRev?'Выручка':'Заказы'} · ${mode==='day'?'день':'неделя'}</span>
+  const onD=mode==='day'?'on':'',onW=mode==='week'?'on':'',onM=mode==='month'?'on':'',onO=CV[n]==='ord'?'on':'',onR=CV[n]==='rev'?'on':'';
+  return`<div class="sec" style="margin-bottom:14px"><div class="sh"><span class="st">${isRev?'Выручка':'Заказы'} · ${mode==='day'?'день':mode==='week'?'неделя':'месяц'}</span>
     <span style="display:flex;align-items:center;gap:8px">
       <span class="sm2"><span style="color:var(--green);font-weight:700">■</span>&gt; <span style="color:var(--red);font-weight:700">■</span>&lt; <span style="color:#D5D0C8;font-weight:700">■</span>${mode==='day'?'вчера':'пр. неделя'}</span>
       <span class="ctog"><button class="${onO}" onclick="setChartVal(${n},'ord')">Шт</button><button class="${onR}" onclick="setChartVal(${n},'rev')">₽</button></span>
-      <span class="ctog"><button class="${onD}" onclick="setChartMode(${n},'day')">День</button><button class="${onW}" onclick="setChartMode(${n},'week')">Неделя</button></span>
+      <span class="ctog"><button class="${onD}" onclick="setChartMode(${n},'day')">День</button><button class="${onW}" onclick="setChartMode(${n},'week')">Неделя</button><button class="${onM}" onclick="setChartMode(${n},'month')">Месяц</button></span>
     </span></div>
     <div class="tw" style="padding:8px"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${yLab}${bars}${xLab}</svg></div></div>`;
 }
@@ -649,13 +678,18 @@ function renderWB(n){
       <div class="mc"><div class="ml">Прошлая неделя</div><div class="mv">${wk.pwC}</div></div>
       <div class="mc"><div class="ml">Сумма за неделю</div><div class="mv sm g">${fmt(wk.twR)}</div><div class="md">${dltW(wk.dR)}</div></div>
       <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div></div>`;}
+  else if(CM[n]==='month'){const mk=monthData(fd,'wb');
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы за месяц</div><div class="mv">${mk.twC}</div><div class="md">${dltW(mk.dO)}</div></div>
+      <div class="mc"><div class="ml">Прошлый месяц</div><div class="mv">${mk.pwC}</div></div>
+      <div class="mc"><div class="ml">Сумма за месяц</div><div class="mv sm g">${fmt(mk.twR)}</div><div class="md">${dltW(mk.dR)}</div></div>
+      <div class="mc"><div class="ml">Сумма пр. месяц</div><div class="mv sm">${fmt(mk.pwR)}</div></div></div>`;}
   else{const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null,dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
     h+=`<div class="mg"><div class="mc"><div class="ml">Заказы сегодня</div><div class="mv">${tC}</div><div class="md">${dlt(dO)}</div></div>
       <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
       <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm g">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
       <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div></div>`;}
   h+=chartHTML(n,'wb');
-  h+=ordersHTML(n,CM[n]==='week'?(fd.orders7||[]):todayO,'wb');
+  h+=ordersHTML(n,CM[n]==='week'||(CM[n]==='month')?(fd.orders7||[]):todayO,'wb');
   h+=deficitHTML(n);h+=stocksHTML(n);
   document.getElementById('v'+n).innerHTML=h;paintTables(n);D[n]=origD;
 }
@@ -672,13 +706,18 @@ function renderOZ(){
       <div class="mc"><div class="ml">Прошлая неделя</div><div class="mv">${wk.pwC}</div></div>
       <div class="mc"><div class="ml">Сумма за неделю</div><div class="mv sm oz">${fmt(wk.twR)}</div><div class="md">${dltW(wk.dR)}</div></div>
       <div class="mc"><div class="ml">Сумма пр. неделя</div><div class="mv sm">${fmt(wk.pwR)}</div></div></div>`;}
+  else if(CM[3]==='month'){const mk=monthData(fd,'oz');
+    h+=`<div class="mg"><div class="mc"><div class="ml">Заказы за месяц</div><div class="mv oz">${mk.twC}</div><div class="md">${dltW(mk.dO)}</div></div>
+      <div class="mc"><div class="ml">Прошлый месяц</div><div class="mv">${mk.pwC}</div></div>
+      <div class="mc"><div class="ml">Сумма за месяц</div><div class="mv sm oz">${fmt(mk.twR)}</div><div class="md">${dltW(mk.dR)}</div></div>
+      <div class="mc"><div class="ml">Сумма пр. месяц</div><div class="mv sm">${fmt(mk.pwR)}</div></div></div>`;}
   else{const dO=yhC>0?Math.round((tC-yhC)/yhC*100):null,dR=yhR>0?Math.round((tR-yhR)/yhR*100):null;
     h+=`<div class="mg"><div class="mc"><div class="ml">Заказы сегодня</div><div class="mv oz">${tC}</div><div class="md">${dlt(dO)}</div></div>
       <div class="mc"><div class="ml">Вчера (всего / к ${new Date().getHours()}:00)</div><div class="mv">${yC} <span style="font-size:14px;color:var(--ink3)">/ ${yhC}</span></div></div>
       <div class="mc"><div class="ml">Сумма сегодня</div><div class="mv sm oz">${fmt(tR)}</div><div class="md">${dlt(dR)}</div></div>
       <div class="mc"><div class="ml">Сумма вчера</div><div class="mv sm">${fmt(yR)}</div></div></div>`;}
   h+=chartHTML(3,'oz');
-  h+=ordersHTML(3,CM[3]==='week'?(fd.orders7||[]):todayO,'oz');
+  h+=ordersHTML(3,CM[3]==='week'||(CM[3]==='month')?(fd.orders7||[]):todayO,'oz');
   h+=deficitHTML(3);h+=stocksHTML(3);
   document.getElementById('v3').innerHTML=h;paintTables(3);D[3]=origD;
 }
