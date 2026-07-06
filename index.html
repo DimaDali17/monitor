@@ -167,7 +167,7 @@ thead th[onclick][data-tip]{cursor:pointer}
 </div>
 
 <script>
-const VERSION="2026-07-05 08:16";
+const VERSION="2026-07-06 09:37";
 console.log("📦 Dashboard version:", VERSION);
 
 const L1="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5Ojf/2wBDAQoKCg0MDRoPDxo3JR8lNzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzf/wAARCABMAEwDASIAAhEBAxEB/8QAGgAAAgMBAQAAAAAAAAAAAAAAAgQAAwUBB//EACwQAAEEAQQBAwMDBQAAAAAAAAEAAgMRBAUSITFBEzJRIkJxI1JhYoGRodH/xAAXAQEBAQEAAAAAAAAAAAAAAAABAAID/8QAGREBAQEBAQEAAAAAAAAAAAAAAAERQSEx/9oADAMBAAIRAxEAPwD1qwOyrWMDh7lk52V6c8Ud9m1oQSW0FcZXRe6IgfP4QUrGSUjIa8ccFaChcREUuIKALobZpc/gItwaFIL2lpooEW/fZQqTE12MiNszRzGd3/U/p0m+Fpu+F3OjEkLgfISehk+gGn7eP8LPTxsXwhGQ1rqtWsaHCisybR8p0znx5fBNgHwE22fFMavqMkbYPKqc/naO0rj4suKC6eQuNccUF3CeZQZD9xtWrDXQS8kpe/02d+f4V8zXGP6e1zHhbGKHZ7J8qoQN2tAHhRWSbft/uq0pTOLYVnaQKdKPh5WlN7Sk9LjoPd+5xKz08aYNBCcgNPLkbW7uEhLpc753OdO7YTwG8cJts+KYYysgSQuAN0EvpJvGZ+Ew/EEOKQ3queeUpo5/QA+CR/tHu+rjVa/aEvkZIZwOXHoDyimJawkCz4VEMG1xe/6nnz8JoWx7ttv9x7RKLikoyDbdo7PCsgjDGgBZ8uYG5/pvNDbYTrchlXuCoTQdS6ZqHaz5s+KMcuCpa6fLPAMcfyeyrVhybI9UOazkDspPRzxIPh5TYjbHFtaKCS0o1NO3+so6uNZwsBCUR6QFaCLiiiEy8/T25RDuQ4dEeEtHpU107Jkr8rbpQBGQ6SxtOhhO6tzv3O5KeaABwoonMGuP9pWRjSiDUZWPNbqcFsFI5WHBO8GRtkdEGkUw+yQPH0m6XSq4Y2xRhrBQCNIRRRRKf//Z";
@@ -576,7 +576,19 @@ function chartHTML(n,type){
     bars+=`<rect x="${gx+gap}" y="${T+cH-yBH}" width="${bW}" height="${yBH}" rx="2" fill="#D5D0C8" opacity=".55"/>`;
     if(yv>0&&showLbl)bars+=`<text x="${gx+gap+bW/2}" y="${T+cH-yBH-3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink3)">${fmtV(yv)}</text>`;
     const tv=todayV[i],tBH=maxO>0?(tv/maxO)*cH:0;
-    const fill=mode==='day'&&i>nowH?'#E8E4DC':tv>yv?'var(--green)':tv<yv?'var(--red)':'var(--ink3)';
+    /* Градиентная окраска по % отклонения от прошлого периода */
+    let fill;
+    if(mode==='day'&&i>nowH){
+      fill='#E8E4DC'; /* будущие часы — светлый */
+    } else {
+      const pct=yv>0?((tv-yv)/yv*100):0;
+      const absPct=Math.abs(pct);
+      if(absPct<=10)fill='#6B6357';              /* ±10% — нейтральный тёмно-серый */
+      else if(pct>10&&pct<=25)fill='#7DB896';    /* +10..25% — слабый зелёный */
+      else if(pct>25)fill='#2D7A4F';             /* +25%+ — насыщенный зелёный */
+      else if(pct<-10&&pct>=-25)fill='#D4827A';  /* -10..25% — слабый красный */
+      else fill='#B84040';                        /* -25%+ — насыщенный красный */
+    }
     const tx=gx+gap+bW+gap,ty=T+cH-tBH;
     bars+=`<rect x="${tx}" y="${ty}" width="${bW}" height="${tBH}" rx="2" fill="${fill}" opacity=".9"/>`;
     if(tv>0&&!(mode==='day'&&i>nowH)&&showLbl)bars+=`<text x="${tx+bW/2}" y="${ty-3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fmtV(tv)}</text>`;
