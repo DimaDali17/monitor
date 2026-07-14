@@ -1,8 +1,11 @@
 /* ── Версия ── */
 export const VERSION = "2026-07-14 modular-1";
 
-/* ── Прокси по умолчанию (перезаписываются из настроек) ── */
-export const DEFAULT_PX = "https://wb-proxy.ooo6311ooo.workers.dev";
+/* ── Воркер ──
+   Единственный адрес, который нужно здесь править. Дашборд лежит на
+   GitHub Pages, воркер — на Cloudflare; ключи живут в его секретах,
+   браузер шлёт только номер кабинета. */
+export const WORKER = "https://wb-proxy.ooo6311ooo.workers.dev";
 
 /* ── Эндпоинты ── */
 export const WB_BASE = "https://statistics-api.wildberries.ru/api/v1/supplier";

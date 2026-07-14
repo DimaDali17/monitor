@@ -11,31 +11,19 @@
 </head>
 <body>
 
-<!-- Настройки -->
-<div class="sov" id="setup">
-  <div class="sc">
+<!-- Вход -->
+<div class="sov" id="gate">
+  <div class="sc" style="width:360px">
     <div class="slogo">
-      <img class="logo" id="slogoimg" alt="">
+      <img class="logo" id="glogo" alt="">
       <div><div class="stitle">EasyForm</div><div class="ssub">Dashboard</div></div>
     </div>
-
-    <div class="ssec">Wildberries</div>
-    <div class="fg"><div class="fl">Ключ Easyform</div><input class="fi" id="sk1" placeholder="eyJhbGciOi…"></div>
-    <div class="fg"><div class="fl">Ключ EZFR</div><input class="fi" id="sk2" placeholder="eyJhbGciOi…"></div>
-
-    <div class="ssec">Ozon</div>
-    <div class="fg"><div class="fl">Client-ID</div><input class="fi" id="soid" placeholder="123456"></div>
-    <div class="fg"><div class="fl">API-ключ</div><input class="fi" id="sokey" placeholder="xxxxxxxx-xxxx-…"></div>
-
-    <div class="ssec">Прокси</div>
-    <div class="fg"><div class="fl">Основной воркер</div><input class="fi" id="sprx"></div>
     <div class="fg">
-      <div class="fl">Второй воркер (для EZFR, необязательно)</div>
-      <input class="fi" id="sprx2" placeholder="свой воркер для второго кабинета">
+      <div class="fl">Пароль</div>
+      <input class="fi" id="pw" type="password" autocomplete="current-password">
     </div>
-
-    <button class="sbtn" onclick="App.doSave()">Сохранить и загрузить</button>
-    <div class="smsg" id="smsg"></div>
+    <button class="sbtn" id="gobtn" onclick="App.doLogin()">Войти</button>
+    <div class="smsg" id="gmsg"></div>
   </div>
 </div>
 
@@ -64,7 +52,7 @@
     <button class="b" id="rb1" onclick="App.reload(1,true)" data-tip="Загрузить Easyform заново, минуя кэш">↻ EF</button>
     <button class="b" id="rb2" onclick="App.reload(2,true)" data-tip="Загрузить EZFR заново, минуя кэш">↻ EZFR</button>
     <button class="b" id="rb3" onclick="App.reload(3,true)" data-tip="Загрузить Ozon заново, минуя кэш">↻ OZ</button>
-    <button class="b" onclick="App.openSetup()">⚙</button>
+    <button class="b" onclick="App.logout()" data-tip="Завершить сессию и забыть пропуск">Выйти</button>
   </div>
 </div>
 

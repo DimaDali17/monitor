@@ -1,5 +1,6 @@
-import { OZ_BASE, ORDERS_DAYS } from "../config.js";
-import { K, PX, D } from "../state.js";
+import { WORKER, OZ_BASE, ORDERS_DAYS } from "../config.js";
+import { D } from "../state.js";
+import { authHeader, expired } from "./auth.js";
 import { td, yd, wd, daysAgo } from "../utils.js";
 import { cacheGet, cacheSet } from "./cache.js";
 
@@ -12,18 +13,19 @@ async function ozPost(url, body) {
   if (gap > 0) await sleep(gap);
   lastAt = Date.now();
 
-  const purl = PX.main + "?url=" + encodeURIComponent(url);
+  /* Client-Id и Api-Key подставит воркер — здесь их нет */
+  const purl = `${WORKER}/?cab=3&url=${encodeURIComponent(url)}`;
   const opts = {
     method: "POST",
-    headers: {
-      "X-Ozon-Client-Id": K.oid,
-      "X-Ozon-Api-Key": K.okey,
-      "Content-Type": "application/json",
-    },
+    headers: { ...authHeader(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
 
   let res = await fetch(purl, opts);
+  if (res.status === 401) {
+    expired();
+    throw new Error("Сессия истекла");
+  }
   if (res.status === 429) {
     await sleep(8000);
     lastAt = Date.now();
@@ -47,8 +49,6 @@ export function loadOZ({ force = false } = {}) {
 }
 
 async function fetchOzon(force) {
-  if (!K.oid || !K.okey) throw new Error("Не заданы Client-ID и ключ Ozon");
-
   const t = td(), y = yd(), w = wd(), from = daysAgo(ORDERS_DAYS);
 
   const postings = await cached("oz:orders", force, async () => {

@@ -1,14 +1,13 @@
 import { VERSION } from "./config.js";
 import {
-  K, PX, D, VM, EXP, EXS, EXD, OA, OAD, OAC, SS, DS, FA, FP, FS, FSZ,
-  CM, CV, CONSO, cabName, saveCreds, loadCreds,
+  D, EXP, EXS, EXD, OA, OAD, OAC, SS, DS, FA, FP,
+  CM, CV, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
+import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal } from "./api/sheets.js";
 import { loadWB } from "./api/wb.js";
 import { loadOZ } from "./api/ozon.js";
-import { cacheClear } from "./api/cache.js";
-import { buildVM } from "./vm.js";
 import { renderCabinet, repaintStocks, repaintDeficit } from "./render/cabinet.js";
 import { renderConso, logConso } from "./render/conso.js";
 import { fpInput, faInput } from "./render/filters.js";
@@ -20,12 +19,6 @@ let curTab = 1;
 async function reload(n, force = false) {
   const view = document.getElementById("v" + n);
   const btn = document.getElementById("rb" + n);
-  const has = n === 3 ? K.oid && K.okey : K[n];
-
-  if (!has) {
-    view.innerHTML = `<div class="lm">Нет ключей для «${cabName(n)}» — откройте ⚙ Настройки</div>`;
-    return;
-  }
 
   btn && (btn.disabled = true);
   view.innerHTML = `<div class="lm"><span class="sp">◜</span> Загрузка «${cabName(n)}»…
@@ -81,35 +74,34 @@ function go(n) {
   else reload(n);
 }
 
-/* ══ Настройки ══ */
-function openSetup() {
-  loadCreds();
-  const set = (id, v) => (document.getElementById(id).value = v || "");
-  set("sk1", K[1]); set("sk2", K[2]);
-  set("soid", K.oid); set("sokey", K.okey);
-  set("sprx", PX.main); set("sprx2", PX.second);
-  document.getElementById("setup").classList.add("show");
-}
+/* ══ Вход и выход ══
+   Ключей в браузере нет — вводить нечего, кроме пароля. Проверяет его
+   воркер: подобрать пропуск правкой этого файла не выйдет. */
+async function doLogin() {
+  const pw = document.getElementById("pw");
+  const msg = document.getElementById("gmsg");
+  const btn = document.getElementById("gobtn");
 
-function doSave() {
-  const val = (id) => document.getElementById(id).value.trim();
-  K[1] = val("sk1"); K[2] = val("sk2");
-  K.oid = val("soid"); K.okey = val("sokey");
-  PX.main = val("sprx"); PX.second = val("sprx2");
+  if (!pw.value) { msg.className = "smsg err"; msg.textContent = "Введите пароль"; return; }
 
-  if (!K[1] && !K[2] && !K.oid) {
-    const m = document.getElementById("smsg");
-    m.className = "smsg err";
-    m.textContent = "Заполните хотя бы один кабинет";
-    return;
+  btn.disabled = true;
+  msg.className = "smsg";
+  msg.textContent = "Проверяем…";
+
+  try {
+    await login(pw.value);
+    document.getElementById("gate").classList.remove("show");
+    go(1);
+  } catch (e) {
+    msg.className = "smsg err";
+    msg.textContent = e.message;
+    pw.select();
+  } finally {
+    btn.disabled = false;
   }
-
-  saveCreds();
-  cacheClear();                       /* сменились ключи — старый кэш не наш */
-  document.getElementById("setup").classList.remove("show");
-  D[1] = D[2] = D[3] = null;
-  go(curTab);
 }
+
+const logout = dropPass;
 
 /* ══ Проверка версии ══ */
 async function checkVersion() {
@@ -136,7 +128,7 @@ async function checkVersion() {
 
 /* ══ Обработчики, на которые ссылается разметка ══ */
 const App = {
-  reload, reloadForConso, go, openSetup, doSave, checkVersion,
+  reload, reloadForConso, go, doLogin, logout, checkVersion,
   fpInput, faInput,
 
   /* график */
@@ -218,13 +210,11 @@ document.addEventListener("mouseout", (e) => {
 
 /* ══ Старт ══ */
 function init() {
-  loadCreds();
-
   document.getElementById("hlogo").src = L1;
+  document.getElementById("glogo").src = L1;
   document.getElementById("logo1").src = L1;
   document.getElementById("logo2").src = L2;
   document.getElementById("logo3").src = L3;
-  document.getElementById("slogoimg").src = L1;
 
   const clock = () => {
     document.getElementById("clk").textContent =
@@ -236,8 +226,15 @@ function init() {
   document.getElementById("verBtn").textContent = VERSION;
   checkVersion();
 
-  if (!K[1] && !K[2] && !K.oid) openSetup();
-  else go(1);
+  /* Пропуск ещё действует — пускаем сразу, иначе показываем окно входа */
+  if (loadPass()) {
+    go(1);
+  } else {
+    document.getElementById("gate").classList.add("show");
+    const pw = document.getElementById("pw");
+    pw.focus();
+    pw.onkeydown = (e) => { if (e.key === "Enter") doLogin(); };
+  }
 }
 
 init();

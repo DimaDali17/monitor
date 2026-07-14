@@ -1,5 +1,6 @@
-import { WB_BASE, WB_GAP, WB_BACKOFF, WB_TIMEOUT, ORDERS_DAYS } from "../config.js";
-import { K, PX, D } from "../state.js";
+import { WORKER, WB_BASE, WB_GAP, WB_BACKOFF, WB_TIMEOUT, ORDERS_DAYS } from "../config.js";
+import { D } from "../state.js";
+import { authHeader, expired } from "./auth.js";
 import { td, yd, wd, daysAgo } from "../utils.js";
 import { cacheGet, cacheSet } from "./cache.js";
 
@@ -9,9 +10,9 @@ import { cacheGet, cacheSet } from "./cache.js";
    1. Ретрай через 3 секунды. WB считает лимит Statistics API
       по ключу и продлевает окно блокировки на каждой попытке
       внутри него — 4 попытки за 25 секунд гарантировали залип.
-   2. Retry-After читался, но через CORS браузер его не отдаёт,
-      если воркер не проставил Access-Control-Expose-Headers.
-      Возвращался null → падали обратно на те же 3 секунды.
+   2. Retry-After читался, но браузер его прятал: воркер не ставил
+      Access-Control-Expose-Headers. Возвращался null → падали
+      обратно на те же 3 секунды.
    3. Пустой ответ (воркер отвалился по таймауту на тяжёлом
       запросе EF — 62 дня заказов) считался ошибкой и запускал
       ретрай. У EZFR заказов меньше, запрос легче — оттого и
@@ -20,10 +21,12 @@ import { cacheGet, cacheSet } from "./cache.js";
       два одинаковых запроса к одному методу.
 
    Что сделано: пауза 20 с между запросами, бэкофф от минуты,
-   кэш на 10 минут, guard по ключу запроса.
-   ══════════════════════════════════════════════════════════ */
+   кэш в браузере и на границе, guard по ключу запроса. Плюс воркер
+   на 429 отдаёт последнюю удачную копию вместо ошибки.
 
-const pxFor = (cab) => (cab === 2 && PX.second ? PX.second : PX.main);
+   Ключей в этом файле нет: браузер шлёт номер кабинета, ключ
+   подставляет воркер из своих секретов.
+   ══════════════════════════════════════════════════════════ */
 
 /* Последовательная очередь: ни один запрос не уходит раньше,
    чем через WB_GAP после предыдущего — независимо от кабинета. */
@@ -45,26 +48,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* Дедупликация: пока запрос летит, повторный вызов получает ту же промис */
 const inflight = new Map();
 
-async function wbGet(url, token, cab, onRetry) {
+function wbGet(url, cab, force, onRetry) {
   const key = cab + "|" + url;
   if (inflight.has(key)) return inflight.get(key);
 
-  const p = enqueue(() => attempt(url, token, cab, onRetry)).finally(() => inflight.delete(key));
+  const p = enqueue(() => attempt(url, cab, force, onRetry)).finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
 }
 
-async function attempt(url, token, cab, onRetry) {
-  const purl = pxFor(cab) + "?url=" + encodeURIComponent(url);
+async function attempt(url, cab, force, onRetry) {
+  const purl = `${WORKER}/?cab=${cab}&url=${encodeURIComponent(url)}`;
+  const headers = { ...authHeader(), ...(force ? { "X-Force": "1" } : {}) };
   let reason = "";
 
   for (let i = 0; i <= WB_BACKOFF.length; i++) {
     let res = null, txt = "";
     try {
-      res = await fetchWithTimeout(purl, { headers: { "X-WB-Token": token } }, WB_TIMEOUT);
+      res = await fetchWithTimeout(purl, { headers }, WB_TIMEOUT);
       txt = await res.text();
     } catch (e) {
       reason = e.name === "AbortError" ? "таймаут прокси" : "сеть: " + e.message;
+    }
+
+    /* Пропуск протух — ретраить бессмысленно, нужно войти заново */
+    if (res && res.status === 401) {
+      expired();
+      throw new Error("Сессия истекла");
     }
 
     const empty = res && res.ok && (!txt || !txt.trim());
@@ -91,9 +101,8 @@ async function attempt(url, token, cab, onRetry) {
       );
     }
 
-    /* Retry-After в секундах, если воркер его прокинул наружу.
-       Чтобы заголовок дошёл, воркер должен отдавать:
-       Access-Control-Expose-Headers: Retry-After */
+    /* Retry-After в секундах — воркер прокидывает его наружу через
+       Access-Control-Expose-Headers, иначе браузер заголовок прячет. */
     const ra = res ? parseInt(res.headers.get("retry-after") || "0", 10) : 0;
     const waitMs = Math.max(ra * 1000, WB_BACKOFF[i]);
 
@@ -110,9 +119,6 @@ function fetchWithTimeout(url, opts, ms) {
 
 /* ── Загрузка кабинета ── */
 export async function loadWB(n, { force = false, onRetry } = {}) {
-  const key = K[n];
-  if (!key) throw new Error("Не задан API-ключ кабинета");
-
   const ordFrom = daysAgo(ORDERS_DAYS) + "T00:00:00Z";
   const stkFrom = new Date().getFullYear() + "-01-01T00:00:00Z";
   const urlOrders = `${WB_BASE}/orders?dateFrom=${ordFrom}&flag=0`;
@@ -121,8 +127,8 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
   /* Заказы и стоки кэшируются раздельно: если один метод упёрся в лимит,
      второй всё равно отдастся из кэша, а не утянет весь рендер в ошибку. */
   const [orders, stocks] = await Promise.all([
-    cached(`wb${n}:orders`, force, () => wbGet(urlOrders, key, n, onRetry)),
-    cached(`wb${n}:stocks`, force, () => wbGet(urlStocks, key, n, onRetry)),
+    cached(`wb${n}:orders`, force, () => wbGet(urlOrders, n, force, onRetry)),
+    cached(`wb${n}:stocks`, force, () => wbGet(urlStocks, n, force, onRetry)),
   ]);
 
   const all = Array.isArray(orders) ? orders : [];

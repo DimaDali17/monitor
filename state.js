@@ -1,8 +1,5 @@
-import { DEFAULT_PX } from "./config.js";
-
-/* Ключи и прокси */
-export const K = { 1: "", 2: "", oid: "", okey: "" };
-export const PX = { main: DEFAULT_PX, second: "" };
+/* Ключи здесь отсутствуют намеренно: они живут в секретах воркера
+   и в браузер не попадают. Клиент знает только номер кабинета. */
 
 /* Сырые данные кабинетов: 1=Easyform, 2=EZFR, 3=Ozon */
 export const D = { 1: null, 2: null, 3: null };
@@ -41,23 +38,3 @@ export const CONSO = { expandOrders: false, log: [] };
 
 export const cabName = (n) => (n === 1 ? "Easyform" : n === 2 ? "EZFR" : n === 3 ? "Ozon" : "Консолидация");
 export const cabShort = (n) => (n === 1 ? "EF" : n === 2 ? "EZFR" : "Ozon");
-
-export function saveCreds() {
-  try {
-    localStorage.setItem("ef_d", JSON.stringify({
-      k1: K[1], k2: K[2], oid: K.oid, okey: K.okey, px: PX.main, px2: PX.second,
-    }));
-  } catch { /* приватный режим — просто не сохраняем */ }
-}
-
-export function loadCreds() {
-  try {
-    const s = JSON.parse(localStorage.getItem("ef_d") || "{}");
-    if (s.k1) K[1] = s.k1;
-    if (s.k2) K[2] = s.k2;
-    if (s.oid) K.oid = s.oid;
-    if (s.okey) K.okey = s.okey;
-    if (s.px) PX.main = s.px;
-    if (s.px2) PX.second = s.px2;
-  } catch { /* битый JSON — стартуем с пустыми */ }
-}
