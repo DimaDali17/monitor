@@ -180,9 +180,10 @@ async function loadStocksNew(cab, onRetry) {
       throw new Error("Остатки (Analytics API): " + e.message);
     }
 
+    /* Реальная структура ответа: { data: { items: [...] } } */
     const rows = Array.isArray(data) ? data
-               : (data?.data?.stocks || data?.stocks || data?.report
-               || data?.data || data?.result || data?.items || []);
+               : (data?.data?.items || data?.data?.stocks || data?.items
+               || data?.stocks || data?.report || data?.data || data?.result || []);
     if (!Array.isArray(rows)) {
       throw new Error("не разобрал ответ Analytics API: " + JSON.stringify(data).slice(0, 200));
     }
