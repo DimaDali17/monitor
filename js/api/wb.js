@@ -10,7 +10,7 @@ import { cacheGet, cacheSet } from "./cache.js";
    v5: Стоки теперь через Analytics API
    GET /api/v1/supplier/stocks — отключён WB 14 июля 2026.
    Новый: POST /api/analytics/v1/stocks-report/wb-warehouses
-   Домен: analytics-api.wildberries.ru
+   Домен: seller-analytics-api.wildberries.ru
    Токен: категория «Аналитика» (WB_ANAL_KEY_1/2 в секретах воркера)
    Лимит: 1 запрос / 20 секунд
 
@@ -164,7 +164,7 @@ function buildChrtCache(orders) {
 
 /* ══════════ Загрузка остатков через новый Analytics API ══════════ */
 
-const ANAL_URL = "https://analytics-api.wildberries.ru/api/analytics/v1/stocks-report/wb-warehouses";
+const ANAL_URL = "https://seller-analytics-api.wildberries.ru/api/analytics/v1/stocks-report/wb-warehouses";
 const ANAL_PAUSE = 21_000; /* лимит 1/20 сек → ждём 21 сек между запросами */
 
 async function loadStocksNew(cab, onRetry) {
