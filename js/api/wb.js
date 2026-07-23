@@ -74,7 +74,15 @@ async function attempt(method, url, body, cab, force, onRetry) {
       reason = e.name === "AbortError" ? "таймаут прокси" : "сеть: " + e.message;
     }
 
-    if (res && res.status === 401) { expired(); throw new Error("Сессия истекла"); }
+    if (res && res.status === 401) {
+      /* 401 от Analytics/Content API означает неверный токен Аналитика,
+         а не истёкшую сессию — не выкидываем пользователя на логин */
+      const isAnalDomain = url.includes("analytics-api") || url.includes("content-api");
+      if (!isAnalDomain) expired();
+      throw new Error(isAnalDomain
+        ? `401 — проверьте токен Аналитика WB_ANAL_KEY_${cab} в секретах воркера`
+        : "Сессия истекла");
+    }
 
     const empty = res && res.ok && (!txt || !txt.trim());
     const rateLimited = res && res.status === 429;
