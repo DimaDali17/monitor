@@ -120,58 +120,46 @@ function fetchWithTimeout(url, opts, ms) {
 }
 
 /* ══════════ Кэш карточек: nmId_chrtId → {supplierArticle, techSize, subject} ══════════
-   Загружается один раз за сессию. Нужен потому что Analytics API
-   возвращает только числовые nmId и chrtId, без человекочитаемых полей. */
+   Строим из заказов — там уже есть supplierArticle, techSize и nmId.
+   Content API требует отдельный токен «Контент» которого у нас нет,
+   поэтому используем данные которые уже загружены бесплатно. */
 
-let cardsCache = null; /* null = ещё не грузили */
+let cardsCache = null;
 
-async function ensureCardsCache(cab, onRetry) {
-  if (cardsCache) return;
+function buildCardsCacheFromOrders(orders) {
+  if (cardsCache) return; /* уже построен */
   cardsCache = {};
-
-  const CONTENT_URL = "https://content-api.wildberries.ru/content/v2/get/cards/list";
-  let cursor = {};
-  let total = 0;
-
-  for (let page = 0; page < 100; page++) {
-    const body = {
-      settings: {
-        cursor: { limit: 100, ...cursor },
-        filter: { withPhoto: -1 },
-      },
-    };
-
-    let data;
-    try {
-      data = await wbPost(CONTENT_URL, body, cab, onRetry);
-    } catch (e) {
-      console.warn("cardsCache: ошибка загрузки карточек:", e.message);
-      break;
+  let count = 0;
+  (orders || []).forEach((o) => {
+    const nm   = o.nmId || o.nmID;
+    const chrt = o.chrtId || o.chrtID;
+    const art  = o.supplierArticle || "";
+    const sz   = o.techSize || "";
+    const subj = o.subject || o.category || "";
+    if (nm && chrt && art) {
+      cardsCache[`${nm}_${chrt}`] = { supplierArticle: art, techSize: sz, subject: subj };
+      count++;
     }
+  });
+  console.log(`cardsCache: построен из заказов — ${count} записей`);
+}
 
-    const cards = data?.cards || [];
-    cards.forEach((card) => {
-      const art  = card.vendorCode || "";
-      const nm   = card.nmID;
-      const subj = card.subjectName || card.object || "";
-      (card.sizes || []).forEach((sz) => {
-        const chrt   = sz.chrtID;
-        const techSz = sz.techSize || sz.sizeName || "";
-        if (nm && chrt) {
-          cardsCache[`${nm}_${chrt}`] = { supplierArticle: art, techSize: techSz, subject: subj };
-        }
-      });
-      total++;
-    });
+/* Fallback: если заказов мало и nmId не нашёлся — используем chrtId как ключ.
+   Стоки по одному артикулу/размеру приходят с одинаковым chrtId,
+   поэтому можно сгруппировать по chrtId и взять supplierArticle из заказов. */
+let chrtCache = null;
 
-    const cur = data?.cursor || {};
-    /* Пагинация: если карточек меньше лимита или нет курсора — конец */
-    if (cards.length < 100 || !cur.updatedAt) break;
-    cursor = { updatedAt: cur.updatedAt, nmID: cur.nmID };
-    await sleep(300); /* небольшая пауза между страницами */
-  }
-
-  console.log(`cardsCache: загружено ${total} карточек, ${Object.keys(cardsCache).length} размеров`);
+function buildChrtCache(orders) {
+  if (chrtCache) return;
+  chrtCache = {};
+  (orders || []).forEach((o) => {
+    const chrt = o.chrtId || o.chrtID;
+    const art  = o.supplierArticle || "";
+    const sz   = o.techSize || "";
+    const subj = o.subject || o.category || "";
+    if (chrt && art) chrtCache[String(chrt)] = { supplierArticle: art, techSize: sz, subject: subj };
+  });
+  console.log(`chrtCache: ${Object.keys(chrtCache).length} записей`);
 }
 
 /* ══════════ Загрузка остатков через новый Analytics API ══════════ */
@@ -180,8 +168,7 @@ const ANAL_URL = "https://analytics-api.wildberries.ru/api/analytics/v1/stocks-r
 const ANAL_PAUSE = 21_000; /* лимит 1/20 сек → ждём 21 сек между запросами */
 
 async function loadStocksNew(cab, onRetry) {
-  await ensureCardsCache(cab, onRetry);
-
+  /* Кэш строится из заказов в loadWB — к этому моменту он уже есть */
   let all = [], offset = 0;
 
   for (let page = 0; page < 50; page++) {
@@ -197,22 +184,23 @@ async function loadStocksNew(cab, onRetry) {
     all = all.concat(rows);
     if (rows.length < 1000) break;
     offset += 1000;
-    await sleep(ANAL_PAUSE); /* строго соблюдаем лимит */
+    await sleep(ANAL_PAUSE);
   }
 
-  /* Маппим числовые ID в человекочитаемые поля */
   return all.map((r) => {
     const nm   = r.nmId   || r.nmID   || 0;
     const chrt = r.chrtId || r.chrtID || 0;
-    const card = cardsCache?.[`${nm}_${chrt}`] || {};
+    /* Ищем сначала по nm+chrt, потом только по chrt */
+    const card = cardsCache?.[`${nm}_${chrt}`]
+              || chrtCache?.[String(chrt)]
+              || {};
     return {
-      supplierArticle: card.supplierArticle || String(nm), /* fallback: nmId как строка */
+      supplierArticle: card.supplierArticle || String(nm),
       techSize:        card.techSize        || String(chrt),
       warehouseName:   r.warehouseName      || "",
       quantity:        r.quantity           ?? 0,
       subject:         card.subject         || "",
       category:        card.subject         || "",
-      /* Дополнительные поля — могут пригодиться */
       inWayToClient:   r.inWayToClient      ?? 0,
       inWayFromClient: r.inWayFromClient    ?? 0,
       regionName:      r.regionName         || "",
@@ -230,11 +218,15 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
   const orders = await cached(`wb${n}:orders`, force,
     () => wbGet(urlOrders, n, force, onRetry));
 
-  /* Остатки — новый Analytics API (кэшируем на 10 мин как раньше) */
+  /* Строим кэш маппинга из заказов ДО загрузки стоков.
+     Заказы содержат nmId+chrtId+supplierArticle+techSize — всё что нужно. */
+  const all = Array.isArray(orders) ? orders : [];
+  buildCardsCacheFromOrders(all);
+  buildChrtCache(all);
+
+  /* Остатки — новый Analytics API */
   const stk = await cached(`wb${n}:stocks`, force,
     () => loadStocksNew(n, onRetry));
-
-  const all = Array.isArray(orders) ? orders : [];
   const t = td(), y = yd(), w = wd();
 
   D[n] = {
