@@ -70,8 +70,16 @@ function go(n) {
   document.querySelectorAll(".view").forEach((v, i) => (v.style.display = i === n - 1 ? "" : "none"));
 
   if (n === 4) { renderConso(); return; }
+
+  /* Сами не грузим: WB считает лимит по ключу, и лишний поход за
+     кабинетом, который никто не открывал, — это чужой бан. */
   if (D[n]) renderCabinet(n);
-  else reload(n);
+  else document.getElementById("v" + n).innerHTML =
+    `<div class="lm">Кабинет «${cabName(n)}» ещё не загружен
+       <div style="margin-top:14px">
+         <button class="loadbtn" onclick="App.reload(${n})">↓ Загрузить данные</button>
+       </div>
+     </div>`;
 }
 
 /* ══ Вход и выход ══
