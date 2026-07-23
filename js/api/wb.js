@@ -165,7 +165,8 @@ function buildChrtCache(orders) {
 /* ══════════ Загрузка остатков через новый Analytics API ══════════ */
 
 const ANAL_URL = "https://seller-analytics-api.wildberries.ru/api/analytics/v1/stocks-report/wb-warehouses";
-const ANAL_PAUSE = 21_000; /* лимит 1/20 сек → ждём 21 сек между запросами */
+/* Паузу между страницами отдельно НЕ ставим: enqueue уже держит WB_GAP
+   между любыми двумя запросами. Свой sleep поверх неё удваивал ожидание. */
 
 async function loadStocksNew(cab, onRetry) {
   /* Кэш строится из заказов в loadWB — к этому моменту он уже есть */
@@ -180,11 +181,14 @@ async function loadStocksNew(cab, onRetry) {
     }
 
     const rows = Array.isArray(data) ? data
-               : (data?.data || data?.result || data?.items || []);
+               : (data?.data?.stocks || data?.stocks || data?.report
+               || data?.data || data?.result || data?.items || []);
+    if (!Array.isArray(rows)) {
+      throw new Error("не разобрал ответ Analytics API: " + JSON.stringify(data).slice(0, 200));
+    }
     all = all.concat(rows);
     if (rows.length < 1000) break;
     offset += 1000;
-    await sleep(ANAL_PAUSE);
   }
 
   return all.map((r) => {
