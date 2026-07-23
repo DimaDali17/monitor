@@ -27,9 +27,9 @@ import { cacheGet, cacheSet } from "./cache.js";
 let chain = Promise.resolve();
 let lastAt = 0;
 
-function enqueue(fn) {
+function enqueue(fn, minGap = WB_GAP) {
   const run = chain.then(async () => {
-    const gap = Math.max(0, lastAt + WB_GAP - Date.now());
+    const gap = Math.max(0, lastAt + minGap - Date.now());
     if (gap > 0) await sleep(gap);
     try { return await fn(); } finally { lastAt = Date.now(); }
   });
@@ -51,9 +51,9 @@ function wbGet(url, cab, force, onRetry) {
   return p;
 }
 
-function wbPost(url, body, cab, onRetry) {
+function wbPost(url, body, cab, onRetry, minGap) {
   /* POST не дедуплицируем — каждый вызов уникален (разный offset) */
-  return enqueue(() => attempt("POST", url, body, cab, false, onRetry));
+  return enqueue(() => attempt("POST", url, body, cab, false, onRetry), minGap);
 }
 
 async function attempt(method, url, body, cab, force, onRetry) {
@@ -119,47 +119,85 @@ function fetchWithTimeout(url, opts, ms) {
   return fetch(url, { ...opts, signal: ctl.signal }).finally(() => clearTimeout(t));
 }
 
-/* ══════════ Кэш карточек: nmId_chrtId → {supplierArticle, techSize, subject} ══════════
-   Строим из заказов — там уже есть supplierArticle, techSize и nmId.
-   Content API требует отдельный токен «Контент» которого у нас нет,
-   поэтому используем данные которые уже загружены бесплатно. */
+/* ══════════ Справочник карточек ══════════
+   Новый Analytics API отдаёт только nmId + chrtId. Артикул поставщика
+   и размер живут в карточках товара.
 
-let cardsCache = null;
+   Из заказов их взять нельзя: Statistics API возвращает nmId, techSize
+   и barcode, но НЕ chrtId — сопоставлять размер не по чему. Поэтому
+   тянем справочник из Content API: он даёт chrtID → размер напрямую
+   и покрывает товары, которых ни разу не заказывали.
 
-function buildCardsCacheFromOrders(orders) {
-  if (cardsCache) return; /* уже построен */
-  cardsCache = {};
-  let count = 0;
-  (orders || []).forEach((o) => {
-    const nm   = o.nmId || o.nmID;
-    const chrt = o.chrtId || o.chrtID;
-    const art  = o.supplierArticle || "";
-    const sz   = o.techSize || "";
-    const subj = o.subject || o.category || "";
-    if (nm && chrt && art) {
-      cardsCache[`${nm}_${chrt}`] = { supplierArticle: art, techSize: sz, subject: subj };
-      count++;
+   Нужен токен категории «Контент» (WB_CONTENT_KEY_1/2 в секретах воркера).
+   Если его нет — откатываемся на nmId из заказов: артикул будет верным,
+   размер покажется как chrtId. */
+
+const CARDS_URL = "https://content-api.wildberries.ru/content/v2/get/cards/list";
+
+/* Отдельно на кабинет: у EF и EZFR свои каталоги, общий словарь
+   подставлял бы чужие артикулы при переключении вкладок. */
+const CARDS = { 1: null, 2: null };
+const blank = () => ({ byChrt: {}, byNm: {}, ready: false, degraded: false });
+const cardsOf = (cab) => (CARDS[cab] ||= blank());
+
+/* Content API разрешает 100 запросов в минуту — на два порядка мягче
+   Statistics. Гнать каталог через общую 20-секундную очередь значило бы
+   ждать минутами на ровном месте. */
+const CARDS_GAP = 700;
+
+async function loadCards(cab, onRetry) {
+  const cards = blank();
+  CARDS[cab] = cards;
+  let cursor = { limit: 100 };
+
+  for (let page = 0; page < 200; page++) {
+    const body = { settings: { cursor, filter: { withPhoto: -1 } } };
+    const d = await wbPost(CARDS_URL, body, cab, onRetry, CARDS_GAP);
+    const list = d?.cards || d?.data?.cards || [];
+
+    for (const c of list) {
+      const art  = c.vendorCode || "";
+      const subj = c.subjectName || "";
+      const nm   = c.nmID || c.nmId;
+      if (nm) cards.byNm[String(nm)] = { supplierArticle: art, subject: subj };
+
+      for (const sz of c.sizes || []) {
+        const chrt = sz.chrtID || sz.chrtId;
+        if (!chrt) continue;
+        cards.byChrt[String(chrt)] = {
+          supplierArticle: art,
+          techSize: sz.techSize || "—",
+          subject: subj,
+        };
+      }
     }
-  });
-  console.log(`cardsCache: построен из заказов — ${count} записей`);
+
+    const cur = d?.cursor || d?.data?.cursor || {};
+    /* WB отдаёт страницы курсором: пока вернулось ровно limit — есть ещё */
+    if ((cur.total ?? list.length) < (cursor.limit || 100)) break;
+    cursor = { limit: 100, updatedAt: cur.updatedAt, nmID: cur.nmID };
+    if (!cur.updatedAt && !cur.nmID) break;
+  }
+
+  cards.ready = true;
+  console.log(`Кабинет ${cab}: каталог ${Object.keys(cards.byChrt).length} размеров, ${Object.keys(cards.byNm).length} товаров`);
+  return cards;
 }
 
-/* Fallback: если заказов мало и nmId не нашёлся — используем chrtId как ключ.
-   Стоки по одному артикулу/размеру приходят с одинаковым chrtId,
-   поэтому можно сгруппировать по chrtId и взять supplierArticle из заказов. */
-let chrtCache = null;
-
-function buildChrtCache(orders) {
-  if (chrtCache) return;
-  chrtCache = {};
+/* Запасной справочник: артикул по nmId из заказов. Размера в нём нет. */
+function buildFallbackFromOrders(cab, orders) {
+  const cards = cardsOf(cab);
+  let n = 0;
   (orders || []).forEach((o) => {
-    const chrt = o.chrtId || o.chrtID;
-    const art  = o.supplierArticle || "";
-    const sz   = o.techSize || "";
-    const subj = o.subject || o.category || "";
-    if (chrt && art) chrtCache[String(chrt)] = { supplierArticle: art, techSize: sz, subject: subj };
+    const nm = o.nmId || o.nmID;
+    if (!nm || cards.byNm[String(nm)]) return;
+    cards.byNm[String(nm)] = {
+      supplierArticle: o.supplierArticle || "",
+      subject: o.subject || o.category || "",
+    };
+    n++;
   });
-  console.log(`chrtCache: ${Object.keys(chrtCache).length} записей`);
+  if (n) console.log(`Кабинет ${cab}: из заказов добрано ${n} артикулов`);
 }
 
 /* ══════════ Загрузка остатков через новый Analytics API ══════════ */
@@ -169,7 +207,6 @@ const ANAL_URL = "https://seller-analytics-api.wildberries.ru/api/analytics/v1/s
    между любыми двумя запросами. Свой sleep поверх неё удваивал ожидание. */
 
 async function loadStocksNew(cab, onRetry) {
-  /* Кэш строится из заказов в loadWB — к этому моменту он уже есть */
   let all = [], offset = 0;
 
   for (let page = 0; page < 50; page++) {
@@ -192,25 +229,34 @@ async function loadStocksNew(cab, onRetry) {
     offset += 1000;
   }
 
-  return all.map((r) => {
-    const nm   = r.nmId   || r.nmID   || 0;
-    const chrt = r.chrtId || r.chrtID || 0;
-    /* Ищем сначала по nm+chrt, потом только по chrt */
-    const card = cardsCache?.[`${nm}_${chrt}`]
-              || chrtCache?.[String(chrt)]
-              || {};
+  const cards = cardsOf(cab);
+  let unknown = 0;
+
+  const mapped = all.map((r) => {
+    const nm   = String(r.nmId   || r.nmID   || 0);
+    const chrt = String(r.chrtId || r.chrtID || 0);
+    /* chrtId точнее: он про конкретный размер. nmId — только про товар. */
+    const byChrt = cards.byChrt[chrt];
+    const byNm   = cards.byNm[nm];
+    const art    = byChrt?.supplierArticle || byNm?.supplierArticle || nm;
+    const subj   = byChrt?.subject || byNm?.subject || "";
+    if (!byChrt?.supplierArticle && !byNm?.supplierArticle) unknown++;
+
     return {
-      supplierArticle: card.supplierArticle || String(nm),
-      techSize:        card.techSize        || String(chrt),
-      warehouseName:   r.warehouseName      || "",
-      quantity:        r.quantity           ?? 0,
-      subject:         card.subject         || "",
-      category:        card.subject         || "",
-      inWayToClient:   r.inWayToClient      ?? 0,
-      inWayFromClient: r.inWayFromClient    ?? 0,
-      regionName:      r.regionName         || "",
+      supplierArticle: art,
+      techSize:        byChrt?.techSize || "—",
+      warehouseName:   r.warehouseName  || "",
+      quantity:        r.quantity       ?? 0,
+      subject:         subj,
+      category:        subj,
+      inWayToClient:   r.inWayToClient  ?? 0,
+      inWayFromClient: r.inWayFromClient ?? 0,
+      regionName:      r.regionName     || "",
     };
   });
+
+  if (unknown) console.warn(`Кабинет ${cab}: ${unknown} позиций без карточки — показаны как nmId`);
+  return mapped;
 }
 
 /* ══════════ Основная загрузка кабинета ══════════ */
@@ -223,11 +269,27 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
   const orders = await cached(`wb${n}:orders`, force,
     () => wbGet(urlOrders, n, force, onRetry));
 
-  /* Строим кэш маппинга из заказов ДО загрузки стоков.
-     Заказы содержат nmId+chrtId+supplierArticle+techSize — всё что нужно. */
   const all = Array.isArray(orders) ? orders : [];
-  buildCardsCacheFromOrders(all);
-  buildChrtCache(all);
+
+  /* Справочник карточек. Меняется редко — кэшируем наравне с данными.
+     Если токена «Контент» нет, воркер вернёт понятную 500: тогда
+     работаем на артикулах из заказов, без размеров. */
+  try {
+    const hit = force ? null : cacheGet(`wb${n}:cards`);
+    if (hit) {
+      CARDS[n] = { byChrt: hit.byChrt, byNm: hit.byNm, ready: true, degraded: false };
+      console.log(`Кабинет ${n}: каталог из кэша, ${Object.keys(hit.byChrt).length} размеров`);
+    } else {
+      onRetry?.("загружаю справочник артикулов", 0, 0);
+      const c = await loadCards(n, onRetry);
+      cacheSet(`wb${n}:cards`, { byChrt: c.byChrt, byNm: c.byNm });
+    }
+  } catch (e) {
+    cardsOf(n).degraded = true;
+    console.warn(`Кабинет ${n}: справочник не загрузился — ${e.message}`);
+    onRetry?.("справочник недоступен, беру артикулы из заказов", 0, 0);
+  }
+  buildFallbackFromOrders(n, all);
 
   /* Остатки — новый Analytics API */
   const stk = await cached(`wb${n}:stocks`, force,
