@@ -67,6 +67,11 @@ tbody tr:hover{background:var(--bg3)}
 .pr{font-weight:700}.qo{color:var(--green);font-weight:700}.ql{color:var(--amber);font-weight:700}.qx{color:var(--red);font-weight:700}
 .tc{font-weight:700;background:var(--bg3)!important;text-align:center;font-size:14px}
 .er td{text-align:center;padding:10px}
+/* Широкие таблицы (остатки, дефицит) прокручиваются вбок, и кнопка
+   «Все» по центру уезжает за экран. Прижимаем её влево и залипаем,
+   чтобы она была на месте при любой прокрутке. */
+.er td.stick{text-align:left;position:sticky;left:0;background:var(--card);z-index:5}
+.er td.stick .eb{margin-left:2px}
 .eb{background:0;border:1px solid var(--border2);border-radius:7px;padding:5px 16px;font-size:11px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit}
 .eb:hover{background:var(--ink);color:var(--bg3);border-color:var(--ink)}
 .fl2{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700}
