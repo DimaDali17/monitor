@@ -93,7 +93,7 @@ export function stocksTbl(n) {
 
   const span = whList.length + 2;
   const more = keys.length > LIM
-    ? `<tr class="er"><td colspan="${span}"><button class="eb" onclick="App.togExS(${n})">${EXS[n] ? "▲ Свернуть" : "▼ Все " + keys.length}</button></td></tr>`
+    ? `<tr class="er"><td class="stick" colspan="${span}"><button class="eb" onclick="App.togExS(${n})">${EXS[n] ? "▲ Свернуть" : "▼ Все " + keys.length}</button></td></tr>`
     : "";
 
   return `<table>
