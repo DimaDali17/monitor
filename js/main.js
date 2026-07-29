@@ -10,6 +10,7 @@ import { loadWB } from "./api/wb.js";
 import { loadOZ } from "./api/ozon.js";
 import { renderCabinet, repaintStocks, repaintDeficit } from "./render/cabinet.js";
 import { renderConso, logConso } from "./render/conso.js";
+import { multiSizeArts, allSizesOpen } from "./render/deficit.js";
 import { fpInput, faInput } from "./render/filters.js";
 import { esc } from "./utils.js";
 import { exportBlock } from "./export.js";
@@ -186,6 +187,18 @@ const App = {
     repaintDeficit(n);
   },
   togExD(n) { EXD[n] = !EXD[n]; repaintDeficit(n); },
+  /* Раскрыть все артикулы до размеров разом — или свернуть обратно.
+     Заодно показываем все строки (EXD), иначе часть артикулов скрыта
+     под «Все N» и раскрывать в них нечего. */
+  togAllSizesD(n) {
+    if (allSizesOpen(n)) {
+      OAD[n].clear();
+    } else {
+      EXD[n] = true;
+      multiSizeArts(n).forEach((a) => OAD[n].add(a));
+    }
+    renderCabinet(n);
+  },
 
   /* консолидация */
   togExpC() { CONSO.expandOrders = !CONSO.expandOrders; renderConso(); },
