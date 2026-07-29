@@ -12,6 +12,7 @@ import { renderCabinet, repaintStocks, repaintDeficit } from "./render/cabinet.j
 import { renderConso, logConso } from "./render/conso.js";
 import { fpInput, faInput } from "./render/filters.js";
 import { esc } from "./utils.js";
+import { exportBlock } from "./export.js";
 
 let curTab = 1;
 
@@ -138,6 +139,7 @@ async function checkVersion() {
 const App = {
   reload, reloadForConso, go, doLogin, logout, checkVersion,
   fpInput, faInput,
+  exportXlsx: exportBlock,
 
   /* график */
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
