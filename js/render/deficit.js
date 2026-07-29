@@ -56,6 +56,7 @@ export function deficitHTML(n) {
         <span class="fl2 fw" data-tip="14–30 дней">⚠️ скоро</span>
         <span class="fl2 fk" data-tip="30–90 дней">✅ норма</span>
         <span class="fl2 fd" data-tip="Больше 90 дней">💀 избыток</span>
+        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.togAllSizesD(${n})" data-tip="Раскрыть все артикулы до размеров или свернуть обратно">${allSizesOpen(n) ? "▲ Свернуть размеры" : "▼ Все размеры"}</button>
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Дефицит','deficit')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
@@ -68,6 +69,26 @@ export function deficitHTML(n) {
     </div>
     <div class="sw" id="dtbl${n}">${defTbl(n)}</div>
   </div>`;
+}
+
+/* Все ли артикулы дефицита раскрыты — от этого зависит подпись кнопки */
+export function allSizesOpen(n) {
+  const vm = VM[n];
+  if (!vm) return false;
+  const arts = new Set(Object.values(vm.arts).map((v) => v.art));
+  if (!arts.size) return false;
+  for (const a of arts) if (!OAD[n].has(a)) return false;
+  return true;
+}
+
+/* Список всех артикулов, у которых больше одного размера — только их
+   и имеет смысл раскрывать. */
+export function multiSizeArts(n) {
+  const vm = VM[n];
+  if (!vm) return [];
+  const bySz = {};
+  for (const v of Object.values(vm.arts)) (bySz[v.art] ||= new Set()).add(v.sz);
+  return Object.keys(bySz).filter((a) => bySz[a].size > 1);
 }
 
 /* Статус по числу дней запаса */
