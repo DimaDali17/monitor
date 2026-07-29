@@ -60,6 +60,7 @@ export function ordersHTML(n, vm, type) {
     <div class="sh">
       <span class="st">${weekMode ? "Заказы за период" : "Заказы сегодня"}</span>
       <span class="sm2">${orders.length} заказов</span>
+      <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Заказы','zakazy')" data-tip="Скачать в Excel">⤓ Excel</button>
     </div>
     <div class="tw"><table>
       <thead><tr>
