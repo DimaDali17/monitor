@@ -56,6 +56,7 @@ export function deficitHTML(n) {
         <span class="fl2 fw" data-tip="14–30 дней">⚠️ скоро</span>
         <span class="fl2 fk" data-tip="30–90 дней">✅ норма</span>
         <span class="fl2 fd" data-tip="Больше 90 дней">💀 избыток</span>
+        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Дефицит','deficit')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
     <div style="font-size:10px;color:var(--ink3);margin-bottom:8px;display:flex;gap:14px;flex-wrap:wrap">

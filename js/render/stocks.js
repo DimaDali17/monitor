@@ -17,6 +17,7 @@ export function stocksHTML(n) {
       <span class="st">Остатки по складам</span>
       <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span class="sm2">${count} позиций · ${vm.whList.length} складов</span>${msk}
+        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Остатки','ostatki')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
     <div class="sw" id="stbl${n}">${stocksTbl(n)}</div>
