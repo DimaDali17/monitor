@@ -12,7 +12,7 @@ export function ordersHTML(n, vm, type) {
 
   const rows = shown.map((o) => {
     const t = timeOf(o) ? new Date(timeOf(o)).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }) : "—";
-    const dt = timeOf(o) ? new Date(timeOf(o)).toLocaleDateString("ru", { day: "2-digit", month: "2-digit" }) : "—";
+    const dt = timeOf(o) ? new Date(timeOf(o)).toLocaleDateString("ru", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—";
     let art, sz, name, qty, price, wh;
 
     if (type === "wb") {
