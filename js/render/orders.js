@@ -12,6 +12,7 @@ export function ordersHTML(n, vm, type) {
 
   const rows = shown.map((o) => {
     const t = timeOf(o) ? new Date(timeOf(o)).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }) : "—";
+    const dt = timeOf(o) ? new Date(timeOf(o)).toLocaleDateString("ru", { day: "2-digit", month: "2-digit" }) : "—";
     let art, sz, name, qty, price, wh;
 
     if (type === "wb") {
@@ -42,6 +43,7 @@ export function ordersHTML(n, vm, type) {
 
     const p = sitePrice(price);
     return `<tr>
+      <td><span class="tp">${dt}</span></td>
       <td><span class="tp">${t}</span></td>
       <td><span class="art">${artCell}</span></td>
       <td>${esc(sz)}</td>
@@ -53,7 +55,7 @@ export function ordersHTML(n, vm, type) {
   }).join("");
 
   const more = sorted.length > LIM
-    ? `<tr class="er"><td colspan="7"><button class="eb" onclick="App.togExp(${n})">${EXP[n] ? "▲ Свернуть" : "▼ Все " + sorted.length}</button></td></tr>`
+    ? `<tr class="er"><td colspan="8"><button class="eb" onclick="App.togExp(${n})">${EXP[n] ? "▲ Свернуть" : "▼ Все " + sorted.length}</button></td></tr>`
     : "";
 
   return `<div class="sec">
@@ -64,11 +66,11 @@ export function ordersHTML(n, vm, type) {
     </div>
     <div class="tw"><table>
       <thead><tr>
-        <th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th>
+        <th>Дата</th><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th>
         <th data-tip="finishedPrice × 0.80 — приблизительная цена на витрине с учётом среднего СПП ~20%">Цена на сайте</th>
         <th>Склад</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="em">Нет заказов</td></tr>'}${more}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" class="em">Нет заказов</td></tr>'}${more}</tbody>
     </table></div>
   </div>`;
 }
