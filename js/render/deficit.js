@@ -209,8 +209,7 @@ export function defTbl(n) {
       : `<span class="buyrate buyrate-ok" data-tip="Выкупаемость из таблицы">${Math.round(r.br.val * 100)}%</span>`;
 
     trs += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArtD(${n},'${q(r.art)}')"` : ""}>
-      <td>${tog}<span class="art">${esc(r.art)}</span>${brBadge}
-        <span style="font-size:10px;color:var(--ink3);margin-left:5px">${esc(r.name.slice(0, 20))}</span></td>
+      <td style="white-space:nowrap">${tog}<span class="art">${esc(r.art)}</span>${brBadge}<span style="font-size:10px;color:var(--ink3);margin-left:5px">${esc(r.name.slice(0, 20))}</span></td>
       <td class="${qc(r.stk, 20)}" style="text-align:center;font-size:14px">${r.stk}</td>
       <td class="${qc(r.sgp, 20)}" style="text-align:center">${r.sgp || "—"}</td>
       <td class="${qc(r.raw, 20)}" style="text-align:center">${r.raw || "—"}</td>
