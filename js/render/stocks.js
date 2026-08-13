@@ -73,8 +73,7 @@ export function stocksTbl(n) {
     }).join("");
 
     rows += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArt(${n},'${q(a)}')"` : ""}>
-      <td>${tog}<span class="art">${esc(a)}</span>
-        <span style="font-size:10px;color:var(--ink3);margin-left:6px">${esc(g.name.slice(0, 22))}</span></td>
+      <td style="white-space:nowrap">${tog}<span class="art">${esc(a)}</span><span style="font-size:10px;color:var(--ink3);margin-left:6px">${esc(g.name.slice(0, 22))}</span></td>
       <td class="tc ${qc(g.total, 10)}">${g.total}</td>${cells}
     </tr>`;
 
