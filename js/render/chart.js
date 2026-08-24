@@ -66,10 +66,10 @@ export function chartHTML(n, vm, type) {
     const tv = cur[i], bH = (tv / max) * cH;
     const bx = gx + (gW - bW) / 2, by = T + cH - bH;
     const future = mode === "day" && i > nowH;
-    const showLbl = mode === "month" ? i % 3 === 0 : true;
 
     bars += `<rect x="${bx}" y="${by}" width="${bW}" height="${bH}" rx="2" fill="${future ? FUT : BAR}" opacity=".9"/>`;
-    if (tv > 0 && !future && showLbl)
+    /* Подпись над каждым столбиком, где есть заказы */
+    if (tv > 0)
       bars += `<text x="${bx + bW / 2}" y="${by - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fv(tv)}</text>`;
   }
 
