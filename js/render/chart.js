@@ -18,68 +18,59 @@ export function chartHTML(n, vm, type) {
   const price = type === "wb" ? wbPrice : ozRev;
   const val = (o) => (isRev ? price(o) : 1);
 
-  let labels = [], cur = [], prev = [];
+  /* Только текущий период — сравнение теперь живёт в верхних карточках */
+  let labels = [], cur = [];
 
   if (mode === "day") {
-    const tH = Array(24).fill(0), yH = Array(24).fill(0);
+    const tH = Array(24).fill(0);
     (vm.todayO || []).forEach((o) => { tH[hourOf(o)] += val(o); });
-    (vm.yestO || []).forEach((o) => { yH[hourOf(o)] += val(o); });
     for (let i = 0; i < 24; i++) {
       labels.push(i % 3 === 0 ? i + ":00" : "");
-      cur.push(tH[i]); prev.push(yH[i]);
+      cur.push(tH[i]);
     }
   } else {
     const span = mode === "week" ? 7 : 30;
-    const curDays = [], prevDays = [];
+    const curDays = [];
     for (let i = span - 1; i >= 0; i--) curDays.push(iso(Date.now() - i * 864e5));
-    for (let i = span * 2 - 1; i >= span; i--) prevDays.push(iso(Date.now() - i * 864e5));
 
-    const curSet = new Set(curDays), prevSet = new Set(prevDays);
-    const cA = {}, pA = {};
+    const curSet = new Set(curDays);
+    const cA = {};
     (vm.allOrders || []).forEach((o) => {
       const d = dateOf(o);
-      if (!d) return;
-      if (curSet.has(d)) cA[d] = (cA[d] || 0) + val(o);
-      if (prevSet.has(d)) pA[d] = (pA[d] || 0) + val(o);
+      if (d && curSet.has(d)) cA[d] = (cA[d] || 0) + val(o);
     });
 
     const every = mode === "month" ? 3 : 1;
     for (let i = 0; i < span; i++) {
-      const show = i % every === 0;
-      labels.push(show
+      labels.push(i % every === 0
         ? new Date(curDays[i] + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" }).replace(".", "")
         : "");
       cur.push(cA[curDays[i]] || 0);
-      prev.push(pA[prevDays[i]] || 0);
     }
   }
 
   const N = labels.length;
-  const max = Math.max(...cur, ...prev, 1);
+  const max = Math.max(...cur, 1);
   const W = 700, H = 155, L = 38, R = 10, T = 13, B = 20;
   const cW = W - L - R, cH = H - T - B;
-  const gW = cW / N, bW = Math.floor(gW * 0.35), gap = Math.max(1, Math.floor(gW * 0.04));
+  const gW = cW / N;
+  const bW = Math.max(2, Math.floor(gW * 0.55));
   const fv = (v) => (isRev ? (v >= 1000 ? Math.round(v / 1000) + "к" : Math.round(v)) : v);
   const lblFs = mode === "month" ? 6 : 7;
 
+  /* Один нейтральный столбик на интервал */
+  const BAR = "#6B6357", FUT = "#E8E4DC";
   let bars = "";
   for (let i = 0; i < N; i++) {
     const gx = L + i * gW;
-    const pv = prev[i], pH = (pv / max) * cH;
+    const tv = cur[i], bH = (tv / max) * cH;
+    const bx = gx + (gW - bW) / 2, by = T + cH - bH;
+    const future = mode === "day" && i > nowH;
     const showLbl = mode === "month" ? i % 3 === 0 : true;
 
-    bars += `<rect x="${gx + gap}" y="${T + cH - pH}" width="${bW}" height="${pH}" rx="2" fill="#D5D0C8" opacity=".55"/>`;
-    if (pv > 0 && showLbl)
-      bars += `<text x="${gx + gap + bW / 2}" y="${T + cH - pH - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink3)">${fv(pv)}</text>`;
-
-    const tv = cur[i], tH2 = (tv / max) * cH;
-    const future = mode === "day" && i > nowH;
-    const fill = future ? "#E8E4DC" : colorFor(tv, pv);
-    const tx = gx + gap + bW + gap, ty = T + cH - tH2;
-
-    bars += `<rect x="${tx}" y="${ty}" width="${bW}" height="${tH2}" rx="2" fill="${fill}" opacity=".9"/>`;
+    bars += `<rect x="${bx}" y="${by}" width="${bW}" height="${bH}" rx="2" fill="${future ? FUT : BAR}" opacity=".9"/>`;
     if (tv > 0 && !future && showLbl)
-      bars += `<text x="${tx + bW / 2}" y="${ty - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fv(tv)}</text>`;
+      bars += `<text x="${bx + bW / 2}" y="${by - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fv(tv)}</text>`;
   }
 
   let xLab = "";
@@ -104,7 +95,6 @@ export function chartHTML(n, vm, type) {
     <div class="sh">
       <span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName}</span>
       <span style="display:flex;align-items:center;gap:8px">
-        <span class="sm2"><span style="color:var(--green);font-weight:700">■</span>&gt; <span style="color:var(--red);font-weight:700">■</span>&lt; <span style="color:#D5D0C8;font-weight:700">■</span>${mode === "day" ? "вчера" : "пред. период"}</span>
         <span class="ctog">
           <button class="${on(CV[n], "ord")}" onclick="App.setChartVal(${n},'ord')">Шт</button>
           <button class="${on(CV[n], "rev")}" onclick="App.setChartVal(${n},'rev')">₽</button>
@@ -120,15 +110,4 @@ export function chartHTML(n, vm, type) {
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${yLab}${bars}${xLab}</svg>
     </div>
   </div>`;
-}
-
-/* Цвет столбца — по отклонению от того же интервала прошлого периода */
-function colorFor(cur, prev) {
-  if (!prev) return "#6B6357";
-  const p = ((cur - prev) / prev) * 100;
-  if (Math.abs(p) <= 10) return "#6B6357";
-  if (p > 25) return "#2D7A4F";
-  if (p > 10) return "#7DB896";
-  if (p >= -25) return "#D4827A";
-  return "#B84040";
 }
