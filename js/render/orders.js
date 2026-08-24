@@ -2,6 +2,19 @@ import { EXP, CM, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { fmt, esc, q, wbPrice, ozRev, sitePrice } from "../utils.js";
 
+/* Модель продажи WB по полю warehouseType из Statistics API.
+   "Склад WB" → FBW (товар на складе WB), иначе "Склад продавца" → FBS.
+   Незнакомое значение показываем как есть — так ничего не соврём.
+   Сверьте реальные строки в консоли, если бейдж где-то пустой:
+     console.table([...new Set(App.D[1].allOrders.map(o=>o.warehouseType))]) */
+function wbModel(wtype) {
+  const s = (wtype || "").toLowerCase();
+  if (s.includes("склад wb") || s === "wb") return { tag: "FBW", bg: "#2f7d55", fg: "#fff" };
+  if (s.includes("продавц") || s.includes("маркетплейс") || s.includes("fbs"))
+    return { tag: "FBS", bg: "#c26a2b", fg: "#fff" };
+  return wtype ? { tag: esc(wtype), bg: "#8a8577", fg: "#fff" } : null;
+}
+
 export function ordersHTML(n, vm, type) {
   const weekMode = CM[n] === "week" || CM[n] === "month";
   const orders = weekMode ? vm.orders7 || [] : vm.todayO || [];
@@ -12,8 +25,8 @@ export function ordersHTML(n, vm, type) {
 
   const rows = shown.map((o) => {
     const t = timeOf(o) ? new Date(timeOf(o)).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" }) : "—";
-    const dt = timeOf(o) ? new Date(timeOf(o)).toLocaleDateString("ru", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—";
-    let art, sz, name, qty, price, wh;
+    const dt = timeOf(o) ? new Date(timeOf(o)).toLocaleDateString("ru", { day: "2-digit", month: "2-digit" }) : "—";
+    let art, sz, name, qty, price, wh, model;
 
     if (type === "wb") {
       art = o.supplierArticle || "—";
@@ -22,6 +35,7 @@ export function ordersHTML(n, vm, type) {
       qty = o.quantity || 1;
       price = wbPrice(o);
       wh = o.warehouseName || "—";
+      model = wbModel(o.warehouseType);
     } else {
       const items = o.products || [];
       art = items.map((p) => p.offer_id || "").join(", ");
@@ -33,6 +47,7 @@ export function ordersHTML(n, vm, type) {
       qty = items.reduce((s, p) => s + (p.quantity || 1), 0);
       price = ozRev(o);
       wh = o.analytics_data?.warehouse_name || "—";
+      model = null;
     }
 
     /* Артикул кликабелен — добавляет себя в фильтр. Составные (Ozon, несколько товаров) — нет. */
@@ -40,6 +55,11 @@ export function ordersHTML(n, vm, type) {
       ? esc(art)
       : `<a href="#" onclick="event.preventDefault();App.addFA(${n},'${q(art)}')"
             style="color:var(--ink2);text-decoration:underline;text-decoration-style:dotted">${esc(art)}</a>`;
+
+    /* Бейдж модели продажи перед названием склада */
+    const badge = model
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-right:6px;background:${model.bg};color:${model.fg}" data-tip="Модель продажи (warehouseType)">${model.tag}</span>`
+      : "";
 
     const p = sitePrice(price);
     return `<tr>
@@ -50,7 +70,7 @@ export function ordersHTML(n, vm, type) {
       <td>${esc(name)}</td>
       <td>${qty}</td>
       <td><span class="pr">${p ? fmt(p) : "—"}</span></td>
-      <td style="font-size:11px;color:var(--ink3)">${esc(wh)}</td>
+      <td style="font-size:11px;color:var(--ink3)">${badge}${esc(wh)}</td>
     </tr>`;
   }).join("");
 
