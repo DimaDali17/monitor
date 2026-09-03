@@ -1,18 +1,27 @@
-import { CSV_BUYRATE, CSV_SGP, CSV_RAW, CSV_MAP, DEFAULT_BUYRATE } from "../config.js";
+import { CSV_BUYRATE, CSV_RAW, CSV_MAP, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
-   Справочники из Google Sheets: выкупаемость, СГП, сырьё, маппинг.
+   Справочники из Google Sheets: выкупаемость, сырьё + СГП, маппинг.
    Ключевое отличие от старой версии — индексы строятся один раз
    после загрузки. Раньше getStocksForArt на каждый артикул
    сканировал весь gSgp и весь gMap: 300 артикулов × 2000 строк
    маппинга = сотни тысяч итераций на каждую перерисовку таблицы.
+
+   СГП больше НЕ отдельный лист. Готовая продукция лежит в «Остатки
+   сводная» вместе с сырьём и определяется по префиксу артикула «СГП »
+   (СГП + пробел). Пример: строка «СГП TS 21 Num 1» → это остаток
+   готовой продукции по артикулу ВБ «TS 21 Num 1».
    ══════════════════════════════════════════════════════════ */
+
+/* Префикс готовой продукции в колонке «Арт производ». Регистр/пробелы
+   допускаем любые, но по брифу это ровно «СГП » (СГП + один пробел). */
+const SGP_RE = /^СГП\s+/i;
 
 export const sheets = {
   loaded: false,
   buyrate: {},   /* artLower → 0..1 */
-  sgp: {},       /* "wbArt;wbSz" → шт */
+  sgp: {},       /* "wbArt;wbSz(norm)" → шт */
   raw: {},       /* "artPr;szPr(norm)" → шт */
   map: {},       /* "wbArt;wbSz" → [{artPr, szPr}] */
   revMap: {},    /* "baseArt;szPr(norm)" → wbSz — для разбора Ozon-артикулов */
@@ -63,8 +72,8 @@ export function loadExternal() {
 
   inflight = (async () => {
     try {
-      const [rB, rS, rR, rM] = await Promise.all(
-        [CSV_BUYRATE, CSV_SGP, CSV_RAW, CSV_MAP].map((u) => fetch(u).then((r) => r.text()))
+      const [rB, rR, rM] = await Promise.all(
+        [CSV_BUYRATE, CSV_RAW, CSV_MAP].map((u) => fetch(u).then((r) => r.text()))
       );
 
       sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {};
@@ -90,22 +99,23 @@ export function loadExternal() {
         });
       });
 
-      /* СГП: «Артикул ИП» — это уже WB-артикул */
-      parseCSV(rS).forEach((row) => {
-        const art = row["Артикул ИП"] || "";
-        const sz = row["Размер"] || "";
-        const qty = parseInt(row[" ИТОГО ТЕ"] || row["ИТОГО ТЕ"] || row[" ИТОГО ТЕ "] || "", 10) || 0;
-        if (!art || !qty) return;
-        const k = art.toLowerCase() + ";" + sz.toLowerCase();
-        sheets.sgp[k] = (sheets.sgp[k] || 0) + qty;
-      });
-
-      /* Сырьё: nobrand-артикулы дублируем под «чистым» именем */
+      /* Остатки сводная: сырьё + СГП в одном листе.
+         Строки с префиксом «СГП » → готовая продукция (ключ по артикулу ВБ).
+         Остальные → сырьё; nobrand-артикулы дублируем под «чистым» именем. */
       parseCSV(rR).forEach((row) => {
         const art = row["Арт производ"] || "";
         const sz = row["Размер"] || "";
         const qty = parseInt(row["SUM из Штук"] || "0", 10) || 0;
         if (!art) return;
+
+        if (SGP_RE.test(art)) {
+          const wbArt = art.replace(SGP_RE, "").trim();
+          if (!wbArt || !qty) return;
+          const k = wbArt.toLowerCase() + ";" + normSz(sz).toLowerCase();
+          sheets.sgp[k] = (sheets.sgp[k] || 0) + qty;
+          return;
+        }
+
         const kSz = normSz(sz).toLowerCase();
         const k = art.toLowerCase() + ";" + kSz;
         sheets.raw[k] = (sheets.raw[k] || 0) + qty;
@@ -189,10 +199,12 @@ export function getBuyrate(art) {
 
 /* ── Остатки СГП/Сырьё ── */
 export function getStocksForSz(wbArt, wbSz) {
-  const ka = (wbArt || "").toLowerCase(), kz = (wbSz || "").toLowerCase();
-  const sgp = sheets.sgp[ka + ";" + kz] || 0;
+  const ka = (wbArt || "").toLowerCase();
+  const kzRaw = (wbSz || "").toLowerCase();            /* маппинг хранит сырой размер ВБ */
+  const kzNorm = normSz(wbSz || "").toLowerCase();     /* СГП хранится нормализованным */
+  const sgp = sheets.sgp[ka + ";" + kzNorm] || 0;
   let raw = 0;
-  for (const { artPr, szPr } of sheets.map[ka + ";" + kz] || []) {
+  for (const { artPr, szPr } of sheets.map[ka + ";" + kzRaw] || []) {
     raw += sheets.raw[artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase()] || 0;
   }
   return { sgp, raw };
