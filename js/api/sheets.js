@@ -2,40 +2,58 @@ import { CSV_BUYRATE, CSV_RAW, CSV_MAP, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
-   Справочники из Google Sheets: выкупаемость, сырьё + СГП, маппинг.
-   Ключевое отличие от старой версии — индексы строятся один раз
-   после загрузки. Раньше getStocksForArt на каждый артикул
-   сканировал весь gSgp и весь gMap: 300 артикулов × 2000 строк
-   маппинга = сотни тысяч итераций на каждую перерисовку таблицы.
+   Справочники: выкупаемость, сырьё + СГП, маппинг. Индексы строятся
+   один раз, читаются за O(1).
 
-   СГП больше НЕ отдельный лист. Готовая продукция лежит в «Остатки
-   сводная» вместе с сырьём и определяется по префиксу артикула «СГП »
-   (СГП + пробел). Пример: строка «СГП TS 21 Num 1» → это остаток
-   готовой продукции по артикулу ВБ «TS 21 Num 1».
+   СГП — не отдельный лист. Готовая продукция лежит в «Остатки сводная»
+   вместе с сырьём и определяется по префиксу артикула «СГП » (СГП +
+   пробел): «СГП TS21num1» → остаток по артикулу ВБ «TS21num1».
+
+   ОБЩИЙ ПУЛ СЫРЬЯ (вариант B). Один произв-артикул сырья (напр. A1905)
+   может быть связан с несколькими артикулами ВБ (TS21num1/num3/num4) —
+   физически это ОДИН остаток на всех. Пропорции раздела неизвестны,
+   поэтому весь пул относим на ОДИН «главный» артикул, остальные видят 0.
+   Главный = артикул с наименьшим номером в конце имени (num1 < num3;
+   сравнение числовое, поэтому num2 < num10). Так сырьё не задваивается,
+   а суммарный остаток совпадает с суммой строк.
    ══════════════════════════════════════════════════════════ */
 
-/* Префикс готовой продукции в колонке «Арт производ». Регистр/пробелы
-   допускаем любые, но по брифу это ровно «СГП » (СГП + один пробел). */
 const SGP_RE = /^СГП\s+/i;
+
+/* Число в конце артикула (…num1 → 1). Нет числа → в конец очереди. */
+function trailingNum(s) {
+  const m = (s || "").match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : Infinity;
+}
+/* Главный артикул пула: наименьший номер, при равенстве — по алфавиту. */
+function primaryOf(users) {
+  return [...users].sort((a, b) => {
+    const na = trailingNum(a), nb = trailingNum(b);
+    return na !== nb ? na - nb : a.localeCompare(b);
+  })[0];
+}
 
 export const sheets = {
   loaded: false,
-  buyrate: {},   /* artLower → 0..1 */
-  sgp: {},       /* "wbArt;wbSz(norm)" → шт */
-  raw: {},       /* "artPr;szPr(norm)" → шт */
-  map: {},       /* "wbArt;wbSz" → [{artPr, szPr}] */
-  revMap: {},    /* "baseArt;szPr(norm)" → wbSz — для разбора Ozon-артикулов */
+  buyrate: {},      /* artLower → 0..1 */
+  sgp: {},          /* "wbArt;wbSz(norm)" → шт */
+  raw: {},          /* "artPr;szPr(norm)" → шт */
+  map: {},          /* "wbArt;wbSz" → [{artPr, szPr}] */
+  revMap: {},       /* "baseArt;szPr(norm)" → wbSz — разбор Ozon-артикулов */
+  artDisplay: {},   /* wbArtLower → как записан в справочнике (для подсказок) */
   /* индексы */
-  sgpByArt: {},  /* wbArt → шт (все размеры) */
-  rawByArt: {},  /* wbArt → шт (через маппинг, без двойного счёта) */
+  sgpByArt: {},     /* wbArt → шт (все размеры) */
+  rawByArt: {},     /* wbArt → шт (только пулы, где он главный) */
+  rawKeysByArt: {}, /* wbArt → Set(ключ сырья) — какие пулы связаны с артикулом */
+  rawUsers: {},     /* ключ сырья → Set(wbArt) — кто связан с пулом (size>1 ⇒ общий) */
+  rawPrimary: {},   /* ключ сырья → wbArt-главный, кому отнесён остаток пула */
+  setByRawKey: {},  /* ключ сырья → «В наборе штук»: сырьё(штук) / set = наборы */
 };
 
 let inflight = null;
 const buyrateCache = new Map();
 
-/* ── CSV с учётом кавычек ──
-   Старый парсер делал split(',') и разъезжался на любом
-   «Брюки, чёрные» — маппинг тихо бился. */
+/* ── CSV с учётом кавычек ── */
 export function parseCSV(text) {
   const rows = [];
   let row = [], field = "", inQuotes = false;
@@ -76,7 +94,7 @@ export function loadExternal() {
         [CSV_BUYRATE, CSV_RAW, CSV_MAP].map((u) => fetch(u).then((r) => r.text()))
       );
 
-      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {};
+      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {};
       buyrateCache.clear();
 
       /* Выкупаемость */
@@ -91,17 +109,23 @@ export function loadExternal() {
         const artPr = row["Артикул произв"] || "";
         const szPr = row["Размер произв"] || "";
         const szWB = row["Размер ВБ"] || "";
+        /* Сколько штук сырья в одном наборе (готовом артикуле ВБ). Пусто/1 — не делим. */
+        const setN = parseInt(row["В наборе штук"] || row["В набор штук"] || "1", 10) || 1;
+        if (artPr && setN > 1) {
+          const rkSet = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+          sheets.setByRawKey[rkSet] = setN;
+        }
         [row["Арт ВБ"], row["Арт ВБ2"]].forEach((wb) => {
           const wbArt = (wb || "").trim();
           if (!wbArt || !artPr) return;
           const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
           (sheets.map[k] ||= []).push({ artPr, szPr });
+          sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
         });
       });
 
       /* Остатки сводная: сырьё + СГП в одном листе.
-         Строки с префиксом «СГП » → готовая продукция (ключ по артикулу ВБ).
-         Остальные → сырьё; nobrand-артикулы дублируем под «чистым» именем. */
+         «СГП …» → готовая продукция; остальное → сырьё (nobrand дублируем). */
       parseCSV(rR).forEach((row) => {
         const art = row["Арт производ"] || "";
         const sz = row["Размер"] || "";
@@ -142,18 +166,27 @@ export function loadExternal() {
   return inflight;
 }
 
-/* Индексы: артикул → сумма. Строятся один раз, читаются за O(1). */
+/* Остаток пула в НАБОРАХ: штуки сырья / «В наборе штук» (целое число наборов). */
+function rawSets(rk) {
+  return Math.floor((sheets.raw[rk] || 0) / (sheets.setByRawKey[rk] || 1));
+}
+
+/* Индексы. Порядок: связи артикул↔пул → главный пула → остаток на главного. */
 function buildIndexes() {
   sheets.sgpByArt = {};
   sheets.rawByArt = {};
+  sheets.rawKeysByArt = {};
+  sheets.rawUsers = {};
+  sheets.rawPrimary = {};
   sheets.revMap = {};
+  /* setByRawKey строится при разборе маппинга (в loadExternal), здесь не трогаем */
 
   for (const [k, v] of Object.entries(sheets.sgp)) {
     const art = k.split(";")[0];
     sheets.sgpByArt[art] = (sheets.sgpByArt[art] || 0) + v;
   }
 
-  /* Сырьё по артикулу — через маппинг, каждый произв-ключ считаем один раз */
+  /* Pass 1: артикул ВБ ↔ ключи сырья (через маппинг, дедуп на артикул) */
   const seenPerArt = {};
   for (const [k, mappings] of Object.entries(sheets.map)) {
     const wbArt = k.split(";")[0];
@@ -162,24 +195,37 @@ function buildIndexes() {
       const kp = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
       if (seenPerArt[wbArt].has(kp)) continue;
       seenPerArt[wbArt].add(kp);
-      sheets.rawByArt[wbArt] = (sheets.rawByArt[wbArt] || 0) + (sheets.raw[kp] || 0);
+      (sheets.rawKeysByArt[wbArt] ||= new Set()).add(kp);
+      (sheets.rawUsers[kp] ||= new Set()).add(wbArt);
 
-      /* обратный маппинг для разбора Ozon offer_id */
       const rk = wbArt + ";" + normSz(szPr).toLowerCase();
       if (!sheets.revMap[rk]) sheets.revMap[rk] = k.split(";")[1] || "";
     }
   }
 
-  /* Фолбэк: артикулы, которых нет в маппинге, но есть в сырье напрямую */
-  for (const [k, v] of Object.entries(sheets.raw)) {
+  /* Фолбэк: сырьё без маппинга — артикул сырья сам себе пул */
+  for (const [k] of Object.entries(sheets.raw)) {
     const art = k.split(";")[0];
-    if (sheets.rawByArt[art] == null && !seenPerArt[art]) {
-      sheets.rawByArt[art] = (sheets.rawByArt[art] || 0) + v;
+    if (!sheets.rawUsers[k] && !seenPerArt[art]) {
+      (sheets.rawKeysByArt[art] ||= new Set()).add(k);
+      (sheets.rawUsers[k] ||= new Set()).add(art);
     }
+  }
+
+  /* Pass 2: главный артикул каждого пула */
+  for (const [rk, users] of Object.entries(sheets.rawUsers)) {
+    sheets.rawPrimary[rk] = primaryOf(users);
+  }
+
+  /* Pass 3: остаток сырья на артикул — только пулы, где он главный */
+  for (const [wbArt, keys] of Object.entries(sheets.rawKeysByArt)) {
+    let sum = 0;
+    for (const rk of keys) if (sheets.rawPrimary[rk] === wbArt) sum += rawSets(rk);
+    sheets.rawByArt[wbArt] = sum;
   }
 }
 
-/* ── Выкупаемость (мемоизирована: вызывается на каждую строку каждого рендера) ── */
+/* ── Выкупаемость (мемоизирована) ── */
 export function getBuyrate(art) {
   if (!art) return { val: DEFAULT_BUYRATE, est: true };
   const k = art.toLowerCase();
@@ -205,7 +251,9 @@ export function getStocksForSz(wbArt, wbSz) {
   const sgp = sheets.sgp[ka + ";" + kzNorm] || 0;
   let raw = 0;
   for (const { artPr, szPr } of sheets.map[ka + ";" + kzRaw] || []) {
-    raw += sheets.raw[artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase()] || 0;
+    const rk = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+    if (sheets.rawPrimary[rk] && sheets.rawPrimary[rk] !== ka) continue; /* пул — у главного */
+    raw += rawSets(rk); /* в наборах */
   }
   return { sgp, raw };
 }
@@ -213,6 +261,50 @@ export function getStocksForSz(wbArt, wbSz) {
 export function getStocksForArt(wbArt) {
   const ka = (wbArt || "").toLowerCase();
   return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
+}
+
+/* ── Общий пул сырья ── */
+
+/* Как артикул записан в справочнике (для подсказок). */
+export function artDisp(a) {
+  const ka = (a || "").toLowerCase();
+  return sheets.artDisplay[ka] || a || "";
+}
+
+/* Другие артикулы ВБ, делящие пул сырья с wbArt (пусто — если сырьё эксклюзивно). */
+export function rawSharedWith(wbArt) {
+  const ka = (wbArt || "").toLowerCase();
+  const sibs = new Set();
+  for (const rk of sheets.rawKeysByArt[ka] || []) {
+    const users = sheets.rawUsers[rk];
+    if (users && users.size > 1) for (const u of users) if (u !== ka) sibs.add(u);
+  }
+  return [...sibs];
+}
+
+/* Главный артикул пула, на котором лежит сырьё для wbArt (если wbArt — спутник).
+   Если wbArt сам главный или пул не общий — вернёт его же. */
+export function rawPrimaryFor(wbArt) {
+  const ka = (wbArt || "").toLowerCase();
+  for (const rk of sheets.rawKeysByArt[ka] || []) {
+    const users = sheets.rawUsers[rk];
+    if (users && users.size > 1 && sheets.rawPrimary[rk] && sheets.rawPrimary[rk] !== ka) {
+      return sheets.rawPrimary[rk];
+    }
+  }
+  return ka;
+}
+
+/* Суммарное сырьё по набору артикулов ВБ — каждый физический пул один раз
+   (не зависит от того, какой артикул назначен главным). */
+export function dedupRawTotal(wbArts) {
+  const keys = new Set();
+  for (const a of wbArts) {
+    for (const rk of sheets.rawKeysByArt[(a || "").toLowerCase()] || []) keys.add(rk);
+  }
+  let sum = 0;
+  for (const rk of keys) sum += rawSets(rk); /* в наборах */
+  return sum;
 }
 
 /* ── Ozon: "Pantal.SK.bejnew.02_XL" → базовый артикул + размер в терминах WB ── */
