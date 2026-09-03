@@ -1,25 +1,40 @@
 import { VM, DS, OAD, EXD, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, fmtDays, pct } from "../utils.js";
-import { sheets, getBuyrate, getStocksForArt, getStocksForSz } from "../api/sheets.js";
+import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
+
+/* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
+function rawPoolBadge(art, sibs) {
+  const members = [art, ...sibs.map(artDisp)].join(", ");
+  const tip = "Общий пул сырья на: " + esc(members) + ". Показан целиком у первого артикула (наименьший номер).";
+  return `<span style="font-size:9px;color:var(--raw);border:1px solid var(--raw);border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
+}
+/* «—» у СПУТНИКА: сырьё пула у главного артикула. */
+function rawPoolDash(primaryLower) {
+  const tip = "Сырьё общего пула — у артикула " + esc(artDisp(primaryLower)) + ".";
+  return `<span style="cursor:help;border-bottom:1px dotted var(--ink3)" data-tip="${tip}">—</span>`;
+}
 
 /* ── Сводные карточки над таблицей ── */
 export function deficitSummary(n) {
   const vm = VM[n];
   if (!vm) return null;
 
-  let wb = 0, sgp = 0, raw = 0, o7 = 0;
+  let wb = 0, sgp = 0, o7 = 0;
   const seen = new Set();
+  const artList = [];
 
   for (const [key, v] of Object.entries(vm.arts)) {
     wb += v.total;
     o7 += vm.orderMap[key] || 0;
     if (!seen.has(v.art)) {
       seen.add(v.art);
-      const s = getStocksForArt(v.art);
-      sgp += s.sgp; raw += s.raw;
+      artList.push(v.art);
+      sgp += getStocksForArt(v.art).sgp;
     }
   }
+  /* Сырьё — каждый физический пул один раз (общий пул не задваиваем) */
+  const raw = dedupRawTotal(artList);
 
   const total = wb + sgp + raw;
   const drDay = o7 / 7;
@@ -65,13 +80,14 @@ export function deficitHTML(n) {
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК — справочно, в общий сток не входит</span>
+      <span><b>пул</b> — общее сырьё на несколько артикулов, показано у первого (остальным «—»)</span>
       <span><b>×</b> — с учётом выкупаемости</span>
     </div>
     <div class="sw" id="dtbl${n}">${defTbl(n)}</div>
   </div>`;
 }
 
-/* Все ли артикулы дефицита раскрыты — от этого зависит подпись кнопки */
+/* Все ли артикулы дефицита раскрыты */
 export function allSizesOpen(n) {
   const vm = VM[n];
   if (!vm) return false;
@@ -81,8 +97,7 @@ export function allSizesOpen(n) {
   return true;
 }
 
-/* Список всех артикулов, у которых больше одного размера — только их
-   и имеет смысл раскрывать. */
+/* Артикулы с более чем одним размером */
 export function multiSizeArts(n) {
   const vm = VM[n];
   if (!vm) return [];
@@ -117,8 +132,7 @@ export function defTbl(n) {
     g.sizes.push({ ...v, o7, msk });
   }
 
-  /* Размеры, которых нет в стоках WB, но есть в СГП/сырье.
-     Например «42-44» живёт в маппинге, а WB отдаёт только «42» и «44». */
+  /* Размеры, которых нет в стоках WB, но есть в СГП/сырье */
   for (const [mapKey] of Object.entries(sheets.map)) {
     const [wbArt, wbSz] = mapKey.split(";");
     const artName = Object.keys(byArt).find((a) => a.toLowerCase() === wbArt);
@@ -182,7 +196,7 @@ export function defTbl(n) {
   <tr>
     ${TH("stk", "ВБ", "Остаток на складах маркетплейса на сегодня", "th-wb")}
     ${THF("СГП", "Готовая продукция — лист Остатки сводная, артикулы с префиксом «СГП »", "th-sgp")}
-    ${THF("Сырьё", "Полуфабрикаты — лист Остатки сводная. Nobrand суммируется с основным артикулом", "th-raw")}
+    ${THF("Сырьё", "Полуфабрикаты — лист Остатки сводная. Общий пул сырья на несколько артикулов ВБ показан у первого (наименьший номер), остальным «—». Nobrand суммируется", "th-raw")}
     ${THF("МСК*", "Коледино, Тула, Электросталь, Подольск, Рязань — справочно, в общий сток не входит", "th-msk")}
     ${THF("Общий", "ВБ + СГП + Сырьё", "th-total")}
     ${TH("o7", "Зак/день", "Среднее число заказов в день за 7 дней", "th-need")}
@@ -204,6 +218,12 @@ export function defTbl(n) {
     const hasSizes = r.sizes.length > 1;
     const tog = hasSizes ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
     const st = statusOf(r.dWb);
+    const rawSibs = rawSharedWith(r.art);
+    const amPrimary = rawSibs.length > 0 && rawPrimaryFor(r.art) === r.art.toLowerCase();
+    const amSibling = rawSibs.length > 0 && !amPrimary;
+    const rawCell = r.raw
+      ? `${r.raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
+      : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
     const brBadge = r.br.est
       ? `<span class="buyrate buyrate-est" data-tip="Выкупаемость не найдена — берём 70% по умолчанию">~70%</span>`
       : `<span class="buyrate buyrate-ok" data-tip="Выкупаемость из таблицы">${Math.round(r.br.val * 100)}%</span>`;
@@ -212,7 +232,7 @@ export function defTbl(n) {
       <td style="white-space:nowrap">${tog}<span class="art">${esc(r.art)}</span>${brBadge}<span style="font-size:10px;color:var(--ink3);margin-left:5px">${esc(r.name.slice(0, 20))}</span></td>
       <td class="${qc(r.stk, 20)}" style="text-align:center;font-size:14px">${r.stk}</td>
       <td class="${qc(r.sgp, 20)}" style="text-align:center">${r.sgp || "—"}</td>
-      <td class="${qc(r.raw, 20)}" style="text-align:center">${r.raw || "—"}</td>
+      <td class="${qc(r.raw, 20)}" style="text-align:center">${rawCell}</td>
       <td class="td-ref" style="text-align:center">${r.msk || "—"}</td>
       <td class="${qc(r.total, 30)}" style="text-align:center;font-size:14px;font-weight:700">${r.total}</td>
       <td style="text-align:center;font-weight:600">${Math.round(r.dr)}</td>
@@ -237,12 +257,15 @@ export function defTbl(n) {
       const eff = dr * r.br.val;
       const dWb = eff > 0 ? Math.round(s.total / eff) : null;
       const sst = statusOf(dWb);
+      const rawCellSz = raw
+        ? `${raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
+        : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
 
       trs += `<tr class="sz-row">
         <td style="padding-left:28px;font-weight:600">${esc(s.sz)}</td>
         <td class="${qc(s.total, 10)}" style="text-align:center;font-weight:600">${s.total}</td>
         <td class="${qc(sgp, 10)}" style="text-align:center;font-size:11px;color:var(--sgp)">${sgp || "—"}</td>
-        <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${raw || "—"}</td>
+        <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${rawCellSz}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${s.msk || "—"}</td>
         <td class="${qc(total, 15)}" style="text-align:center;font-weight:600">${total}</td>
         <td style="text-align:center;font-size:11px">${Math.round(dr)}</td>

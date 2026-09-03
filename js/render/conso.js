@@ -1,7 +1,7 @@
 import { D, OAC, CONSO, cabShort } from "../state.js";
 import { MSK_RE } from "../config.js";
 import { fmt, esc, q, szCmp, fmtDays, sitePrice, wbPrice, pct } from "../utils.js";
-import { getBuyrate, getStocksForArt, getStocksForSz, parseOzonArt } from "../api/sheets.js";
+import { getBuyrate, getStocksForArt, getStocksForSz, parseOzonArt, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
 
 const CABS = [
   { n: 1, key: "ef", label: "Easyform", short: "EF", color: "#FFF8F0", accent: "#E65100" },
@@ -103,6 +103,24 @@ function loaderPanel() {
   </div>`;
 }
 
+/* Общий пул сырья: сырьё на первом артикуле (бейдж «пул»), остальным «—». */
+function rawPoolBadge(art, sibs) {
+  const members = [art, ...sibs.map(artDisp)].join(", ");
+  const tip = "Общий пул сырья на: " + esc(members) + ". Показан целиком у первого артикула (наименьший номер).";
+  return `<span style="font-size:9px;color:#8B4513;border:1px solid #8B4513;border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
+}
+function rawPoolDash(primaryLower) {
+  const tip = "Сырьё общего пула — у артикула " + esc(artDisp(primaryLower)) + ".";
+  return `<span style="cursor:help;border-bottom:1px dotted var(--ink3)" data-tip="${tip}">—</span>`;
+}
+function consoRawCell(art, raw) {
+  const sibs = rawSharedWith(art);
+  if (!sibs.length) return raw ? String(raw) : "—";
+  const amPrimary = rawPrimaryFor(art) === (art || "").toLowerCase();
+  if (amPrimary) return raw ? raw + rawPoolBadge(art, sibs) : "—";
+  return rawPoolDash(rawPrimaryFor(art));
+}
+
 function totals() {
   const data = buildConsoData();
   const arts = Object.keys(data).sort();
@@ -113,10 +131,10 @@ function totals() {
     ["ef", "ezfr", "oz"].forEach((k) => { stk[k] += r.stk[k]; o7[k] += r.o7[k]; });
   }
 
-  const sheetStk = arts.reduce((acc, a) => {
-    const s = getStocksForArt(a);
-    return { sgp: acc.sgp + s.sgp, raw: acc.raw + s.raw };
-  }, { sgp: 0, raw: 0 });
+  const sheetStk = {
+    sgp: arts.reduce((s, a) => s + getStocksForArt(a).sgp, 0),
+    raw: dedupRawTotal(arts), /* общий пул считаем один раз */
+  };
 
   const mp = stk.ef + stk.ezfr + stk.oz;
   const total = mp + sheetStk.sgp + sheetStk.raw;
@@ -270,7 +288,7 @@ function deficitTable(loaded) {
         <td class="${qc(stk[c.key], 20)}" style="text-align:center;background:${c.color}">${stk[c.key] || "—"}</td>
         <td style="text-align:center;background:${c.color};font-size:11px">${Math.round(o7[c.key] / 7) || "—"}</td>`).join("")}
       <td style="text-align:center;color:#5B3FA0">${sgp || "—"}</td>
-      <td style="text-align:center;color:#8B4513">${raw || "—"}</td>
+      <td style="text-align:center;color:#8B4513">${consoRawCell(art, raw)}</td>
       <td class="${qc(total, 30)}" style="text-align:center;font-weight:900;font-size:14px">${total}</td>
       <td style="text-align:center;font-weight:600">${Math.round(dr)}</td>
       <td style="text-align:center">${need || "—"}</td>
@@ -300,7 +318,7 @@ function deficitTable(loaded) {
           <td class="${qc(r.stk[c.key], 10)}" style="text-align:center;background:${c.color};font-size:11px">${r.stk[c.key] || "—"}</td>
           <td style="text-align:center;background:${c.color};font-size:10px;color:var(--ink3)">${Math.round(r.o7[c.key] / 7) || "—"}</td>`).join("")}
         <td style="text-align:center;font-size:11px;color:#5B3FA0">${s2.sgp || "—"}</td>
-        <td style="text-align:center;font-size:11px;color:#8B4513">${s2.raw || "—"}</td>
+        <td style="text-align:center;font-size:11px;color:#8B4513">${consoRawCell(art, s2.raw)}</td>
         <td class="${qc(szTotal, 15)}" style="text-align:center;font-weight:700">${szTotal}</td>
         <td style="text-align:center;font-size:11px">${Math.round(szDr)}</td>
         <td style="text-align:center;font-size:11px">${szNeed || "—"}</td>
