@@ -278,27 +278,36 @@ const MP_BASE = "https://marketplace-api.wildberries.ru";
 const FBS_GAP = 700; /* marketplace-api мягче Statistics, свой лимит */
 
 async function loadFBS(cab, onRetry) {
-  /* 1. Склады FBS продавца */
+  const empty = { fbs: {}, fbsWh: {} };
+
+  /* 1. Склады FBS продавца (id → название) */
   let whs = [];
   try {
     const w = await wbGet(`${MP_BASE}/api/v3/warehouses`, cab, false, onRetry);
     whs = Array.isArray(w) ? w : (w?.warehouses || w?.data || []);
   } catch (e) {
     console.warn(`Кабинет ${cab}: FBS-склады не загрузились — ${e.message}`);
-    return {};
+    return empty;
   }
-  const whIds = (Array.isArray(whs) ? whs : [])
-    .map((x) => x.id ?? x.warehouseId ?? x.officeId).filter(Boolean);
-  if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return {}; }
+  const whName = {};
+  (Array.isArray(whs) ? whs : []).forEach((x) => {
+    const id = x.id ?? x.warehouseId ?? x.officeId;
+    if (id != null) whName[id] = x.name || x.officeName || ("Склад " + id);
+  });
+  const whIds = Object.keys(whName);
+  if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return empty; }
 
   /* 2. Баркоды товаров из карточек */
   const cards = cardsOf(cab);
   const barcodes = Object.keys(cards.byBarcode || {});
-  if (!barcodes.length) { console.warn(`Кабинет ${cab}: нет баркодов (нужны карточки) — FBS пропущен`); return {}; }
+  if (!barcodes.length) { console.warn(`Кабинет ${cab}: нет баркодов (нужны карточки) — FBS пропущен`); return empty; }
 
-  /* 3. Остатки по каждому складу, батчами по 1000 баркодов */
-  const fbs = {};
+  /* 3. Остатки по каждому складу, батчами по 1000 баркодов.
+     fbs    — "арт · размер" → шт (сумма по складам, для дефицита);
+     fbsWh  — название склада → шт (сумма по товарам, для «Остатки по складам»). */
+  const fbs = {}, fbsWh = {};
   for (const wid of whIds) {
+    const nm = whName[wid];
     for (let i = 0; i < barcodes.length; i += 1000) {
       const skus = barcodes.slice(i, i + 1000);
       let data;
@@ -317,11 +326,12 @@ async function loadFBS(cab, onRetry) {
         if (!meta) continue; /* баркод не из нашего каталога */
         const key = meta.supplierArticle + " · " + (meta.techSize || "—");
         fbs[key] = (fbs[key] || 0) + amt;
+        fbsWh[nm] = (fbsWh[nm] || 0) + amt;
       }
     }
   }
   console.log(`Кабинет ${cab}: FBS-остатки по ${Object.keys(fbs).length} позициям, складов ${whIds.length}`);
-  return fbs;
+  return { fbs, fbsWh };
 }
 
 /* ══════════ Основная загрузка кабинета ══════════ */
@@ -362,9 +372,9 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
 
   /* Остатки FBS (склад продавца) — best-effort, справочно.
      Если воркер/ключ не готов — вернётся {}, колонка покажет «—». */
-  let fbs = {};
+  let fbsRes = { fbs: {}, fbsWh: {} };
   try {
-    fbs = await cached(`wb${n}:fbs`, force, () => loadFBS(n, onRetry));
+    fbsRes = await cached(`wb${n}:fbs2`, force, () => loadFBS(n, onRetry));
   } catch (e) {
     console.warn(`Кабинет ${n}: FBS не загрузился — ${e.message}`);
   }
@@ -378,7 +388,8 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     yestO:   all.filter((o) => (o.date || "").startsWith(y)),
     orders7: all.filter((o) => (o.date || "") >= w),
     stocks:  Array.isArray(stk) ? stk : [],
-    fbs:     fbs || {},
+    fbs:     fbsRes.fbs || {},
+    fbsWh:   fbsRes.fbsWh || {},
   };
   return D[n];
 }
