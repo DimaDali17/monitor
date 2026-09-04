@@ -278,7 +278,7 @@ const MP_BASE = "https://marketplace-api.wildberries.ru";
 const FBS_GAP = 700; /* marketplace-api мягче Statistics, свой лимит */
 
 async function loadFBS(cab, onRetry) {
-  const empty = { fbs: {}, fbsWh: {} };
+  const empty = { fbs: {}, fbsWh: {}, fbsCells: {} };
 
   /* 1. Склады FBS продавца (id → название) */
   let whs = [];
@@ -305,7 +305,7 @@ async function loadFBS(cab, onRetry) {
   /* 3. Остатки по каждому складу, батчами по 1000 баркодов.
      fbs    — "арт · размер" → шт (сумма по складам, для дефицита);
      fbsWh  — название склада → шт (сумма по товарам, для «Остатки по складам»). */
-  const fbs = {}, fbsWh = {};
+  const fbs = {}, fbsWh = {}, fbsCells = {};
   for (const wid of whIds) {
     const nm = whName[wid];
     for (let i = 0; i < barcodes.length; i += 1000) {
@@ -327,11 +327,12 @@ async function loadFBS(cab, onRetry) {
         const key = meta.supplierArticle + " · " + (meta.techSize || "—");
         fbs[key] = (fbs[key] || 0) + amt;
         fbsWh[nm] = (fbsWh[nm] || 0) + amt;
+        (fbsCells[key] ||= {})[nm] = (fbsCells[key][nm] || 0) + amt;
       }
     }
   }
   console.log(`Кабинет ${cab}: FBS-остатки по ${Object.keys(fbs).length} позициям, складов ${whIds.length}`);
-  return { fbs, fbsWh };
+  return { fbs, fbsWh, fbsCells };
 }
 
 /* ══════════ Основная загрузка кабинета ══════════ */
@@ -372,7 +373,7 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
 
   /* Остатки FBS (склад продавца) — best-effort, справочно.
      Если воркер/ключ не готов — вернётся {}, колонка покажет «—». */
-  let fbsRes = { fbs: {}, fbsWh: {} };
+  let fbsRes = { fbs: {}, fbsWh: {}, fbsCells: {} };
   try {
     fbsRes = await cached(`wb${n}:fbs2`, force, () => loadFBS(n, onRetry));
   } catch (e) {
@@ -390,6 +391,7 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     stocks:  Array.isArray(stk) ? stk : [],
     fbs:     fbsRes.fbs || {},
     fbsWh:   fbsRes.fbsWh || {},
+    fbsCells: fbsRes.fbsCells || {},
   };
   return D[n];
 }

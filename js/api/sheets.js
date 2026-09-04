@@ -115,13 +115,19 @@ export function loadExternal() {
           const rkSet = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
           sheets.setByRawKey[rkSet] = setN;
         }
-        [row["Арт ВБ"], row["Арт ВБ2"]].forEach((wb) => {
-          const wbArt = (wb || "").trim();
-          if (!wbArt || !artPr) return;
-          const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
-          (sheets.map[k] ||= []).push({ artPr, szPr });
-          sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
-        });
+        /* «Арт ВБ2» может содержать несколько артикулов через перенос строки —
+           разбиваем, иначе многострочная ячейка станет одним фантомным артикулом
+           (дубли в подписи пула, кривой расчёт). */
+        [row["Арт ВБ"], row["Арт ВБ2"]]
+          .flatMap((cell) => String(cell || "").split(/[\r\n]+/))
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .forEach((wbArt) => {
+            if (!artPr) return;
+            const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
+            (sheets.map[k] ||= []).push({ artPr, szPr });
+            sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
+          });
       });
 
       /* Остатки сводная: сырьё + СГП в одном листе.
