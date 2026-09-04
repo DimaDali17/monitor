@@ -137,7 +137,7 @@ const CARDS_URL = "https://content-api.wildberries.ru/content/v2/get/cards/list"
 /* Отдельно на кабинет: у EF и EZFR свои каталоги, общий словарь
    подставлял бы чужие артикулы при переключении вкладок. */
 const CARDS = { 1: null, 2: null };
-const blank = () => ({ byChrt: {}, byNm: {}, ready: false, degraded: false });
+const blank = () => ({ byChrt: {}, byNm: {}, byBarcode: {}, ready: false, degraded: false });
 const cardsOf = (cab) => (CARDS[cab] ||= blank());
 
 /* Content API разрешает 100 запросов в минуту — на два порядка мягче
@@ -169,6 +169,12 @@ async function loadCards(cab, onRetry) {
           techSize: sz.techSize || "—",
           subject: subj,
         };
+        /* Баркоды нужны для запроса остатков FBS (marketplace v3/stocks) */
+        for (const bc of sz.skus || []) {
+          if (bc) cards.byBarcode[String(bc)] = {
+            supplierArticle: art, techSize: sz.techSize || "—", subject: subj,
+          };
+        }
       }
     }
 
@@ -259,6 +265,65 @@ async function loadStocksNew(cab, onRetry) {
   return mapped;
 }
 
+/* ══════════ Остатки FBS (склад продавца) ══════════
+   Источник — Marketplace API, ДРУГОЙ домен и ДРУГАЯ область ключа:
+     GET  /api/v3/warehouses            — список складов продавца (id)
+     POST /api/v3/stocks/{warehouseId}  — { skus:[баркоды] } → { stocks:[{sku,amount}] }
+   ВАЖНО: воркер должен пропускать домен marketplace-api.wildberries.ru
+   и подставлять для него ключ с областью «Маркетплейс». Если этого нет —
+   запросы вернут ошибку, FBS-остаток будет пустым, колонка покажет «—».
+   Справочно: в «Общий сток» FBS НЕ входит. */
+
+const MP_BASE = "https://marketplace-api.wildberries.ru";
+const FBS_GAP = 700; /* marketplace-api мягче Statistics, свой лимит */
+
+async function loadFBS(cab, onRetry) {
+  /* 1. Склады FBS продавца */
+  let whs = [];
+  try {
+    const w = await wbGet(`${MP_BASE}/api/v3/warehouses`, cab, false, onRetry);
+    whs = Array.isArray(w) ? w : (w?.warehouses || w?.data || []);
+  } catch (e) {
+    console.warn(`Кабинет ${cab}: FBS-склады не загрузились — ${e.message}`);
+    return {};
+  }
+  const whIds = (Array.isArray(whs) ? whs : [])
+    .map((x) => x.id ?? x.warehouseId ?? x.officeId).filter(Boolean);
+  if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return {}; }
+
+  /* 2. Баркоды товаров из карточек */
+  const cards = cardsOf(cab);
+  const barcodes = Object.keys(cards.byBarcode || {});
+  if (!barcodes.length) { console.warn(`Кабинет ${cab}: нет баркодов (нужны карточки) — FBS пропущен`); return {}; }
+
+  /* 3. Остатки по каждому складу, батчами по 1000 баркодов */
+  const fbs = {};
+  for (const wid of whIds) {
+    for (let i = 0; i < barcodes.length; i += 1000) {
+      const skus = barcodes.slice(i, i + 1000);
+      let data;
+      try {
+        data = await wbPost(`${MP_BASE}/api/v3/stocks/${wid}`, { skus }, cab, onRetry, FBS_GAP);
+      } catch (e) {
+        console.warn(`Кабинет ${cab}: FBS-остатки склад ${wid} — ${e.message}`);
+        continue;
+      }
+      const rows = data?.stocks || data?.data?.stocks || [];
+      for (const r of rows) {
+        const bc = String(r.sku || r.barcode || "");
+        const amt = r.amount ?? r.quantity ?? 0;
+        if (!bc || !amt) continue;
+        const meta = cards.byBarcode[bc];
+        if (!meta) continue; /* баркод не из нашего каталога */
+        const key = meta.supplierArticle + " · " + (meta.techSize || "—");
+        fbs[key] = (fbs[key] || 0) + amt;
+      }
+    }
+  }
+  console.log(`Кабинет ${cab}: FBS-остатки по ${Object.keys(fbs).length} позициям, складов ${whIds.length}`);
+  return fbs;
+}
+
 /* ══════════ Основная загрузка кабинета ══════════ */
 
 export async function loadWB(n, { force = false, onRetry } = {}) {
@@ -294,6 +359,16 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
   /* Остатки — новый Analytics API */
   const stk = await cached(`wb${n}:stocks`, force,
     () => loadStocksNew(n, onRetry));
+
+  /* Остатки FBS (склад продавца) — best-effort, справочно.
+     Если воркер/ключ не готов — вернётся {}, колонка покажет «—». */
+  let fbs = {};
+  try {
+    fbs = await cached(`wb${n}:fbs`, force, () => loadFBS(n, onRetry));
+  } catch (e) {
+    console.warn(`Кабинет ${n}: FBS не загрузился — ${e.message}`);
+  }
+
   const t = td(), y = yd(), w = wd();
 
   D[n] = {
@@ -303,6 +378,7 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     yestO:   all.filter((o) => (o.date || "").startsWith(y)),
     orders7: all.filter((o) => (o.date || "") >= w),
     stocks:  Array.isArray(stk) ? stk : [],
+    fbs:     fbs || {},
   };
   return D[n];
 }
