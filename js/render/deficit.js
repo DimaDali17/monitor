@@ -6,12 +6,12 @@ import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, raw
 /* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
 function rawPoolBadge(art, sibs) {
   const members = [art, ...sibs.map(artDisp)].join(", ");
-  const tip = "Общий пул сырья на: " + esc(members) + ". Показан целиком у первого артикула (наименьший номер).";
+  const tip = "Весь остаток общего пула сырья показан здесь. Пул делят артикулы: " + esc(members) + ".";
   return `<span style="font-size:9px;color:var(--raw);border:1px solid var(--raw);border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
 }
 /* «—» у СПУТНИКА: сырьё пула у главного артикула. */
 function rawPoolDash(primaryLower) {
-  const tip = "Сырьё общего пула — у артикула " + esc(artDisp(primaryLower)) + ".";
+  const tip = "Сырьё общего пула показано у артикула " + esc(artDisp(primaryLower)) + " (первый по номеру).";
   return `<span style="cursor:help;border-bottom:1px dotted var(--ink3)" data-tip="${tip}">—</span>`;
 }
 

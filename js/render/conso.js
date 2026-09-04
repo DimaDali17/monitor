@@ -106,11 +106,11 @@ function loaderPanel() {
 /* Общий пул сырья: сырьё на первом артикуле (бейдж «пул»), остальным «—». */
 function rawPoolBadge(art, sibs) {
   const members = [art, ...sibs.map(artDisp)].join(", ");
-  const tip = "Общий пул сырья на: " + esc(members) + ". Показан целиком у первого артикула (наименьший номер).";
+  const tip = "Весь остаток общего пула сырья показан здесь. Пул делят артикулы: " + esc(members) + ".";
   return `<span style="font-size:9px;color:#8B4513;border:1px solid #8B4513;border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
 }
 function rawPoolDash(primaryLower) {
-  const tip = "Сырьё общего пула — у артикула " + esc(artDisp(primaryLower)) + ".";
+  const tip = "Сырьё общего пула показано у артикула " + esc(artDisp(primaryLower)) + " (первый по номеру).";
   return `<span style="cursor:help;border-bottom:1px dotted var(--ink3)" data-tip="${tip}">—</span>`;
 }
 function consoRawCell(art, raw) {
@@ -343,10 +343,15 @@ function deficitTable(loaded) {
 
 function warehouseSummary() {
   let out = "";
+  const chip = (label, val, accent) =>
+    `<div style="background:var(--bg3);border:1px solid ${accent || "var(--border)"};border-radius:8px;padding:6px 10px;font-size:11px">
+      <span style="color:var(--ink3)">${esc(String(label).slice(0, 18))}</span><br><b>${Number(val).toLocaleString("ru")}</b></div>`;
 
   [1, 2].forEach((n) => {
     const d = D[n];
     if (!d) return;
+
+    /* Склады WB (FBW) */
     const byWh = {};
     (d.stocks || []).forEach((s) => {
       const w = s.warehouseName || "—";
@@ -355,13 +360,23 @@ function warehouseSummary() {
     const top = Object.keys(byWh).sort((a, b) => byWh[b] - byWh[a]).slice(0, 8);
     const grand = Object.values(byWh).reduce((a, b) => a + b, 0);
 
+    /* Склады FBS (склад продавца) */
+    const fbsWh = d.fbsWh || {};
+    const fbsList = Object.keys(fbsWh).sort((a, b) => fbsWh[b] - fbsWh[a]);
+    const fbsGrand = Object.values(fbsWh).reduce((a, b) => a + b, 0);
+
     out += `<div style="margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:6px">
-        ${cabShort(n)} — ${grand.toLocaleString("ru")} шт на ${Object.keys(byWh).length} складах</div>
+        ${cabShort(n)} · FBW — ${grand.toLocaleString("ru")} шт на ${Object.keys(byWh).length} складах</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${top.map((w) => `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px">
-          <span style="color:var(--ink3)">${esc(w.slice(0, 18))}</span><br><b>${byWh[w].toLocaleString("ru")}</b></div>`).join("")}
+        ${top.map((w) => chip(w, byWh[w])).join("")}
       </div>
+      ${fbsList.length ? `
+      <div style="font-size:11px;font-weight:700;color:#8B4513;margin:10px 0 6px">
+        ${cabShort(n)} · FBS (склад продавца) — ${fbsGrand.toLocaleString("ru")} шт на ${fbsList.length} складах</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${fbsList.map((w) => chip(w, fbsWh[w], "#8B4513")).join("")}
+      </div>` : `<div style="font-size:10px;color:var(--ink3);margin-top:6px">FBS: нет данных (нужен ключ «Маркетплейс» в воркере)</div>`}
     </div>`;
   });
 
