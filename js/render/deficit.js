@@ -80,6 +80,7 @@ export function deficitHTML(n) {
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК — справочно, в общий сток не входит</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>FBS — остаток на складе продавца, справочно (в общий сток не входит)</span>
       <span><b>пул</b> — общее сырьё на несколько артикулов, показано у первого (остальным «—»)</span>
       <span><b>×</b> — с учётом выкупаемости</span>
     </div>
@@ -121,6 +122,14 @@ export function defTbl(n) {
 
   const { arts, orderMap, mskWhs } = vm;
   const totalO7 = Object.values(orderMap).reduce((a, b) => a + b, 0);
+
+  /* FBS-остатки (склад продавца) — справочно. Ключ как в arts: "арт · размер". */
+  const fbsMap = vm.fbs || {};
+  const fbsByArt = {};
+  for (const [k, v] of Object.entries(fbsMap)) {
+    const a = (k.split(" · ")[0] || "").toLowerCase();
+    fbsByArt[a] = (fbsByArt[a] || 0) + v;
+  }
 
   /* Группировка по артикулу */
   const byArt = {};
@@ -184,7 +193,7 @@ export function defTbl(n) {
   const head = `<tr>
     <th rowspan="2" data-sort style="text-align:left;vertical-align:middle;background:var(--bg3)"
         onclick="App.sortD(${n},'art')" data-tip="Артикул WB. Клик — сортировка">Артикул${arrow("art")}</th>
-    <th class="th-group thg-wb">📦 Склад ВБ</th>
+    <th colspan="2" class="th-group thg-wb">📦 Склад ВБ · FBS</th>
     <th class="th-group thg-sgp">🏭 СГП</th>
     <th class="th-group thg-raw">🧵 Сырьё</th>
     <th class="th-group thg-ref" style="border-style:dashed">* МСК</th>
@@ -194,7 +203,8 @@ export function defTbl(n) {
     <th colspan="4" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
   </tr>
   <tr>
-    ${TH("stk", "ВБ", "Остаток на складах маркетплейса на сегодня", "th-wb")}
+    ${TH("stk", "ВБ", "Остаток на складах маркетплейса (FBW)", "th-wb")}
+    ${THF("FBS", "Остатки на вашем FBS-складе (marketplace-api /api/v3/stocks). Справочно, в общий сток не входит", "th-wb")}
     ${THF("СГП", "Готовая продукция — лист Остатки сводная, артикулы с префиксом «СГП »", "th-sgp")}
     ${THF("Сырьё", "Полуфабрикаты — лист Остатки сводная. Общий пул сырья на несколько артикулов ВБ показан у первого (наименьший номер), остальным «—». Nobrand суммируется", "th-raw")}
     ${THF("МСК*", "Коледино, Тула, Электросталь, Подольск, Рязань — справочно, в общий сток не входит", "th-msk")}
@@ -231,6 +241,7 @@ export function defTbl(n) {
     trs += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArtD(${n},'${q(r.art)}')"` : ""}>
       <td style="white-space:nowrap">${tog}<span class="art">${esc(r.art)}</span>${brBadge}<span style="font-size:10px;color:var(--ink3);margin-left:5px">${esc(r.name.slice(0, 20))}</span></td>
       <td class="${qc(r.stk, 20)}" style="text-align:center;font-size:14px">${r.stk}</td>
+      <td class="td-ref" style="text-align:center" data-tip="FBS — справочно">${fbsByArt[r.art.toLowerCase()] || "—"}</td>
       <td class="${qc(r.sgp, 20)}" style="text-align:center">${r.sgp || "—"}</td>
       <td class="${qc(r.raw, 20)}" style="text-align:center">${rawCell}</td>
       <td class="td-ref" style="text-align:center">${r.msk || "—"}</td>
@@ -264,6 +275,7 @@ export function defTbl(n) {
       trs += `<tr class="sz-row">
         <td style="padding-left:28px;font-weight:600">${esc(s.sz)}</td>
         <td class="${qc(s.total, 10)}" style="text-align:center;font-weight:600">${s.total}</td>
+        <td class="td-ref" style="text-align:center;font-size:11px">${fbsMap[r.art + " · " + s.sz] || "—"}</td>
         <td class="${qc(sgp, 10)}" style="text-align:center;font-size:11px;color:var(--sgp)">${sgp || "—"}</td>
         <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${rawCellSz}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${s.msk || "—"}</td>
@@ -282,8 +294,8 @@ export function defTbl(n) {
   }
 
   const more = rows.length > LIM
-    ? `<tr class="er"><td class="stick" colspan="16"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
+    ? `<tr class="er"><td class="stick" colspan="17"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
     : "";
 
-  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="16">Нет данных</td></tr>'}${more}</tbody></table>`;
+  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="17">Нет данных</td></tr>'}${more}</tbody></table>`;
 }
