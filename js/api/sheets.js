@@ -1,4 +1,4 @@
-import { CSV_BUYRATE, CSV_RAW, CSV_MAP, DEFAULT_BUYRATE } from "../config.js";
+import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
@@ -41,6 +41,7 @@ export const sheets = {
   map: {},          /* "wbArt;wbSz" → [{artPr, szPr}] */
   revMap: {},       /* "baseArt;szPr(norm)" → wbSz — разбор Ozon-артикулов */
   artDisplay: {},   /* wbArtLower → как записан в справочнике (для подсказок) */
+  nomen: {},        /* артикулПоставщикаLower → { predmet, kratko } — структура спроса */
   /* индексы */
   sgpByArt: {},     /* wbArt → шт (все размеры) */
   rawByArt: {},     /* wbArt → шт (только пулы, где он главный) */
@@ -90,11 +91,11 @@ export function loadExternal() {
 
   inflight = (async () => {
     try {
-      const [rB, rR, rM] = await Promise.all(
-        [CSV_BUYRATE, CSV_RAW, CSV_MAP].map((u) => fetch(u).then((r) => r.text()))
+      const [rB, rR, rM, rN] = await Promise.all(
+        [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN].map((u) => fetch(u).then((r) => r.text()))
       );
 
-      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {};
+      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {}; sheets.nomen = {};
       buyrateCache.clear();
 
       /* Выкупаемость */
@@ -102,6 +103,18 @@ export function loadExternal() {
         const art = (row["supplierArticle"] || "").toLowerCase();
         const p = (row["Выкупаемость"] || "").replace("%", "").trim();
         if (art && p) sheets.buyrate[art] = parseFloat(p) / 100;
+      });
+
+      /* Номенклатура: артикул поставщика → Предмет + Кратко (структура спроса).
+         По артикулу несколько строк (размеры) — берём первую, пустые поля дозаполняем. */
+      parseCSV(rN).forEach((row) => {
+        const art = (row["Артикул поставщика"] || "").trim().toLowerCase();
+        if (!art) return;
+        const predmet = (row["Предмет"] || "").trim();
+        const kratko = (row["Кратко"] || "").trim();
+        const ex = sheets.nomen[art];
+        if (!ex) sheets.nomen[art] = { predmet, kratko };
+        else { if (!ex.predmet && predmet) ex.predmet = predmet; if (!ex.kratko && kratko) ex.kratko = kratko; }
       });
 
       /* Маппинг: WB-арт + WB-размер → произв-арт + произв-размер */
@@ -160,7 +173,7 @@ export function loadExternal() {
       console.log(
         `Справочники: выкупаемость=${Object.keys(sheets.buyrate).length} ` +
         `СГП=${Object.keys(sheets.sgp).length} сырьё=${Object.keys(sheets.raw).length} ` +
-        `маппинг=${Object.keys(sheets.map).length}`
+        `маппинг=${Object.keys(sheets.map).length} номенклатура=${Object.keys(sheets.nomen).length}`
       );
     } catch (e) {
       console.warn("Справочники не загрузились:", e);
@@ -275,6 +288,11 @@ export function getStocksForArt(wbArt) {
 export function artDisp(a) {
   const ka = (a || "").toLowerCase();
   return sheets.artDisplay[ka] || a || "";
+}
+
+/* Группа спроса по артикулу поставщика: { predmet, kratko } или null. */
+export function artGroup(art) {
+  return sheets.nomen[(art || "").toLowerCase()] || null;
 }
 
 /* Другие артикулы ВБ, делящие пул сырья с wbArt (пусто — если сырьё эксклюзивно). */
