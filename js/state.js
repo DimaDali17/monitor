@@ -32,6 +32,7 @@ export const FSZ = { 1: "", 2: "", 3: "" }; /* поиск по размеру */
 /* Режим графика */
 export const CM = { 1: "day", 2: "day", 3: "day" };  /* day | week | month */
 export const CV = { 1: "ord", 2: "ord", 3: "ord" };  /* ord | rev */
+export const GB = { 1: "predmet", 2: "predmet", 3: "predmet" }; /* predmet | kratko — уровень структуры спроса */
 
 /* Консолидация */
 export const CONSO = { expandOrders: false, log: [] };

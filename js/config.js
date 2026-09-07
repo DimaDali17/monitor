@@ -16,6 +16,7 @@ export const CSV_BUYRATE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZu
 export const CSV_SGP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1909727956&single=true&output=csv";
 export const CSV_RAW = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1387615415&single=true&output=csv";
 export const CSV_MAP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1004508899&single=true&output=csv";
+export const CSV_NOMEN = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRv2VuvAbmweu5Q_5cj-zoss2s3RoFMwKfK2z6tp22oG7FFfNGvoR8LYAyv56tvnvdJc6wouLBaYpph/pub?gid=612792464&single=true&output=csv"; /* Предмет + Кратко по артикулу поставщика */
 
 /* ══════════════════════════════════════════════════════════
    ЛЕЧЕНИЕ 429 — все ручки собраны здесь
