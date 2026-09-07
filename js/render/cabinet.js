@@ -1,6 +1,7 @@
 import { D, VM } from "../state.js";
 import { buildVM } from "../vm.js";
 import { filterHTML } from "./filters.js";
+import { structureHTML } from "./structure.js";
 import { metricsHTML } from "./metrics.js";
 import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
@@ -17,7 +18,10 @@ export function renderCabinet(n) {
   const type = vm.isOz ? "oz" : "wb";
 
   el.innerHTML =
-    filterHTML(n) +
+    `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+       <div style="flex:1 1 440px;min-width:300px">${filterHTML(n)}</div>
+       <div style="flex:1 1 360px;min-width:300px">${structureHTML(n)}</div>
+     </div>` +
     metricsHTML(n, vm, type) +
     chartHTML(n, vm, type) +
     ordersHTML(n, vm, type) +
