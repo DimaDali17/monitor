@@ -22,7 +22,7 @@ export function structureHTML(n) {
     orders = (vm.allOrders || []).filter((o) => dOf(o) >= w);
   } else orders = vm.todayO || [];
 
-  /* Артикул поставщика из заказа: WB — supplierArticle; Ozon — база offer_id до последнего "_" */
+  /* Артикул поставщика: WB — supplierArticle; Ozon — база offer_id до последнего "_" */
   const baseOz = (oid) => {
     const s = oid || "";
     const i = s.lastIndexOf("_");
@@ -48,31 +48,40 @@ export function structureHTML(n) {
   const rest = rows.length > TOPN ? rows.slice(TOPN).reduce((s, r) => s + r[1], 0) : 0;
   const max = shown.length ? shown[0][1] : 1;
 
-  const bars = shown.map(([name, v]) => {
-    const w = Math.round((v / max) * 100);
+  /* Ряд: имя | дорожка с полосой | число | % — четыре выровненные колонки */
+  const row = (name, v) => {
+    const w = Math.max(2, Math.round((v / max) * 100));
     const pct = total ? Math.round((v / total) * 100) : 0;
-    return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:12px">
-      <div style="flex:0 0 42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(name)}">${esc(name)}</div>
-      <div style="flex:1;background:var(--bg3);border-radius:4px;height:14px;overflow:hidden">
-        <div style="width:${w}%;height:100%;background:#6B6357;border-radius:4px"></div>
+    return `<div style="display:grid;grid-template-columns:38% 1fr 40px 32px;align-items:center;gap:10px;height:22px;font-size:12px">
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)" title="${esc(name)}">${esc(name)}</div>
+      <div style="background:var(--bg3);border-radius:4px;height:12px">
+        <div style="width:${w}%;height:100%;background:#8A8275;border-radius:4px"></div>
       </div>
-      <div style="flex:0 0 60px;text-align:right;font-weight:600">${v}<span style="color:var(--ink3);font-weight:400;font-size:10px"> ${pct}%</span></div>
+      <div style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${v}</div>
+      <div style="text-align:right;color:var(--ink3);font-size:10px;font-variant-numeric:tabular-nums">${pct}%</div>
     </div>`;
-  }).join("");
+  };
+
+  const bars = shown.map(([name, v]) => row(name, v)).join("");
 
   const restRow = rest
-    ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-top:5px;padding-top:4px;border-top:1px solid var(--border)"><span>Прочее (${rows.length - TOPN} групп)</span><span style="font-weight:600">${rest}</span></div>`
+    ? `<div style="display:grid;grid-template-columns:38% 1fr 40px 32px;gap:10px;align-items:center;height:22px;margin-top:2px;padding-top:4px;border-top:1px solid var(--border);font-size:11px;color:var(--ink3)">
+        <div>Прочее · ${rows.length - TOPN} групп</div><div></div>
+        <div style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${rest}</div>
+        <div style="text-align:right;font-variant-numeric:tabular-nums">${total ? Math.round((rest / total) * 100) : 0}%</div>
+      </div>`
     : "";
 
   const seg = (val, label) =>
     `<button class="${GB[n] === val ? "on" : ""}" onclick="App.setGroupBy(${n},'${val}')">${label}</button>`;
 
   return `<div class="sec" style="margin-bottom:0">
-    <div class="sh">
-      <span class="st">Структура спроса <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${modeName} · ${total} шт</span></span>
+    <div class="sh" style="margin-bottom:8px">
+      <span class="st">Структура спроса
+        <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${modeName} · ${total} шт</span></span>
       <span class="ctog">${seg("predmet", "Предмет")}${seg("kratko", "Группа")}</span>
     </div>
-    <div style="max-height:300px;overflow:auto;padding:4px 2px 0">
+    <div style="max-height:296px;overflow:auto;padding-right:2px">
       ${bars || '<div class="em">Нет заказов за период</div>'}${restRow}
     </div>
   </div>`;
