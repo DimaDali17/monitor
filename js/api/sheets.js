@@ -148,7 +148,7 @@ export function loadExternal() {
       parseCSV(rR).forEach((row) => {
         const art = row["Арт производ"] || "";
         const sz = row["Размер"] || "";
-        const qty = parseInt(row["SUM из Штук"] || "0", 10) || 0;
+        const qty = parseInt(row["Остаток"] || row["SUM из Штук"] || "0", 10) || 0;
         if (!art) return;
 
         if (SGP_RE.test(art)) {
