@@ -14,7 +14,7 @@ export const OZ_BASE = "https://api-seller.ozon.ru";
 /* ── Google Sheets ── */
 export const CSV_BUYRATE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZuc_t740K_yF5Nhw3saPZcbyxchMhJ93WrS05BbLY9OqqXtj3y5xG6WaraGsI4Z7SmNTHFyBlNTcn/pub?gid=0&single=true&output=csv";
 export const CSV_SGP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1909727956&single=true&output=csv";
-export const CSV_RAW = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1387615415&single=true&output=csv";
+export const CSV_RAW = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1104329590&single=true&output=csv";
 export const CSV_MAP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1004508899&single=true&output=csv";
 export const CSV_NOMEN = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRv2VuvAbmweu5Q_5cj-zoss2s3RoFMwKfK2z6tp22oG7FFfNGvoR8LYAyv56tvnvdJc6wouLBaYpph/pub?gid=612792464&single=true&output=csv"; /* Предмет + Кратко по артикулу поставщика */
 
