@@ -34,6 +34,14 @@ export const CM = { 1: "day", 2: "day", 3: "day" };  /* day | week | month */
 export const CV = { 1: "ord", 2: "ord", 3: "ord" };  /* ord | rev */
 export const GB = { 1: "predmet", 2: "predmet", 3: "predmet" }; /* predmet | kratko — уровень структуры спроса */
 
+/* Детализация графика («Глубже»): стек по предметам → группам → артикулам.
+   deep — режим вкл/выкл; predmet/group — текущий фокус (drill); hi — подсветка листа. */
+export const CD = {
+  1: { deep: false, predmet: null, group: null, hi: null },
+  2: { deep: false, predmet: null, group: null, hi: null },
+  3: { deep: false, predmet: null, group: null, hi: null },
+};
+
 /* Консолидация */
 export const CONSO = { expandOrders: false, log: [] };
 
