@@ -160,35 +160,40 @@ export function chartHTML(n, vm, type) {
 
   const segOrder = [...top, ...(hasOther ? ["Прочее"] : [])];
   const colorOf = (seg) => (seg === "Прочее" ? OTHER : PAL[top.indexOf(seg) % PAL.length]);
-  const dim = (seg) => (cd.hi && seg !== cd.hi ? 0.28 : 0.95);
+  /* На листе клик по артикулу оставляет ТОЛЬКО его (solo) */
+  const solo = level === 3 && cd.hi && topSet.has(cd.hi) ? cd.hi : null;
+  const visSegs = solo ? [solo] : segOrder;
 
-  /* Максимум высоты столбца = макс сумма по интервалу */
+  /* Максимум высоты столбца = макс сумма по интервалу (из видимых сегментов) */
   let max = 1;
-  for (let i = 0; i < N; i++) { let s = 0; segOrder.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
+  for (let i = 0; i < N; i++) { let s = 0; visSegs.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
 
   let bars = "";
   for (let i = 0; i < N; i++) {
     const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.6)), bx = gx + (gW - bW) / 2;
     let yAcc = T + cH, colTot = 0;
-    segOrder.forEach((seg) => {
+    visSegs.forEach((seg) => {
       const v = per[seg][i]; if (v <= 0) return;
       const h = (v / max) * cH; yAcc -= h; colTot += v;
-      bars += `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${h}" fill="${colorOf(seg)}" opacity="${dim(seg)}"><title>${esc(seg)}: ${fv(v)}</title></rect>`;
+      bars += `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${h}" fill="${colorOf(seg)}" opacity="0.95"><title>${esc(seg)}: ${fv(v)}</title></rect>`;
     });
     if (colTot > 0) bars += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600">${fv(colTot)}</text>`;
   }
 
-  /* Легенда слева: клик — глубже (или подсветка на листе) */
+  /* Легенда слева: клик — глубже (или solo на листе) */
   const drillable = level < 3;
   const otherTotal = ev.reduce((s, e) => s + (topSet.has(catOf(e)) ? 0 : e.val), 0);
+  const shortName = (s) => (s.length > 24 ? "…" + s.slice(-23) : s);   /* режем С НАЧАЛА — хвост различает */
   const legend = segOrder.map((seg) => {
     const clickable = seg !== "Прочее";
     const act = clickable ? `onclick="App.chartDrill(${n},'${q(seg)}')"` : "";
-    const cur = cd.hi === seg ? "font-weight:700;" : "";
+    const active = solo === seg;
+    const st = active ? "font-weight:700;" : (solo ? "opacity:.45;" : "");
     const segVal = seg === "Прочее" ? otherTotal : (catTotal[seg] || 0);
-    return `<div ${act} style="display:flex;align-items:center;gap:6px;font-size:11px;margin:2px 0;${clickable ? "cursor:pointer;" : "color:var(--ink3);"}${cur}" title="${esc(seg)}${clickable && drillable ? " — раскрыть" : ""}">
+    const tip = clickable ? (drillable ? " — раскрыть" : " — только он") : "";
+    return `<div ${act} style="display:flex;align-items:center;gap:6px;font-size:10px;margin:2px 0;${clickable ? "cursor:pointer;" : "color:var(--ink3);"}${st}" title="${esc(seg)}${tip}">
       <span style="flex:0 0 10px;width:10px;height:10px;border-radius:2px;background:${colorOf(seg)}"></span>
-      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(seg)}</span>
+      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(shortName(seg))}</span>
       <span style="font-variant-numeric:tabular-nums;color:var(--ink3)">${fv(segVal)}</span>
     </div>`;
   }).join("");
@@ -204,9 +209,9 @@ export function chartHTML(n, vm, type) {
   return `<div class="sec" style="margin-bottom:14px">
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName}</span></span>${controls}</div>
     <div style="font-size:11px;margin:2px 2px 8px">${crumbs}
-      <span style="color:var(--ink3);font-size:10px;margin-left:8px">${drillable ? "клик по легенде — глубже" : "клик по легенде — подсветка"}</span></div>
+      <span style="color:var(--ink3);font-size:10px;margin-left:8px">${drillable ? "клик по легенде — глубже" : "клик по легенде — оставить только его"}</span></div>
     <div class="tw" style="padding:8px;display:flex;gap:10px;align-items:stretch">
-      <div style="flex:0 0 140px;max-height:150px;overflow:auto;padding-right:2px">
+      <div style="flex:0 0 188px;max-height:150px;overflow:auto;padding-right:2px">
         ${legend}
       </div>
       <div style="flex:1;min-width:0">
