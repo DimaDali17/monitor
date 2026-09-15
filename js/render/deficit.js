@@ -48,7 +48,7 @@ export function deficitHTML(n) {
   const cards = s ? `<div class="mg" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
     <div class="mc" style="border-top:3px solid var(--ink)">
       <div class="ml">Общий сток</div><div class="mv">${s.total.toLocaleString("ru")}</div>
-      <div class="md" style="font-size:10px;color:var(--ink3)">ВБ ${s.wb} · СГП ${s.sgp} · Сырьё ${s.raw}</div>
+      <div class="md" style="font-size:10px;color:var(--ink3)">FBW ${s.wb} · СГП ${s.sgp} · Сырьё ${s.raw}</div>
     </div>
     <div class="mc" style="border-top:3px solid var(--green)">
       <div class="ml">Заказов в день (7д)</div><div class="mv g">${s.drDay}</div>
@@ -77,7 +77,7 @@ export function deficitHTML(n) {
       </span>
     </div>
     <div style="font-size:10px;color:var(--ink3);margin-bottom:8px;display:flex;gap:14px;flex-wrap:wrap">
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#A06820;margin-right:3px;vertical-align:middle"></span>ВБ — остаток на маркетплейсе</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#A06820;margin-right:3px;vertical-align:middle"></span>FBW — остаток на складах WB (маркетплейс)</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>FBS — остаток на складе продавца, справочно (в общий сток не входит)</span>
@@ -294,7 +294,7 @@ export function defTbl(n) {
   const head = `<tr>
     <th rowspan="2" data-sort style="text-align:left;vertical-align:middle;background:var(--bg3)"
         onclick="App.sortD(${n},'art')" data-tip="Артикул WB. Клик — сортировка">Артикул${arrow("art")}</th>
-    <th colspan="2" class="th-group thg-wb">📦 Склад ВБ · FBS</th>
+    <th colspan="2" class="th-group thg-wb">📦 Склад FBW · FBS</th>
     <th class="th-group thg-sgp">🏭 СГП</th>
     <th class="th-group thg-raw">🧵 Сырьё</th>
     <th class="th-group thg-total" style="border-right:2px solid #C7BFB0">📊 Общий</th>
@@ -303,7 +303,7 @@ export function defTbl(n) {
     <th colspan="5" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
   </tr>
   <tr>
-    ${TH("stk", "ВБ", "Остаток на складах маркетплейса (FBW)", "th-wb")}
+    ${TH("stk", "FBW", "Остаток на складах Wildberries (FBW)", "th-wb")}
     ${THF("FBS", "Остатки на вашем FBS-складе (marketplace-api /api/v3/stocks). Справочно, в общий сток не входит", "th-wb")}
     ${THF("СГП", "Готовая продукция — лист Остатки сводная new, артикулы с префиксом «СГП »", "th-sgp")}
     ${THF("Сырьё", "Полуфабрикаты — лист Остатки сводная new. Общий пул сырья на несколько артикулов ВБ показан у первого (наименьший номер), остальным «—». Nobrand суммируется", "th-raw")}
@@ -313,11 +313,11 @@ export function defTbl(n) {
     ${THF("Доля", "Доля размера в заказах артикула / доля артикула в общих заказах", "th-need")}
     ${TH("def", "Дефицит", "Потребность 30 дней минус общий сток. ✓ — запаса хватает", "th-need")}
     <th class="th-need" style="text-align:center;border-right:2px solid #C7BFB0" data-tip="Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше">Статус</th>
-    ${TH("days", "ВБ×", "Хватит дней: остаток ВБ (FBW) ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
-    ${THF("ВБ FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
+    ${TH("days", "FBW×", "Хватит дней: остаток FBW ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
+    ${THF("FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
     ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток ВБ + FBS списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
     ${THF("Без сырья×", "Хватит дней: ВБ + СГП ÷ дневной темп", "th-days")}
-    ${THF("Всё×", "Хватит дней: ВБ + СГП + Сырьё ÷ дневной темп", "th-days")}
+    ${THF("Общий×", "Хватит дней: ВБ + СГП + Сырьё ÷ дневной темп", "th-days")}
   </tr>`;
 
   const shown = EXD[n] ? rows : rows.slice(0, LIM);
