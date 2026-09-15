@@ -1,6 +1,7 @@
-import { D, VM, FA, FP } from "./state.js";
+import { D, VM, FA, FP, FG } from "./state.js";
 import { MSK_RE } from "./config.js";
 import { wbQty } from "./utils.js";
+import { artGroup } from "./api/sheets.js";
 
 /* ══════════════════════════════════════════════════════════
    Вьюмодель кабинета: фильтры применены, агрегаты посчитаны.
@@ -25,10 +26,12 @@ export function buildVM(n) {
   return VM[n];
 }
 
-export const hasFilters = (n) => FA[n].length > 0 || FP[n].length > 0;
+export const hasFilters = (n) => FA[n].length > 0 || FP[n].length > 0 || FG[n].length > 0;
 
 function applyFilters(n, d) {
-  const arts = FA[n], subs = FP[n], isOz = d.isOz;
+  const arts = FA[n], subs = FP[n], groups = FG[n], isOz = d.isOz;
+  const baseOz = (oid) => { const x = oid || ""; const i = x.lastIndexOf("_"); return i > 0 ? x.slice(0, i) : x; };
+  const grpOf = (a) => { const g = artGroup(a); return g ? (g.kratko || "") : ""; };
 
   const orderOk = (o) => {
     const artOk = !arts.length || (isOz
@@ -37,7 +40,10 @@ function applyFilters(n, d) {
     const subOk = !subs.length || (isOz
       ? (o.products || []).some((p) => subs.some((s) => (p.name || "").startsWith(s)))
       : subs.includes(o.subject || o.category || ""));
-    return artOk && subOk;
+    const grpOk = !groups.length || (isOz
+      ? (o.products || []).some((p) => groups.includes(grpOf(baseOz(p.offer_id))))
+      : groups.includes(grpOf(o.supplierArticle)));
+    return artOk && subOk && grpOk;
   };
 
   const stockOk = (s) => {
@@ -45,7 +51,8 @@ function applyFilters(n, d) {
       ? arts.includes(s.item_code || s.offer_id)
       : arts.includes(s.supplierArticle));
     const subOk = isOz || !subs.length || subs.includes(s.subject || s.category || "");
-    return artOk && subOk;
+    const grpOk = !groups.length || groups.includes(grpOf(isOz ? (s.item_code || s.offer_id) : s.supplierArticle));
+    return artOk && subOk && grpOk;
   };
 
   return {
@@ -112,6 +119,23 @@ export function getSubjects(n) {
     (d.stocks || []).forEach((r) => s.add(r.subject || r.category || ""));
   }
   s.delete("");
+  return [...s].sort();
+}
+
+export function getGroups(n) {
+  const d = D[n];
+  if (!d) return [];
+  const s = new Set();
+  const baseOz = (oid) => { const x = oid || ""; const i = x.lastIndexOf("_"); return i > 0 ? x.slice(0, i) : x; };
+  const add = (a) => { const g = artGroup(a); if (g && g.kratko) s.add(g.kratko); };
+  const orders = [...(d.todayO || []), ...(d.yestO || []), ...(d.orders7 || [])];
+  if (d.isOz) {
+    orders.forEach((o) => (o.products || []).forEach((p) => add(baseOz(p.offer_id))));
+    (d.stocks || []).forEach((r) => add(r.item_code || r.offer_id || ""));
+  } else {
+    orders.forEach((o) => add(o.supplierArticle || ""));
+    (d.stocks || []).forEach((r) => add(r.supplierArticle || ""));
+  }
   return [...s].sort();
 }
 
