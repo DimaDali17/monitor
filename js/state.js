@@ -20,8 +20,8 @@ export const OAD = { 1: new Set(), 2: new Set(), 3: new Set() }; /* дефици
 export const OAC = new Set();                                    /* консолидация */
 
 /* Сортировки */
-export const SS = { 1: { c: "total", d: -1 }, 2: { c: "total", d: -1 }, 3: { c: "total", d: -1 } };
-export const DS = { 1: { c: "stk", d: -1 }, 2: { c: "stk", d: -1 }, 3: { c: "stk", d: -1 } };
+export const SS = { 1: { c: "art", d: 1 }, 2: { c: "art", d: 1 }, 3: { c: "art", d: 1 } };
+export const DS = { 1: { c: "art", d: 1 }, 2: { c: "art", d: 1 }, 3: { c: "art", d: 1 } };
 
 /* Фильтры */
 export const FA = { 1: [], 2: [], 3: [] }; /* артикулы */
