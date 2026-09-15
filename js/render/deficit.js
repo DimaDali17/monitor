@@ -263,12 +263,13 @@ export function defTbl(n) {
     const fbsArt = fbsByArt[art.toLowerCase()] || 0;
     const dWb = effDr > 0 ? Math.round(g.stk / effDr) : null;
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
+    const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
     const dSeason = seasonalDays(artSeason(art), g.stk + fbsArt, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
       def: Math.max(0, need - total),
-      dWb, dFbs, dSeason,
+      dWb, dFbs, dStock, dSeason,
       dAll: effDr > 0 ? Math.round(total / effDr) : null,
       dNoRaw: effDr > 0 ? Math.round((g.stk + sgp) / effDr) : null,
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
@@ -314,7 +315,7 @@ export function defTbl(n) {
     ${THF("Мес. потр.", "Потребность на 30 дней при текущем темпе заказов", "th-need")}
     ${THF("Доля", "Доля размера в заказах артикула / доля артикула в общих заказах", "th-need")}
     ${TH("def", "Дефицит", "Потребность 30 дней минус общий сток. ✓ — запаса хватает", "th-need")}
-    ${THF("Статус", "Алерт по запасу дней на ВБ. Через «/» — доп. флаг, если с учётом сезона (ВБ сезон) запас требует внимания раньше", "th-need")}
+    ${THF("Статус", "Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше", "th-need")}
     ${TH("days", "ВБ×", "Хватит дней: остаток ВБ (FBW) ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
     ${THF("ВБ FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
     ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток ВБ + FBS списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
@@ -351,7 +352,7 @@ export function defTbl(n) {
       <td style="text-align:center;color:var(--ink2)">${r.need || "—"}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(r.o7, totalO7)}</td>
       <td style="text-align:center;color:${r.def > 0 ? "var(--red)" : "var(--green)"};font-weight:700">${r.def > 0 ? "−" + r.def : "✓"}</td>
-      <td>${statusCell(r.dWb, r.dSeason)}</td>
+      <td>${statusCell(r.dStock, r.dSeason)}</td>
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
       <td class="td-ref" style="text-align:center">${fmtDays(r.dFbs)}</td>
       <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
@@ -369,6 +370,8 @@ export function defTbl(n) {
       const def = Math.max(0, need - total);
       const eff = dr * r.br.val;
       const dWb = eff > 0 ? Math.round(s.total / eff) : null;
+      const fbsSz = fbsMap[r.art + " · " + s.sz] || 0;
+      const dStockSz = eff > 0 ? Math.round((s.total + fbsSz) / eff) : null;
       const rawCellSz = raw
         ? `${raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
         : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
@@ -385,7 +388,7 @@ export function defTbl(n) {
         <td style="text-align:center;font-size:11px">${need || "—"}</td>
         <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(s.o7, r.o7)}</td>
         <td style="text-align:center;font-size:11px;color:${def > 0 ? "var(--red)" : "var(--green)"}">${def > 0 ? "−" + def : "✓"}</td>
-        <td>${statusChip(dWb, true)}</td>
+        <td>${statusChip(dStockSz, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
