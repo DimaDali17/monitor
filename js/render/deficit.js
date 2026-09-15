@@ -1,7 +1,7 @@
 import { VM, DS, OAD, EXD, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, fmtDays, pct } from "../utils.js";
-import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
+import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason } from "../api/sheets.js";
 
 /* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
 function rawPoolBadge(art, sibs) {
@@ -67,10 +67,11 @@ export function deficitHTML(n) {
     <div class="sh">
       <span class="st">📦 Дефицит · запас · стоки</span>
       <span class="sm2" style="display:flex;gap:4px;flex-wrap:wrap">
-        <span class="fl2 ff" data-tip="Запаса меньше 14 дней">🔥 горит</span>
-        <span class="fl2 fw" data-tip="14–30 дней">⚠️ скоро</span>
-        <span class="fl2 fk" data-tip="30–90 дней">✅ норма</span>
-        <span class="fl2 fd" data-tip="Больше 90 дней">💀 избыток</span>
+        ${statusLegend("urgent", "Меньше 14 дней запаса на ВБ — срочно отгружать")}
+        ${statusLegend("soon", "14–21 день — скоро дефицит")}
+        ${statusLegend("ok", "21–45 дней — норма")}
+        ${statusLegend("enough", "45–90 дней — достаточно")}
+        ${statusLegend("over", "Больше 90 дней — залежался")}
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.togAllSizesD(${n})" data-tip="Раскрыть все артикулы до размеров или свернуть обратно">${allSizesOpen(n) ? "▲ Свернуть размеры" : "▼ Все размеры"}</button>
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Дефицит','deficit')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
@@ -108,12 +109,79 @@ export function multiSizeArts(n) {
 }
 
 /* Статус по числу дней запаса */
-function statusOf(days) {
-  if (days == null) return { fc: "fe", bc: "bd", bw: 0, label: "нет продаж" };
-  if (days < 14) return { fc: "ff", bc: "bf", bw: Math.min(100, (days / 14) * 100), label: "🔥 " + days + "д" };
-  if (days < 30) return { fc: "fw", bc: "bw", bw: Math.min(100, (days / 30) * 100), label: "⚠️ " + days + "д" };
-  if (days <= 90) return { fc: "fk", bc: "bk", bw: Math.min(100, (days / 90) * 100), label: "✅ " + days + "д" };
-  return { fc: "fd", bc: "bd", bw: 100, label: "💀 " + days + "д" };
+/* Короткие алерты по запасу дней на ВБ (dWb — с учётом выкупаемости).
+   <14 срочно · <21 скоро дефицит · <45 норма · 45–90 достаточно · >90 залежался. */
+const STATUS = {
+  none:   { label: "нет продаж",    bg: "var(--bg3)", fg: "var(--ink3)", icon: "" },
+  urgent: { label: "срочно на ВБ!", bg: "#F7DDD9",    fg: "#B3261E",     icon: "🔥" },
+  soon:   { label: "скоро дефицит", bg: "#FBEBCF",    fg: "#8A5A00",     icon: "❗" },
+  ok:     { label: "норма",         bg: "#E1EFE4",    fg: "#2F7D55",     icon: "✅" },
+  enough: { label: "достаточно",    bg: "#E7EDF3",    fg: "#48657E",     icon: "👍" },
+  over:   { label: "залежался",     bg: "#ECE9E4",    fg: "#6B6357",     icon: "💀" },
+};
+const DAY = 864e5;
+function mondayMs(ms) {
+  const d = new Date(ms); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+function isoWeekNum(ms) {
+  const d = new Date(ms); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);       /* четверг этой недели */
+  const ft = new Date(d.getFullYear(), 0, 4);
+  ft.setDate(ft.getDate() - ((ft.getDay() + 6) % 7) + 3);
+  return 1 + Math.round((d - ft) / (7 * DAY));
+}
+/* «ВБ сезон»: за сколько дней кончится сток ВБ с учётом сезонной кривой.
+   Динамика по ТЗ: сглаженный спрос-на-коэффициент по 3 закрытым неделям
+   (веса 50/30/20), затем списание будущих недель, масштабированных кривой.
+   Только факт текущего сезона, без прогнозов. */
+function seasonalDays(season, stk, buyrate, weeks, nowMon) {
+  if (!season || stk <= 0) return null;
+  const curve = sheets.seasonWk[season];
+  if (!curve || !Object.keys(curve).length) return null;
+  const Wt = [0.5, 0.3, 0.2];
+  let dpu = 0, wsum = 0;
+  for (let i = 0; i < 3; i++) {
+    const H = curve[isoWeekNum(nowMon - (i + 1) * 7 * DAY)] || 0;
+    if (H > 0) { dpu += Wt[i] * ((weeks[i] || 0) / H); wsum += Wt[i]; }
+  }
+  if (wsum <= 0) return "off";                 /* недавние недели вне сезона */
+  const sdpu = dpu / wsum;                       /* заказов на 1.0 коэффициента / неделю */
+  if (sdpu <= 0) return null;
+  let rem = stk, days = 0;
+  for (let k = 0; k < 156; k++) {
+    const H = curve[isoWeekNum(nowMon + k * 7 * DAY)] || 0;
+    const sales = sdpu * H * buyrate;            /* заказы → продажи через выкупаемость */
+    if (sales <= 0) { days += 7; continue; }
+    if (sales >= rem) { days += Math.round((rem / sales) * 7); rem = 0; break; }
+    rem -= sales; days += 7;
+  }
+  return rem > 0 ? Infinity : days;
+}
+function fmtSeason(d) {
+  if (d == null) return "—";
+  if (d === "off") return `<span style="color:var(--ink3);cursor:help" data-tip="Сейчас вне сезона — оценить нельзя">—</span>`;
+  if (d === Infinity) return "∞";
+  return fmtDays(d);
+}
+
+function statusKey(days) {
+  if (days == null) return "none";
+  if (days < 14) return "urgent";
+  if (days < 21) return "soon";
+  if (days < 45) return "ok";
+  if (days <= 90) return "enough";
+  return "over";
+}
+function statusChip(days, small) {
+  const s = STATUS[statusKey(days)];
+  const fs = small ? 10 : 11;
+  return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:${fs}px;font-weight:600;white-space:nowrap;background:${s.bg};color:${s.fg}">${s.icon ? s.icon + " " : ""}${s.label}</span>`;
+}
+function statusLegend(key, tip) {
+  const s = STATUS[key];
+  return `<span data-tip="${tip}" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${s.bg};color:${s.fg}">${s.icon ? s.icon + " " : ""}${s.label}</span>`;
 }
 
 export function defTbl(n) {
@@ -154,6 +222,18 @@ export function defTbl(n) {
     }
   }
 
+  /* Недельный факт по артикулам (последние 3 закрытые недели) — для «ВБ сезон» */
+  const nowMon = mondayMs(Date.now());
+  const wk3 = {};
+  for (const o of (vm.allOrders || [])) {
+    const art = (o.supplierArticle || "").toLowerCase();
+    if (!art || !o.date) continue;
+    const t = Date.parse(o.date);
+    if (isNaN(t)) continue;
+    const ago = Math.round((nowMon - mondayMs(t)) / (7 * DAY));
+    if (ago >= 1 && ago <= 3) (wk3[art] ||= [0, 0, 0])[ago - 1] += (o.quantity || 1);
+  }
+
   /* Расчёт по артикулам */
   const rows = Object.entries(byArt).map(([art, g]) => {
     const br = getBuyrate(art);
@@ -163,11 +243,12 @@ export function defTbl(n) {
     const need = Math.round(dr * 30);
     const effDr = dr * br.val;
     const dWb = effDr > 0 ? Math.round(g.stk / effDr) : null;
+    const dSeason = seasonalDays(artSeason(art), g.stk, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon);
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
       def: Math.max(0, need - total),
-      dWb,
+      dWb, dSeason,
       dAll: effDr > 0 ? Math.round(total / effDr) : null,
       dNoRaw: effDr > 0 ? Math.round((g.stk + sgp) / effDr) : null,
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
@@ -200,7 +281,7 @@ export function defTbl(n) {
     <th class="th-group thg-total">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
     <th colspan="2" class="th-group thg-need">⚡ Дефицит</th>
-    <th colspan="4" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
+    <th colspan="5" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
   </tr>
   <tr>
     ${TH("stk", "ВБ", "Остаток на складах маркетплейса (FBW)", "th-wb")}
@@ -215,6 +296,7 @@ export function defTbl(n) {
     ${TH("def", "Дефицит", "Потребность 30 дней минус общий сток. ✓ — запаса хватает", "th-need")}
     ${THF("Статус", "Запас дней на ВБ с учётом выкупаемости", "th-need")}
     ${TH("days", "ВБ×", "На сколько дней хватит остатка ВБ с учётом выкупаемости", "th-days")}
+    ${THF("ВБ сезон", "Запас дней на ВБ с поправкой на сезонность (динамика от факта текущего сезона). «—» — сезон не задан или сейчас вне сезона", "th-days")}
     ${THF("Всё×", "На сколько дней хватит ВБ + СГП + Сырьё", "th-days")}
     ${THF("Без сырья×", "На сколько дней хватит ВБ + СГП", "th-days")}
     ${THF("МСК×", "На сколько дней хватит московского стока", "th-days")}
@@ -227,7 +309,6 @@ export function defTbl(n) {
     const open = OAD[n].has(r.art) || FA[n].length > 0;
     const hasSizes = r.sizes.length > 1;
     const tog = hasSizes ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
-    const st = statusOf(r.dWb);
     const rawSibs = rawSharedWith(r.art);
     const amPrimary = rawSibs.length > 0 && rawPrimaryFor(r.art) === r.art.toLowerCase();
     const amSibling = rawSibs.length > 0 && !amPrimary;
@@ -250,8 +331,9 @@ export function defTbl(n) {
       <td style="text-align:center;color:var(--ink2)">${r.need || "—"}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(r.o7, totalO7)}</td>
       <td style="text-align:center;color:${r.def > 0 ? "var(--red)" : "var(--green)"};font-weight:700">${r.def > 0 ? "−" + r.def : "✓"}</td>
-      <td><span class="fl2 ${st.fc}">${st.label}</span><span class="dbw"><span class="db ${st.bc}" style="width:${st.bw}%"></span></span></td>
+      <td>${statusChip(r.dWb)}</td>
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
+      <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
       <td style="text-align:center">${fmtDays(r.dAll)}</td>
       <td style="text-align:center">${fmtDays(r.dNoRaw)}</td>
       <td style="text-align:center">${fmtDays(r.dMsk)}</td>
@@ -267,7 +349,6 @@ export function defTbl(n) {
       const def = Math.max(0, need - total);
       const eff = dr * r.br.val;
       const dWb = eff > 0 ? Math.round(s.total / eff) : null;
-      const sst = statusOf(dWb);
       const rawCellSz = raw
         ? `${raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
         : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
@@ -284,8 +365,9 @@ export function defTbl(n) {
         <td style="text-align:center;font-size:11px">${need || "—"}</td>
         <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(s.o7, r.o7)}</td>
         <td style="text-align:center;font-size:11px;color:${def > 0 ? "var(--red)" : "var(--green)"}">${def > 0 ? "−" + def : "✓"}</td>
-        <td><span class="fl2 ${sst.fc}" style="font-size:10px">${sst.label}</span></td>
+        <td>${statusChip(dWb, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
+        <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round(total / eff) : null)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((s.total + sgp) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round(s.msk / eff) : null)}</td>
@@ -294,8 +376,8 @@ export function defTbl(n) {
   }
 
   const more = rows.length > LIM
-    ? `<tr class="er"><td class="stick" colspan="17"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
+    ? `<tr class="er"><td class="stick" colspan="18"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
     : "";
 
-  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="17">Нет данных</td></tr>'}${more}</tbody></table>`;
+  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="18">Нет данных</td></tr>'}${more}</tbody></table>`;
 }
