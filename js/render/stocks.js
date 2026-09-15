@@ -57,7 +57,8 @@ export function stocksTbl(n) {
   }
 
   const getSort = (o) => (c === "total" ? o.total : (o.wh[c] ?? o.fbsWh[c] ?? 0));
-  const keys = Object.keys(byArt).sort((a, b) => (getSort(byArt[a]) - getSort(byArt[b])) * dir);
+  const keys = Object.keys(byArt).sort((a, b) =>
+    c === "art" ? a.localeCompare(b) * dir : (getSort(byArt[a]) - getSort(byArt[b])) * dir);
 
   const arrow = (k) => (SS[n].c === k ? (SS[n].d < 0 ? " ↓" : " ↑") : " ↕");
   const cls = (k) => (SS[n].c === k ? " sa" : "");
@@ -70,7 +71,7 @@ export function stocksTbl(n) {
 
   const fbsHead = fbsWhList.map((w) =>
     `<th class="${cls(w)}" data-sort style="background:#FBE9E7;color:#8B4513" onclick="App.sortS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
-    `<span style="font-size:8px">FBS·${esc(w.slice(0, 11))}</span>${arrow(w)}</th>`
+    `<span style="font-size:8px">FBS·${esc(w)}</span>${arrow(w)}</th>`
   ).join("");
 
   const shown = EXS[n] ? keys : keys.slice(0, LIM);
@@ -78,7 +79,7 @@ export function stocksTbl(n) {
 
   for (const a of shown) {
     const g = byArt[a];
-    const open = OA[n].has(a) || FA[n].length > 0;
+    const open = OA[n].has(a);
     const hasSizes = g.sizes.length > 1;
     const tog = hasSizes ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
 
@@ -123,7 +124,7 @@ export function stocksTbl(n) {
 
   return `<table>
     <thead><tr>
-      <th>Артикул</th>
+      <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortS(${n},'art')">Артикул${arrow('art')}</th>
       <th class="${cls("total")}" data-sort style="background:var(--bg3)" onclick="App.sortS(${n},'total')">Итого${arrow("total")}</th>
       ${whHead}${fbsHead}
     </tr></thead>
