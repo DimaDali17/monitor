@@ -136,7 +136,7 @@ function isoWeekNum(ms) {
    Динамика по ТЗ: сглаженный спрос-на-коэффициент по 3 закрытым неделям
    (веса 50/30/20), затем списание будущих недель, масштабированных кривой.
    Только факт текущего сезона, без прогнозов. */
-function seasonalDays(season, stk, buyrate, weeks, nowMon) {
+function seasonalDays(season, stk, buyrate, weeks, nowMon, curWeekly) {
   if (!season || stk <= 0) return null;
   const curve = sheets.seasonWk[season];
   if (!curve || !Object.keys(curve).length) return null;
@@ -146,8 +146,15 @@ function seasonalDays(season, stk, buyrate, weeks, nowMon) {
     const H = curve[isoWeekNum(nowMon - (i + 1) * 7 * DAY)] || 0;
     if (H > 0) { dpu += Wt[i] * ((weeks[i] || 0) / H); wsum += Wt[i]; }
   }
-  if (wsum <= 0) return "off";                 /* недавние недели вне сезона */
-  const sdpu = dpu / wsum;                       /* заказов на 1.0 коэффициента / неделю */
+  let sdpu;
+  if (wsum > 0) {
+    sdpu = dpu / wsum;                            /* сглаженный спрос-на-коэффициент */
+  } else {
+    /* Начало сезона: закрытые недели ещё вне сезона — опираемся на текущую неделю */
+    const Hnow = curve[isoWeekNum(nowMon)] || 0;
+    if (Hnow > 0 && curWeekly > 0) sdpu = curWeekly / Hnow;
+    else return "off";                           /* реально вне сезона / нет спроса */
+  }
   if (sdpu <= 0) return null;
   let rem = stk, days = 0;
   for (let k = 0; k < 156; k++) {
@@ -243,7 +250,7 @@ export function defTbl(n) {
     const need = Math.round(dr * 30);
     const effDr = dr * br.val;
     const dWb = effDr > 0 ? Math.round(g.stk / effDr) : null;
-    const dSeason = seasonalDays(artSeason(art), g.stk, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon);
+    const dSeason = seasonalDays(artSeason(art), g.stk, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
