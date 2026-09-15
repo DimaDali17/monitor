@@ -80,7 +80,6 @@ export function deficitHTML(n) {
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#A06820;margin-right:3px;vertical-align:middle"></span>ВБ — остаток на маркетплейсе</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#5B3FA0;margin-right:3px;vertical-align:middle"></span>СГП — готовая продукция</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B4513;margin-right:3px;vertical-align:middle"></span>Сырьё — полуфабрикаты</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>МСК — справочно, в общий сток не входит</span>
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A1B9A;border:1px dashed #CE93D8;margin-right:3px;vertical-align:middle"></span>FBS — остаток на складе продавца, справочно (в общий сток не входит)</span>
       <span><b>пул</b> — общее сырьё на несколько артикулов, показано у первого (остальным «—»)</span>
       <span><b>×</b> — с учётом выкупаемости</span>
@@ -298,10 +297,9 @@ export function defTbl(n) {
     <th colspan="2" class="th-group thg-wb">📦 Склад ВБ · FBS</th>
     <th class="th-group thg-sgp">🏭 СГП</th>
     <th class="th-group thg-raw">🧵 Сырьё</th>
-    <th class="th-group thg-ref" style="border-style:dashed">* МСК</th>
-    <th class="th-group thg-total">📊 Общий</th>
+    <th class="th-group thg-total" style="border-right:2px solid #C7BFB0">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
-    <th colspan="2" class="th-group thg-need">⚡ Дефицит</th>
+    <th colspan="2" class="th-group thg-need" style="border-right:2px solid #C7BFB0">⚡ Дефицит</th>
     <th colspan="5" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
   </tr>
   <tr>
@@ -309,13 +307,12 @@ export function defTbl(n) {
     ${THF("FBS", "Остатки на вашем FBS-складе (marketplace-api /api/v3/stocks). Справочно, в общий сток не входит", "th-wb")}
     ${THF("СГП", "Готовая продукция — лист Остатки сводная new, артикулы с префиксом «СГП »", "th-sgp")}
     ${THF("Сырьё", "Полуфабрикаты — лист Остатки сводная new. Общий пул сырья на несколько артикулов ВБ показан у первого (наименьший номер), остальным «—». Nobrand суммируется", "th-raw")}
-    ${THF("МСК*", "Коледино, Тула, Электросталь, Подольск, Рязань — справочно, в общий сток не входит", "th-msk")}
-    ${THF("Общий", "ВБ + СГП + Сырьё", "th-total")}
+    <th class="th-total" style="text-align:center;border-right:2px solid #C7BFB0" data-tip="ВБ + СГП + Сырьё">Общий</th>
     ${TH("o7", "Зак/день", "Среднее число заказов в день за 7 дней", "th-need")}
     ${THF("Мес. потр.", "Потребность на 30 дней при текущем темпе заказов", "th-need")}
     ${THF("Доля", "Доля размера в заказах артикула / доля артикула в общих заказах", "th-need")}
     ${TH("def", "Дефицит", "Потребность 30 дней минус общий сток. ✓ — запаса хватает", "th-need")}
-    ${THF("Статус", "Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше", "th-need")}
+    <th class="th-need" style="text-align:center;border-right:2px solid #C7BFB0" data-tip="Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше">Статус</th>
     ${TH("days", "ВБ×", "Хватит дней: остаток ВБ (FBW) ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
     ${THF("ВБ FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
     ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток ВБ + FBS списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
@@ -327,7 +324,7 @@ export function defTbl(n) {
   let trs = "";
 
   for (const r of shown) {
-    const open = OAD[n].has(r.art) || FA[n].length > 0;
+    const open = OAD[n].has(r.art);
     const hasSizes = r.sizes.length > 1;
     const tog = hasSizes ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
     const rawSibs = rawSharedWith(r.art);
@@ -346,13 +343,12 @@ export function defTbl(n) {
       <td class="td-ref" style="text-align:center" data-tip="FBS — справочно">${fbsByArt[r.art.toLowerCase()] || "—"}</td>
       <td class="${qc(r.sgp, 20)}" style="text-align:center">${r.sgp || "—"}</td>
       <td class="${qc(r.raw, 20)}" style="text-align:center">${rawCell}</td>
-      <td class="td-ref" style="text-align:center">${r.msk || "—"}</td>
-      <td class="${qc(r.total, 30)}" style="text-align:center;font-size:14px;font-weight:700">${r.total}</td>
+      <td class="${qc(r.total, 30)}" style="text-align:center;font-size:14px;font-weight:700;border-right:2px solid #C7BFB0">${r.total}</td>
       <td style="text-align:center;font-weight:600">${Math.round(r.dr)}</td>
       <td style="text-align:center;color:var(--ink2)">${r.need || "—"}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(r.o7, totalO7)}</td>
       <td style="text-align:center;color:${r.def > 0 ? "var(--red)" : "var(--green)"};font-weight:700">${r.def > 0 ? "−" + r.def : "✓"}</td>
-      <td>${statusCell(r.dStock, r.dSeason)}</td>
+      <td style="border-right:2px solid #C7BFB0">${statusCell(r.dStock, r.dSeason)}</td>
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
       <td class="td-ref" style="text-align:center">${fmtDays(r.dFbs)}</td>
       <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
@@ -382,13 +378,12 @@ export function defTbl(n) {
         <td class="td-ref" style="text-align:center;font-size:11px">${fbsMap[r.art + " · " + s.sz] || "—"}</td>
         <td class="${qc(sgp, 10)}" style="text-align:center;font-size:11px;color:var(--sgp)">${sgp || "—"}</td>
         <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${rawCellSz}</td>
-        <td class="td-ref" style="text-align:center;font-size:11px">${s.msk || "—"}</td>
-        <td class="${qc(total, 15)}" style="text-align:center;font-weight:600">${total}</td>
+        <td class="${qc(total, 15)}" style="text-align:center;font-weight:600;border-right:2px solid #C7BFB0">${total}</td>
         <td style="text-align:center;font-size:11px">${Math.round(dr)}</td>
         <td style="text-align:center;font-size:11px">${need || "—"}</td>
         <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(s.o7, r.o7)}</td>
         <td style="text-align:center;font-size:11px;color:${def > 0 ? "var(--red)" : "var(--green)"}">${def > 0 ? "−" + def : "✓"}</td>
-        <td>${statusChip(dStockSz, true)}</td>
+        <td style="border-right:2px solid #C7BFB0">${statusChip(dStockSz, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
@@ -399,8 +394,8 @@ export function defTbl(n) {
   }
 
   const more = rows.length > LIM
-    ? `<tr class="er"><td class="stick" colspan="18"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
+    ? `<tr class="er"><td class="stick" colspan="16"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
     : "";
 
-  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="18">Нет данных</td></tr>'}${more}</tbody></table>`;
+  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="16">Нет данных</td></tr>'}${more}</tbody></table>`;
 }
