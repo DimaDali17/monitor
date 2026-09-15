@@ -1,5 +1,5 @@
-import { FA, FP } from "../state.js";
-import { getSubjects, getArts } from "../vm.js";
+import { FA, FP, FG } from "../state.js";
+import { getSubjects, getArts, getGroups } from "../vm.js";
 import { esc, q } from "../utils.js";
 
 export function filterHTML(n) {
@@ -11,7 +11,11 @@ export function filterHTML(n) {
     `<span class="chip">${esc(a)}<span class="cx" onclick="App.rmFA(${n},${i})">×</span></span>`
   ).join("");
 
-  const clear = (FA[n].length || FP[n].length)
+  const groupChips = FG[n].map((g, i) =>
+    `<span class="chip" style="background:#8064A2">${esc(g)}<span class="cx" onclick="App.rmFG(${n},${i})">×</span></span>`
+  ).join("");
+
+  const clear = (FA[n].length || FP[n].length || FG[n].length)
     ? `<button class="eb" style="margin-top:4px" onclick="App.clearFilters(${n})">✕ Очистить фильтры</button>`
     : "";
 
@@ -23,6 +27,15 @@ export function filterHTML(n) {
         <input id="fpi${n}" placeholder="${FP[n].length ? "+ ещё предмет…" : "все предметы…"}"
                oninput="App.fpInput(${n})" onfocus="App.fpInput(${n})" autocomplete="off">
         <div class="ddrop" id="fpdd${n}"></div>
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">🏷️ Группа</span>
+      <div class="fb" style="flex:1">
+        ${groupChips}
+        <input id="fgi${n}" placeholder="${FG[n].length ? "+ ещё группа…" : "все группы…"}"
+               oninput="App.fgInput(${n})" onfocus="App.fgInput(${n})" autocomplete="off">
+        <div class="ddrop" id="fgdd${n}"></div>
       </div>
     </div>
     <div class="filter-row">
@@ -55,6 +68,7 @@ function suggest(n, inputId, dropId, all, chosen, addFn) {
 
 export const fpInput = (n) => suggest(n, "fpi" + n, "fpdd" + n, getSubjects(n), FP[n], "addFP");
 export const faInput = (n) => suggest(n, "fai" + n, "fdd" + n, getArts(n), FA[n], "addFA");
+export const fgInput = (n) => suggest(n, "fgi" + n, "fgdd" + n, getGroups(n), FG[n], "addFG");
 
 /* Клик вне выпадашки — закрыть */
 document.addEventListener("click", (e) => {

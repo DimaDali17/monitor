@@ -1,4 +1,4 @@
-import { EXP, CM, FA } from "../state.js";
+import { EXP, CM, FA, OFM } from "../state.js";
 import { LIM } from "../config.js";
 import { fmt, esc, q, wbPrice, ozRev, sitePrice } from "../utils.js";
 
@@ -20,7 +20,15 @@ export function ordersHTML(n, vm, type) {
   const orders = weekMode ? vm.orders7 || [] : vm.todayO || [];
 
   const timeOf = (o) => (type === "wb" ? o.date : o.in_process_at || o.created_at);
-  const sorted = [...orders].sort((a, b) => new Date(timeOf(b)) - new Date(timeOf(a)));
+  const fm = OFM[n] || "all";
+  const sortedAll = [...orders].sort((a, b) => new Date(timeOf(b)) - new Date(timeOf(a)));
+  const sorted = type === "wb" && fm !== "all"
+    ? sortedAll.filter((o) => {
+        const m = wbModel(o.warehouseType);
+        const tag = m ? m.tag : "";
+        return fm === "fbw" ? tag === "FBW" : tag === "FBS";
+      })
+    : sortedAll;
   const shown = EXP[n] ? sorted : sorted.slice(0, LIM);
 
   const rows = shown.map((o) => {
@@ -34,8 +42,9 @@ export function ordersHTML(n, vm, type) {
       name = o.subject || o.category || "—";
       qty = o.quantity || 1;
       price = wbPrice(o);
-      wh = o.warehouseName || "—";
       model = wbModel(o.warehouseType);
+      wh = o.warehouseName || "—";
+      if (model && model.tag === "FBS") wh = o.fbsWarehouse || "склад продавца";
     } else {
       const items = o.products || [];
       art = items.map((p) => p.offer_id || "").join(", ");
@@ -81,8 +90,15 @@ export function ordersHTML(n, vm, type) {
   return `<div class="sec">
     <div class="sh">
       <span class="st">${weekMode ? "Заказы за период" : "Заказы сегодня"}</span>
-      <span class="sm2">${orders.length} заказов</span>
-      <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Заказы','zakazy')" data-tip="Скачать в Excel">⤓ Excel</button>
+      <span style="display:flex;align-items:center;gap:8px">
+        ${type === "wb" ? `<span class="ctog">
+          <button class="${fm === "all" ? "on" : ""}" onclick="App.setOrdFilter(${n},'all')">Все</button>
+          <button class="${fm === "fbw" ? "on" : ""}" onclick="App.setOrdFilter(${n},'fbw')">FBW</button>
+          <button class="${fm === "fbs" ? "on" : ""}" onclick="App.setOrdFilter(${n},'fbs')">FBS</button>
+        </span>` : ""}
+        <span class="sm2">${sorted.length} заказов</span>
+        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Заказы','zakazy')" data-tip="Скачать в Excel">⤓ Excel</button>
+      </span>
     </div>
     <div class="tw"><table>
       <thead><tr>
