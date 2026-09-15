@@ -278,7 +278,7 @@ const MP_BASE = "https://marketplace-api.wildberries.ru";
 const FBS_GAP = 700; /* marketplace-api мягче Statistics, свой лимит */
 
 async function loadFBS(cab, onRetry) {
-  const empty = { fbs: {}, fbsWh: {}, fbsCells: {} };
+  const empty = { fbs: {}, fbsWh: {}, fbsCells: {}, sridWh: {} };
 
   /* 1. Склады FBS продавца (id → название) */
   let whs = [];
@@ -332,7 +332,33 @@ async function loadFBS(cab, onRetry) {
     }
   }
   console.log(`Кабинет ${cab}: FBS-остатки по ${Object.keys(fbs).length} позициям, складов ${whIds.length}`);
-  return { fbs, fbsWh, fbsCells };
+
+  /* Сборочные задания FBS (Marketplace) — чтобы у каждого FBS-заказа знать склад.
+     Свяжем со Statistics-заказами по srid (фолбэк rid); склад по warehouseId → имя. */
+  const sridWh = {};
+  try {
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const from = Math.floor((d0.getTime() - 10 * 864e5) / 1000);   /* ~10 дней, старт суток — стабильный URL для кэша */
+    let next = 0, guard = 0;
+    while (guard++ < 40) {
+      const data = await wbGet(`${MP_BASE}/api/v3/orders?limit=1000&next=${next}&dateFrom=${from}`, cab, false, onRetry);
+      const ords = (data && data.orders) || [];
+      for (const mo of ords) {
+        const wh = whName[mo.warehouseId];
+        if (!wh) continue;
+        if (mo.srid) sridWh[mo.srid] = wh;
+        if (mo.rid) sridWh[mo.rid] = wh;
+      }
+      const nx = data && data.next;
+      if (!ords.length || nx == null || nx === next) break;
+      next = nx;
+    }
+    console.log(`Кабинет ${cab}: FBS-заказы со складом: ${Object.keys(sridWh).length}`);
+  } catch (e) {
+    console.warn(`Кабинет ${cab}: FBS-заказы (склады) не загрузились — ${e.message}`);
+  }
+
+  return { fbs, fbsWh, fbsCells, sridWh };
 }
 
 /* ══════════ Основная загрузка кабинета ══════════ */
@@ -373,11 +399,17 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
 
   /* Остатки FBS (склад продавца) — best-effort, справочно.
      Если воркер/ключ не готов — вернётся {}, колонка покажет «—». */
-  let fbsRes = { fbs: {}, fbsWh: {}, fbsCells: {} };
+  let fbsRes = { fbs: {}, fbsWh: {}, fbsCells: {}, sridWh: {} };
   try {
     fbsRes = await cached(`wb${n}:fbs2`, force, () => loadFBS(n, onRetry));
   } catch (e) {
     console.warn(`Кабинет ${n}: FBS не загрузился — ${e.message}`);
+  }
+
+  /* Обогащаем FBS-заказы именем склада продавца (по srid ↔ v3/orders) */
+  const sridWh = fbsRes.sridWh || {};
+  if (Object.keys(sridWh).length) {
+    all.forEach((o) => { const wh = sridWh[o.srid] || sridWh[o.rid]; if (wh) o.fbsWarehouse = wh; });
   }
 
   const t = td(), y = yd(), w = wd();
