@@ -1,6 +1,6 @@
 import { CM, CV, CD } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
-import { artGroup } from "../api/sheets.js";
+import { artGroup, artColor } from "../api/sheets.js";
 
 /* Контрастная палитра под топ-5 категорий + серый для «Прочее» */
 const PAL = ["#C0504D", "#4F81BD", "#9BBB59", "#8064A2", "#E0A030"];
@@ -159,7 +159,11 @@ export function chartHTML(n, vm, type) {
   ev.forEach((e) => { const k = topSet.has(catOf(e)) ? catOf(e) : "Прочее"; per[k][e.i] += e.val; });
 
   const segOrder = [...top, ...(hasOther ? ["Прочее"] : [])];
-  const colorOf = (seg) => (seg === "Прочее" ? OTHER : PAL[top.indexOf(seg) % PAL.length]);
+  const colorOf = (seg) => {
+    if (seg === "Прочее") return OTHER;
+    if (level === 3) { const c = artColor(seg); if (c) return c; }   /* цвет из справочника (по артикулу) */
+    return PAL[top.indexOf(seg) % PAL.length];
+  };
   /* На листе клик по артикулу оставляет ТОЛЬКО его (solo) */
   const solo = level === 3 && cd.hi && topSet.has(cd.hi) ? cd.hi : null;
   const visSegs = solo ? [solo] : segOrder;
