@@ -6,7 +6,7 @@ import { alertsHTML } from "./alerts.js";
 import { metricsHTML } from "./metrics.js";
 import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
-import { stocksHTML, stocksTbl } from "./stocks.js";
+import { stocksHTML, stocksTbl, fbsStocksHTML } from "./stocks.js";
 import { deficitHTML, defTbl } from "./deficit.js";
 
 /* Раньше renderWB и renderOZ были почти одинаковыми копиями.
@@ -28,7 +28,8 @@ export function renderCabinet(n) {
     chartHTML(n, vm, type) +
     ordersHTML(n, vm, type) +
     deficitHTML(n) +
-    stocksHTML(n);
+    stocksHTML(n) +
+    fbsStocksHTML(n);
 }
 
 /* Точечная перерисовка — сортировка таблицы не должна пересобирать график */
