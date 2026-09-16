@@ -1,6 +1,6 @@
 import { EXP, CM, FA, OFM } from "../state.js";
 import { LIM } from "../config.js";
-import { fmt, esc, q, wbPrice, ozRev, sitePrice } from "../utils.js";
+import { fmt, esc, q, wbPrice, ozRev, sitePrice, iso } from "../utils.js";
 
 /* Модель продажи WB по полю warehouseType из Statistics API.
    "Склад WB" → FBW (товар на складе WB), иначе "Склад продавца" → FBS.
@@ -16,10 +16,16 @@ function wbModel(wtype) {
 }
 
 export function ordersHTML(n, vm, type) {
-  const weekMode = CM[n] === "week" || CM[n] === "month";
-  const orders = weekMode ? vm.orders7 || [] : vm.todayO || [];
-
+  const mode = CM[n] || "day";
+  const weekMode = mode === "week" || mode === "month";
   const timeOf = (o) => (type === "wb" ? o.date : o.in_process_at || o.created_at);
+
+  let orders;
+  if (mode === "month") {
+    const wk = iso(Date.now() - 30 * 864e5);
+    orders = (vm.allOrders || []).filter((o) => (timeOf(o) || "").slice(0, 10) >= wk);
+  } else if (mode === "week") orders = vm.orders7 || [];
+  else orders = vm.todayO || [];
   const fm = OFM[n] || "all";
   const sortedAll = [...orders].sort((a, b) => new Date(timeOf(b)) - new Date(timeOf(a)));
   const sorted = type === "wb" && fm !== "all"
