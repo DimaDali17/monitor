@@ -292,7 +292,7 @@ async function loadFBS(cab, onRetry) {
   const whName = {};
   (Array.isArray(whs) ? whs : []).forEach((x) => {
     const id = x.id ?? x.warehouseId ?? x.officeId;
-    if (id != null) whName[id] = x.name || x.officeName || ("Склад " + id);
+    if (id != null) { const nm = String(x.name || x.officeName || "").replace(/^\s*мой\s+склад\s*/i, "").trim(); whName[id] = nm || ("Склад " + id); }
   });
   const whIds = Object.keys(whName);
   if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return empty; }
