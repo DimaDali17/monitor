@@ -13,6 +13,7 @@ export const VM = { 1: null, 2: null, 3: null };
 export const EXP = { 1: false, 2: false, 3: false }; /* заказы */
 export const EXS = { 1: false, 2: false, 3: false }; /* остатки */
 export const EXD = { 1: false, 2: false, 3: false }; /* дефицит */
+export const EXA = { 1: false, 2: false, 3: false }; /* внимание по остаткам (развернуть) */
 
 /* Открытые артикулы (аккордеон по размерам) */
 export const OA = { 1: new Set(), 2: new Set(), 3: new Set() };  /* остатки */

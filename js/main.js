@@ -1,6 +1,6 @@
 import { VERSION } from "./config.js";
 import {
-  D, EXP, EXS, EXD, OA, OAD, OAC, SS, DS, FA, FP,
+  D, EXP, EXS, EXD, EXA, OA, OAD, OAC, SS, DS, FA, FP,
   CM, CV, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -216,6 +216,7 @@ const App = {
     repaintDeficit(n);
   },
   togExD(n) { EXD[n] = !EXD[n]; repaintDeficit(n); },
+  togAlerts(n) { EXA[n] = !EXA[n]; renderCabinet(n); },
   /* Раскрыть все артикулы до размеров разом — или свернуть обратно.
      Заодно показываем все строки (EXD), иначе часть артикулов скрыта
      под «Все N» и раскрывать в них нечего. */
