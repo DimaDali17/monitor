@@ -1,7 +1,7 @@
 import { VERSION } from "./config.js";
 import {
   D, EXP, EXS, EXD, OA, OAD, OAC, SS, DS, FA, FP,
-  CM, CV, GB, FG, OFM, CONSO, cabName,
+  CM, CV, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
