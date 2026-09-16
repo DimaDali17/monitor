@@ -18,6 +18,23 @@ import { normSz } from "../utils.js";
    а суммарный остаток совпадает с суммой строк.
    ══════════════════════════════════════════════════════════ */
 
+const COLOR_MAP = {
+  черный: "#2B2B2B", светлочерный: "#555555", серый: "#9E9E9E", светлосерый: "#C4C0B6",
+  бордовый: "#7B2233", розовый: "#E48FB0", синий: "#2F5AA0", темносиний: "#1F3A6B",
+  голубой: "#6FB1E0", коричневый: "#6B4A2B", светлокоричневый: "#A9835A",
+  бежевый: "#D8B98C", рыжий: "#C9612B", белый: "#E3E0D8", зеленый: "#4C9A56",
+  изумруд: "#1E8E6A", изумрудный: "#1E8E6A", желтый: "#E0B93B", фиолетовый: "#7E57C2",
+  оранжевый: "#E08A2B",
+};
+/* Название цвета из справочника → hex. Пусто/не найдено → null. */
+function colorHex(raw) {
+  const v = String(raw || "").trim();
+  if (!v) return null;
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) return v;
+  const k = v.toLowerCase().replace(/ё/g, "е").replace(/[\s-]/g, "");
+  return COLOR_MAP[k] || null;
+}
+
 const SGP_RE = /^СГП\s+/i;
 
 /* Число в конце артикула (…num1 → 1). Нет числа → в конец очереди. */
@@ -41,7 +58,7 @@ export const sheets = {
   map: {},          /* "wbArt;wbSz" → [{artPr, szPr}] */
   revMap: {},       /* "baseArt;szPr(norm)" → wbSz — разбор Ozon-артикулов */
   artDisplay: {},   /* wbArtLower → как записан в справочнике (для подсказок) */
-  nomen: {},        /* артикулПоставщикаLower → { predmet, kratko, season } */
+  nomen: {},        /* артикулПоставщикаLower → { predmet, kratko, season, color } */
   seasonWk: { winter: {}, summer: {} }, /* ISO-неделя → коэффициент */
   /* индексы */
   sgpByArt: {},     /* wbArt → шт (все размеры) */
@@ -115,9 +132,10 @@ export function loadExternal() {
         const kratko = (row["Кратко"] || "").trim();
         const sRaw = (row["Сезон"] || "").trim().toLowerCase();
         const season = sRaw.startsWith("зим") ? "winter" : sRaw.startsWith("лет") ? "summer" : null;
+        const color = colorHex(row["Цвет"]);
         const ex = sheets.nomen[art];
-        if (!ex) sheets.nomen[art] = { predmet, kratko, season };
-        else { if (!ex.predmet && predmet) ex.predmet = predmet; if (!ex.kratko && kratko) ex.kratko = kratko; if (!ex.season && season) ex.season = season; }
+        if (!ex) sheets.nomen[art] = { predmet, kratko, season, color };
+        else { if (!ex.predmet && predmet) ex.predmet = predmet; if (!ex.kratko && kratko) ex.kratko = kratko; if (!ex.season && season) ex.season = season; if (!ex.color && color) ex.color = color; }
       });
 
       /* Недельные кривые сезонности (вкладка «Сезон»): № недели ISO → Зима/Лето */
@@ -311,6 +329,12 @@ export function artGroup(art) {
 export function artSeason(art) {
   const g = sheets.nomen[(art || "").toLowerCase()];
   return g ? (g.season || null) : null;
+}
+
+/* Цвет артикула (hex из справочника) или null. */
+export function artColor(art) {
+  const g = sheets.nomen[(art || "").toLowerCase()];
+  return g ? (g.color || null) : null;
 }
 
 /* Другие артикулы ВБ, делящие пул сырья с wbArt (пусто — если сырьё эксклюзивно). */
