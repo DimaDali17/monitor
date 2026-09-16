@@ -146,6 +146,26 @@ const App = {
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
   setChartVal(n, v) { CV[n] = v; renderCabinet(n); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
+  /* Детализация графика («Глубже») */
+  chartDeep(n, on) {
+    const c = CD[n]; c.deep = on;
+    if (!on) { c.predmet = null; c.group = null; c.hi = null; }
+    renderCabinet(n);
+  },
+  chartDrill(n, key) {
+    const c = CD[n];
+    if (key === "Прочее") return;                 /* агрегат — не раскрываем */
+    if (!c.predmet) { c.predmet = key; c.group = null; c.hi = null; }
+    else if (!c.group) { c.group = key; c.hi = null; }
+    else { c.hi = (c.hi === key ? null : key); }  /* лист: solo-подсветка */
+    renderCabinet(n);
+  },
+  chartCrumb(n, to) {
+    const c = CD[n];
+    if (to === "root") { c.predmet = null; c.group = null; c.hi = null; }
+    else if (to === "predmet") { c.group = null; c.hi = null; }
+    renderCabinet(n);
+  },
 
   /* фильтры */
   addFA(n, a) {
