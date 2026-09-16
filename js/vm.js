@@ -55,6 +55,22 @@ function applyFilters(n, d) {
     return artOk && subOk && grpOk;
   };
 
+  /* FBS-данные (ключ "артикул · размер") — фильтруем по тем же Предмет/Группа/Артикул */
+  const fbsOk = (art) => {
+    const g = artGroup(art) || {};
+    const artOk = !arts.length || arts.includes(art);
+    const subOk = !subs.length || subs.includes(g.predmet || "");
+    const grpOk = !groups.length || groups.includes(g.kratko || "");
+    return artOk && subOk && grpOk;
+  };
+  const fbs = {}, fbsCells = {}, fbsWh = {};
+  for (const [k, v] of Object.entries(d.fbs || {})) if (fbsOk(k.split(" · ")[0])) fbs[k] = v;
+  for (const [k, wm] of Object.entries(d.fbsCells || {})) {
+    if (!fbsOk(k.split(" · ")[0])) continue;
+    fbsCells[k] = wm;
+    for (const [w, qy] of Object.entries(wm)) fbsWh[w] = (fbsWh[w] || 0) + qy;
+  }
+
   return {
     ...d,
     todayO: (d.todayO || []).filter(orderOk),
@@ -62,6 +78,7 @@ function applyFilters(n, d) {
     orders7: (d.orders7 || []).filter(orderOk),
     allOrders: (d.allOrders || []).filter(orderOk),
     stocks: (d.stocks || []).filter(stockOk),
+    fbs, fbsCells, fbsWh,
   };
 }
 
