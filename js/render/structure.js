@@ -43,7 +43,7 @@ export function structureHTML(n) {
   }
 
   const rows = Object.entries(grp).sort((a, b) => b[1] - a[1]);
-  const TOPN = 12;
+  const TOPN = 8;
   const shown = rows.length > TOPN ? rows.slice(0, TOPN) : rows;
   const rest = rows.length > TOPN ? rows.slice(TOPN).reduce((s, r) => s + r[1], 0) : 0;
   const max = shown.length ? shown[0][1] : 1;
@@ -52,7 +52,7 @@ export function structureHTML(n) {
   const row = (name, v) => {
     const w = Math.max(2, Math.round((v / max) * 100));
     const pct = total ? Math.round((v / total) * 100) : 0;
-    return `<div style="display:grid;grid-template-columns:38% 1fr 40px 32px;align-items:center;gap:10px;height:22px;font-size:12px">
+    return `<div style="display:grid;grid-template-columns:40% 1fr 34px 30px;align-items:center;gap:10px;height:19px;font-size:11px">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)" title="${esc(name)}">${esc(name)}</div>
       <div style="background:var(--bg3);border-radius:4px;height:12px">
         <div style="width:${w}%;height:100%;background:#8A8275;border-radius:4px"></div>
@@ -65,7 +65,7 @@ export function structureHTML(n) {
   const bars = shown.map(([name, v]) => row(name, v)).join("");
 
   const restRow = rest
-    ? `<div style="display:grid;grid-template-columns:38% 1fr 40px 32px;gap:10px;align-items:center;height:22px;margin-top:2px;padding-top:4px;border-top:1px solid var(--border);font-size:11px;color:var(--ink3)">
+    ? `<div style="display:grid;grid-template-columns:40% 1fr 34px 30px;gap:10px;align-items:center;height:22px;margin-top:2px;padding-top:4px;border-top:1px solid var(--border);font-size:11px;color:var(--ink3)">
         <div>Прочее · ${rows.length - TOPN} групп</div><div></div>
         <div style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${rest}</div>
         <div style="text-align:right;font-variant-numeric:tabular-nums">${total ? Math.round((rest / total) * 100) : 0}%</div>
@@ -75,13 +75,13 @@ export function structureHTML(n) {
   const seg = (val, label) =>
     `<button class="${GB[n] === val ? "on" : ""}" onclick="App.setGroupBy(${n},'${val}')">${label}</button>`;
 
-  return `<div class="sec" style="margin-bottom:0">
+  return `<div class="filter-bar" style="margin-bottom:0">
     <div class="sh" style="margin-bottom:8px">
       <span class="st">Структура спроса
         <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${modeName} · ${total} шт</span></span>
       <span class="ctog">${seg("predmet", "Предмет")}${seg("kratko", "Группа")}</span>
     </div>
-    <div style="max-height:296px;overflow:auto;padding-right:2px">
+    <div style="max-height:230px;overflow:auto;padding-right:2px">
       ${bars || '<div class="em">Нет заказов за период</div>'}${restRow}
     </div>
   </div>`;

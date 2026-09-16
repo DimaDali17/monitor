@@ -19,10 +19,10 @@ export function renderCabinet(n) {
   const type = vm.isOz ? "oz" : "wb";
 
   el.innerHTML =
-    `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-       <div style="flex:1 1 320px;min-width:270px">${filterHTML(n)}</div>
-       <div style="flex:1 1 300px;min-width:260px">${alertsHTML(n)}</div>
-       <div style="flex:1 1 320px;min-width:280px">${structureHTML(n)}</div>
+    `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
+       <div style="flex:1 1 300px;min-width:270px">${filterHTML(n)}</div>
+       <div style="flex:1 1 300px;min-width:270px">${alertsHTML(n)}</div>
+       <div style="flex:1 1 300px;min-width:270px">${structureHTML(n)}</div>
      </div>` +
     metricsHTML(n, vm, type) +
     chartHTML(n, vm, type) +
