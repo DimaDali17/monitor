@@ -16,10 +16,15 @@ export function alertsHTML(n) {
 
   const byArt = {};
   const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, stk: 0, o7: 0, fbs: 0 });
-  for (const [key, v] of Object.entries(arts)) {
-    const g = add(v.art); g.art = v.art; g.stk += v.total; g.o7 += orderMap[key] || 0;
+  for (const [, v] of Object.entries(arts)) {
+    const g = add(v.art); g.art = v.art; g.stk += v.total;
   }
   for (const [k, val] of Object.entries(fbsMap)) add(k.split(" · ")[0]).fbs += val;
+  /* Заказы — единственный источник спроса o7 (суммируем по всем размерам артикула).
+     Заодно они ДОБАВЛЯЮТ в перебор артикулы, которые полностью вышли из остатков
+     (их нет ни в стоках WB, ни в FBS), но спрос по ним ещё идёт — иначе
+     «закончился» вообще не попадёт в блок «Внимание по остаткам». */
+  for (const [k, val] of Object.entries(orderMap)) add(k.split(" · ")[0]).o7 += val;
 
   const over = [], low = [];
   for (const g of Object.values(byArt)) {
@@ -29,6 +34,8 @@ export function alertsHTML(n) {
     }
     const eff = (g.o7 / 7) * getBuyrate(g.art).val;
     if (eff <= 0) continue;
+    /* Полностью закончился на обоих каналах, а спрос есть — самый срочный сигнал (0 дн). */
+    if (g.fbs <= 0 && g.stk <= 0) { low.push({ art: g.art, ch: "OUT", d: 0 }); continue; }
     if (g.fbs > 0) { const d = Math.round(g.fbs / eff); if (d < LIMIT) low.push({ art: g.art, ch: "FBS", d }); }
     if (g.stk > 0) { const d = Math.round(g.stk / eff); if (d < LIMIT) low.push({ art: g.art, ch: stkLabel, d }); }
   }
@@ -50,15 +57,20 @@ export function alertsHTML(n) {
     </div>`).join("");
 
   const chip = (ch) => {
+    if (ch === "OUT")
+      return `<span style="flex:0 0 auto;padding:0 5px;border-radius:7px;font-size:9px;font-weight:700;background:#F7C9C4;color:#B3261E" data-tip="Закончился на всех каналах, а спрос есть">нет</span>`;
     const fbs = ch === "FBS";
     return `<span style="flex:0 0 auto;padding:0 5px;border-radius:7px;font-size:9px;font-weight:700;background:${fbs ? "#FBEBCF" : "#F7DDD9"};color:${fbs ? "#8A5A00" : "#B3261E"}">${ch}</span>`;
   };
-  const lowRows = lowShown.map((a) =>
-    `<div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:18px">
+  const lowRows = lowShown.map((a) => {
+    const right = a.ch === "OUT" ? "закончился" : `${a.d}д`;
+    const col = a.ch === "OUT" || a.d < 2 ? "#B3261E" : "#8A5A00";
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:18px">
       ${chip(a.ch)}
       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(a.art)}">${esc(a.art)}</span>
-      <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${a.d < 2 ? "#B3261E" : "#8A5A00"}">${a.d}д</span>
-    </div>`).join("");
+      <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${col}">${right}</span>
+    </div>`;
+  }).join("");
 
   const sep = overRows && lowRows ? `<div style="height:6px"></div>` : "";
   const moreRow = rest > 0
