@@ -4,7 +4,9 @@ import { getBuyrate, getStocksForArt } from "../api/sheets.js";
 
 /* Внимание по остаткам:
    1) FBS завышен — остаток FBS на WB больше, чем Сырьё+СГП (реальное наличие). ВВЕРХУ.
-   2) Остаток (FBS или FBW) кончается — меньше LIMIT дней при текущем темпе. */
+   2) Остаток кончается — на канале (FBW или FBS) < LIMIT дней или 0 при текущем темпе.
+      Если ВТОРОЙ склад прикрывает (есть остаток и хватает ≥ LIMIT дней) — значок жёлтый,
+      а рядом через запятую показываем запас второго склада. Если оба пусты/мало — красный. */
 const LIMIT = 5;
 
 export function alertsHTML(n) {
@@ -34,13 +36,50 @@ export function alertsHTML(n) {
     }
     const eff = (g.o7 / 7) * getBuyrate(g.art).val;
     if (eff <= 0) continue;
-    /* Полностью закончился на обоих каналах, а спрос есть — самый срочный сигнал (0 дн). */
-    if (g.fbs <= 0 && g.stk <= 0) { low.push({ art: g.art, ch: "OUT", d: 0 }); continue; }
-    if (g.fbs > 0) { const d = Math.round(g.fbs / eff); if (d < LIMIT) low.push({ art: g.art, ch: "FBS", d }); }
-    if (g.stk > 0) { const d = Math.round(g.stk / eff); if (d < LIMIT) low.push({ art: g.art, ch: stkLabel, d }); }
+
+    const fbw = g.stk, fbs = g.fbs;
+    const dFbw = fbw > 0 ? Math.round(fbw / eff) : 0;
+    const dFbs = fbs > 0 ? Math.round(fbs / eff) : 0;
+
+    /* Полностью закончился на обоих каналах, а спрос есть — самый срочный сигнал. */
+    if (fbw <= 0 && fbs <= 0) {
+      low.push({ art: g.art, lead: "OUT", leadOut: true, leadDays: 0, other: null, sev: "red" });
+      continue;
+    }
+
+    /* Проблемный канал:
+       FBW — основной канал WB, тревожим при 0 или < LIMIT дней;
+       FBS — свой склад (опциональный): тревожим только если он в ходу (>0) и < LIMIT дней,
+       иначе засыплем алертами товары, которые по FBS вообще не продаются. */
+    const probFbw = fbw <= 0 || dFbw < LIMIT;
+    const probFbs = fbs > 0 && dFbs < LIMIT;
+    if (!probFbw && !probFbs) continue;
+
+    /* Ведущий канал = проблемный с меньшим запасом дней (при обоих проблемных — FBW). */
+    const leadFbw = probFbw && (!probFbs || dFbw <= dFbs);
+    const lead = leadFbw ? stkLabel : "FBS";
+    const leadOut = leadFbw ? fbw <= 0 : fbs <= 0;
+    const leadDays = leadFbw ? dFbw : dFbs;
+
+    const otherStk = leadFbw ? fbs : fbw;
+    const otherDays = leadFbw ? dFbs : dFbw;
+    const otherCh = leadFbw ? "FBS" : stkLabel;
+    /* Второй склад «прикрывает», если на нём есть остаток и хватает ≥ LIMIT дней →
+       не критично, значок жёлтый; иначе (второй тоже пуст/мало) — красный. */
+    const covered = otherStk > 0 && otherDays >= LIMIT;
+
+    low.push({
+      art: g.art, lead, leadOut, leadDays,
+      other: otherStk > 0 ? { ch: otherCh, days: otherDays } : null,
+      sev: covered ? "yellow" : "red",
+    });
   }
   over.sort((a, b) => (b.fbs - b.base) - (a.fbs - a.base));
-  low.sort((a, b) => a.d - b.d || a.ch.localeCompare(b.ch));
+  /* Красные (без прикрытия) выше жёлтых; внутри — по возрастанию запаса дней. */
+  low.sort((a, b) =>
+    (a.sev === "red" ? 0 : 1) - (b.sev === "red" ? 0 : 1)
+    || a.leadDays - b.leadDays
+    || a.lead.localeCompare(b.lead));
 
   const has = over.length || low.length;
   const ex = EXA[n];
@@ -56,19 +95,22 @@ export function alertsHTML(n) {
       <span style="font-weight:700;color:#7B2233;font-variant-numeric:tabular-nums" data-tip="FBS ${o.fbs} больше склада ${o.base}">${o.fbs}&nbsp;&gt;&nbsp;${o.base}</span>
     </div>`).join("");
 
-  const chip = (ch) => {
-    if (ch === "OUT")
-      return `<span style="flex:0 0 auto;padding:0 5px;border-radius:7px;font-size:9px;font-weight:700;background:#F7C9C4;color:#B3261E" data-tip="Закончился на всех каналах, а спрос есть">нет</span>`;
-    const fbs = ch === "FBS";
-    return `<span style="flex:0 0 auto;padding:0 5px;border-radius:7px;font-size:9px;font-weight:700;background:${fbs ? "#FBEBCF" : "#F7DDD9"};color:${fbs ? "#8A5A00" : "#B3261E"}">${ch}</span>`;
+  const chip = (a) => {
+    const red = a.sev === "red";
+    const label = a.lead === "OUT" ? "нет" : a.lead;
+    const tip = a.lead === "OUT" ? ' data-tip="Закончился на всех каналах, а спрос есть"' : "";
+    return `<span${tip} style="flex:0 0 auto;padding:0 5px;border-radius:7px;font-size:9px;font-weight:700;background:${red ? "#F7DDD9" : "#FBEBCF"};color:${red ? "#B3261E" : "#8A5A00"}">${label}</span>`;
   };
   const lowRows = lowShown.map((a) => {
-    const right = a.ch === "OUT" ? "закончился" : `${a.d}д`;
-    const col = a.ch === "OUT" || a.d < 2 ? "#B3261E" : "#8A5A00";
+    const daysFg = a.sev === "red" ? "#B3261E" : "#8A5A00";
+    const leadTxt = a.leadOut ? "закончился" : `${a.leadDays}д`;
+    const otherTxt = a.other
+      ? `<span style="color:var(--ink3);font-weight:600">, ${a.other.ch}&nbsp;${a.other.days}д</span>`
+      : "";
     return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:18px">
-      ${chip(a.ch)}
+      ${chip(a)}
       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(a.art)}">${esc(a.art)}</span>
-      <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${col}">${right}</span>
+      <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${daysFg};white-space:nowrap">${leadTxt}${otherTxt}</span>
     </div>`;
   }).join("");
 
