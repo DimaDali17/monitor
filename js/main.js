@@ -1,6 +1,6 @@
 import { VERSION } from "./config.js";
 import {
-  D, EXP, EXS, EXD, EXA, OA, OAD, OAC, SS, DS, FA, FP,
+  D, EXP, EXS, EXD, EXA, OA, OAD, OAC, SS, DS, FSS, FA, FP,
   CM, CV, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -8,7 +8,7 @@ import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal } from "./api/sheets.js";
 import { loadWB } from "./api/wb.js";
 import { loadOZ } from "./api/ozon.js";
-import { renderCabinet, repaintStocks, repaintDeficit } from "./render/cabinet.js";
+import { renderCabinet, repaintStocks, repaintDeficit, repaintFbsStocks } from "./render/cabinet.js";
 import { renderConso, logConso } from "./render/conso.js";
 import { multiSizeArts, allSizesOpen } from "./render/deficit.js";
 import { fpInput, faInput, fgInput } from "./render/filters.js";
@@ -205,6 +205,12 @@ const App = {
     repaintStocks(n);
   },
   togExS(n) { EXS[n] = !EXS[n]; repaintStocks(n); },
+
+  /* остатки по FBS — точечная перерисовка (сортировка по любому заголовку) */
+  sortFS(n, c) {
+    FSS[n] = FSS[n].c === c ? { c, d: -FSS[n].d } : { c, d: -1 };
+    repaintFbsStocks(n);
+  },
 
   /* дефицит — точечная перерисовка */
   sortD(n, c) {
