@@ -16,6 +16,11 @@ import { normSz } from "../utils.js";
    Главный = артикул с наименьшим номером в конце имени (num1 < num3;
    сравнение числовое, поэтому num2 < num10). Так сырьё не задваивается,
    а суммарный остаток совпадает с суммой строк.
+   ПРИОРИТЕТ КОЛОНКИ: сначала выбираем среди артикулов из колонки «Арт ВБ»
+   (основной столбец в «Арт производ»); «Арт ВБ2» — только запасной вариант.
+   Если среди «Арт ВБ» кандидатов нет — тогда берём наименьший из «Арт ВБ2».
+   Пример: пул с «Арт ВБ»=Pantal.SK.blacknew.02 и «Арт ВБ2»=Pantal.SK.black.01 —
+   главный = blacknew.02 (хотя .01 < .02, но .01 лежит только в «Арт ВБ2»).
    ══════════════════════════════════════════════════════════ */
 
 const COLOR_MAP = {
@@ -65,6 +70,7 @@ export const sheets = {
   rawByArt: {},     /* wbArt → шт (только пулы, где он главный) */
   rawKeysByArt: {}, /* wbArt → Set(ключ сырья) — какие пулы связаны с артикулом */
   rawUsers: {},     /* ключ сырья → Set(wbArt) — кто связан с пулом (size>1 ⇒ общий) */
+  rawPrimaryCol: {},/* ключ сырья → Set(wbArt) — кто пришёл из колонки «Арт ВБ» (приоритет для главного) */
   rawPrimary: {},   /* ключ сырья → wbArt-главный, кому отнесён остаток пула */
   setByRawKey: {},  /* ключ сырья → «В наборе штук»: сырьё(штук) / set = наборы */
 };
@@ -158,19 +164,22 @@ export function loadExternal() {
           const rkSet = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
           sheets.setByRawKey[rkSet] = setN;
         }
-        /* «Арт ВБ2» может содержать несколько артикулов через перенос строки —
-           разбиваем, иначе многострочная ячейка станет одним фантомным артикулом
-           (дубли в подписи пула, кривой расчёт). */
-        [row["Арт ВБ"], row["Арт ВБ2"]]
-          .flatMap((cell) => String(cell || "").split(/[\r\n]+/))
-          .map((x) => x.trim())
-          .filter(Boolean)
-          .forEach((wbArt) => {
-            if (!artPr) return;
-            const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
-            (sheets.map[k] ||= []).push({ artPr, szPr });
-            sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
-          });
+        /* «Арт ВБ»/«Арт ВБ2» могут содержать несколько артикулов через перенос
+           строки — разбиваем, иначе многострочная ячейка станет одним фантомным
+           артикулом (дубли в подписи пула, кривой расчёт).
+           col помечает столбец-источник: 1 = «Арт ВБ» (основной), 2 = «Арт ВБ2».
+           Главный артикул пула выбираем с приоритетом col=1 (см. buildIndexes). */
+        const pushLinks = (cell, col) => {
+          if (!artPr) return;
+          String(cell || "").split(/[\r\n]+/).map((x) => x.trim()).filter(Boolean)
+            .forEach((wbArt) => {
+              const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
+              (sheets.map[k] ||= []).push({ artPr, szPr, col });
+              sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
+            });
+        };
+        pushLinks(row["Арт ВБ"], 1);
+        pushLinks(row["Арт ВБ2"], 2);
       });
 
       /* Остатки сводная: сырьё + СГП в одном листе.
@@ -226,6 +235,7 @@ function buildIndexes() {
   sheets.rawByArt = {};
   sheets.rawKeysByArt = {};
   sheets.rawUsers = {};
+  sheets.rawPrimaryCol = {};
   sheets.rawPrimary = {};
   sheets.revMap = {};
   /* setByRawKey строится при разборе маппинга (в loadExternal), здесь не трогаем */
@@ -240,8 +250,11 @@ function buildIndexes() {
   for (const [k, mappings] of Object.entries(sheets.map)) {
     const wbArt = k.split(";")[0];
     (seenPerArt[wbArt] ||= new Set());
-    for (const { artPr, szPr } of mappings) {
+    for (const { artPr, szPr, col } of mappings) {
       const kp = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+      /* приоритет главного: артикулы из колонки «Арт ВБ» (col=1) — вне дедупа,
+         чтобы пометка не потерялась, если артикул есть и в «Арт ВБ», и в «Арт ВБ2» */
+      if (col === 1) (sheets.rawPrimaryCol[kp] ||= new Set()).add(wbArt);
       if (seenPerArt[wbArt].has(kp)) continue;
       seenPerArt[wbArt].add(kp);
       (sheets.rawKeysByArt[wbArt] ||= new Set()).add(kp);
@@ -261,9 +274,15 @@ function buildIndexes() {
     }
   }
 
-  /* Pass 2: главный артикул каждого пула */
+  /* Pass 2: главный артикул каждого пула.
+     Приоритет — артикулы из колонки «Арт ВБ» (col=1): среди них берём наименьший
+     порядковый номер. Если в пуле нет ни одного из «Арт ВБ» (все пришли из «Арт ВБ2»)
+     — выбираем среди всех участников. Так остаток пула лежит на «настоящем»
+     артикуле ВБ, а не на том, что случайно оказался в «Арт ВБ2» с меньшим номером. */
   for (const [rk, users] of Object.entries(sheets.rawUsers)) {
-    sheets.rawPrimary[rk] = primaryOf(users);
+    const col1 = sheets.rawPrimaryCol[rk];
+    const pool = col1 && col1.size ? [...col1] : [...users];
+    sheets.rawPrimary[rk] = primaryOf(pool);
   }
 
   /* Pass 3: остаток сырья на артикул — только пулы, где он главный */
