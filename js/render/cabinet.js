@@ -6,7 +6,7 @@ import { alertsHTML } from "./alerts.js";
 import { metricsHTML } from "./metrics.js";
 import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
-import { stocksHTML, stocksTbl, fbsStocksHTML } from "./stocks.js";
+import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl } from "./stocks.js";
 import { deficitHTML, defTbl } from "./deficit.js";
 
 /* Раньше renderWB и renderOZ были почти одинаковыми копиями.
@@ -41,4 +41,9 @@ export function repaintStocks(n) {
 export function repaintDeficit(n) {
   const el = document.getElementById("dtbl" + n);
   if (el && VM[n]) el.innerHTML = defTbl(n);
+}
+
+export function repaintFbsStocks(n) {
+  const el = document.getElementById("fbstbl" + n);
+  if (el && VM[n]) el.innerHTML = fbsStocksTbl(n);
 }

@@ -1,4 +1,4 @@
-import { VM, SS, FS, FSZ, OA, EXS, FA } from "../state.js";
+import { VM, SS, FSS, FS, FSZ, OA, EXS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
 import { getStocksForArt } from "../api/sheets.js";
@@ -134,31 +134,63 @@ export function stocksTbl(n) {
 }
 
 /* ══════════ Остатки по FBS (отдельный блок) ══════════
-   Артикул · Сырьё+СГП · FBS общий · FBS по складам (колонки). Экспорт в Excel. */
+   Артикул · Сырьё+СГП · FBS общий · FBS по складам (колонки).
+   Каркас + тело: сортировка перерисовывает только #fbstbl, как и в остальных таблицах. */
 export function fbsStocksHTML(n) {
   const vm = VM[n];
   if (!vm) return "";
   const fbsMap = vm.fbs || {};
+  if (!Object.keys(fbsMap).length) return "";          /* нет FBS-данных — блок не показываем */
+
+  const whCount = Object.keys(vm.fbsWh || {}).length;
+  const posCount = new Set(Object.keys(fbsMap).map((k) => k.split(" · ")[0].toLowerCase())).size;
+
+  return `<div class="sec">
+    <div class="sh">
+      <span class="st">Остатки по FBS</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <span class="sm2">${posCount} позиций · ${whCount} складов</span>
+        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'FBS','fbs')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
+      </span>
+    </div>
+    <div class="sw" id="fbstbl${n}">${fbsStocksTbl(n)}</div>
+  </div>`;
+}
+
+export function fbsStocksTbl(n) {
+  const vm = VM[n];
+  if (!vm) return '<div class="em">Нет данных</div>';
+  const fbsMap = vm.fbs || {};
   const fbsCells = vm.fbsCells || {};
-  if (!Object.keys(fbsMap).length) return "";           /* нет FBS-данных — блок не показываем */
 
   const whList = Object.keys(vm.fbsWh || {}).sort((a, b) => (vm.fbsWh[b] || 0) - (vm.fbsWh[a] || 0));
 
   const byArt = {};
   const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, fbs: 0, wh: {} });
   for (const [k, v] of Object.entries(fbsMap)) { const g = add(k.split(" · ")[0]); g.art = k.split(" · ")[0]; g.fbs += v; }
-  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w, q] of Object.entries(wm)) g.wh[w] = (g.wh[w] || 0) + q; }
+  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w, qy] of Object.entries(wm)) g.wh[w] = (g.wh[w] || 0) + qy; }
 
-  const rows = Object.values(byArt)
-    .map((g) => { const s = getStocksForArt(g.art); return { art: g.art, base: s.sgp + s.raw, fbs: g.fbs, wh: g.wh }; })
-    .sort((a, b) => a.art.localeCompare(b.art));
+  const rows = Object.values(byArt).map((g) => {
+    const s = getStocksForArt(g.art);
+    return { art: g.art, base: s.sgp + s.raw, fbs: g.fbs, wh: g.wh };
+  });
+
+  /* Сортировка по любому заголовку: артикул (строка), Сырьё+СГП, FBS общий и любой склад (числа). */
+  const { c, d: dir } = FSS[n];
+  const keyOf = (r) => (c === "base" ? r.base : c === "fbs" ? r.fbs : (r.wh[c] || 0));
+  rows.sort((a, b) =>
+    c === "art" ? a.art.localeCompare(b.art) * dir : (keyOf(a) - keyOf(b)) * dir);
+
+  const arrow = (k) => (FSS[n].c === k ? (FSS[n].d < 0 ? " ↓" : " ↑") : " ↕");
+  const cls = (k) => (FSS[n].c === k ? " sa" : "");
 
   const whHead = whList.map((w) =>
-    `<th style="text-align:center;background:#FBE9E7;color:#8B4513"><span style="font-size:9px">${esc(w)}</span></th>`).join("");
+    `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513" onclick="App.sortFS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
+    `<span style="font-size:9px">${esc(w)}</span>${arrow(w)}</th>`).join("");
 
   const body = rows.map((r) => {
     const over = r.fbs > r.base;
-    const cells = whList.map((w) => { const q = r.wh[w] || 0; return `<td style="text-align:center;font-size:11px;color:#8B4513">${q || "—"}</td>`; }).join("");
+    const cells = whList.map((w) => { const qy = r.wh[w] || 0; return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`; }).join("");
     return `<tr>
       <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>
       <td style="text-align:center">${r.base || "—"}</td>
@@ -167,22 +199,13 @@ export function fbsStocksHTML(n) {
     </tr>`;
   }).join("");
 
-  return `<div class="sec">
-    <div class="sh">
-      <span class="st">Остатки по FBS</span>
-      <span style="display:flex;align-items:center;gap:8px">
-        <span class="sm2">${rows.length} позиций · ${whList.length} складов</span>
-        <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'FBS','fbs')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
-      </span>
-    </div>
-    <div class="sw"><table>
-      <thead><tr>
-        <th style="text-align:left">Артикул</th>
-        <th style="text-align:center" data-tip="Сырьё (в наборах) + СГП — реальное наличие">Сырьё+СГП</th>
-        <th style="text-align:center" data-tip="Остаток FBS по всем вашим складам">FBS общий</th>
-        ${whHead}
-      </tr></thead>
-      <tbody>${body || '<tr><td class="em" colspan="99">Нет FBS-остатков</td></tr>'}</tbody>
-    </table></div>
-  </div>`;
+  return `<table>
+    <thead><tr>
+      <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortFS(${n},'art')">Артикул${arrow('art')}</th>
+      <th class="${cls('base')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'base')" data-tip="Сырьё (в наборах) + СГП — реальное наличие">Сырьё+СГП${arrow('base')}</th>
+      <th class="${cls('fbs')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'fbs')" data-tip="Остаток FBS по всем вашим складам">FBS общий${arrow('fbs')}</th>
+      ${whHead}
+    </tr></thead>
+    <tbody>${body || '<tr><td class="em" colspan="99">Нет FBS-остатков</td></tr>'}</tbody>
+  </table>`;
 }
