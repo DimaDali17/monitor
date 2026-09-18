@@ -1,4 +1,4 @@
-import { VM, SS, FSS, FS, FSZ, OA, EXS, FA } from "../state.js";
+import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
 import { getStocksForArt } from "../api/sheets.js";
@@ -188,7 +188,9 @@ export function fbsStocksTbl(n) {
     `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513" onclick="App.sortFS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
     `<span style="font-size:9px">${esc(w)}</span>${arrow(w)}</th>`).join("");
 
-  const body = rows.map((r) => {
+  /* Свёрнуто до LIM строк, ниже — кнопка «Все N / Свернуть» (как в «Остатки по складам»). */
+  const shown = EXFS[n] ? rows : rows.slice(0, LIM);
+  const body = shown.map((r) => {
     const over = r.fbs > r.base;
     const cells = whList.map((w) => { const qy = r.wh[w] || 0; return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`; }).join("");
     return `<tr>
@@ -199,6 +201,11 @@ export function fbsStocksTbl(n) {
     </tr>`;
   }).join("");
 
+  const span = whList.length + 3;
+  const more = rows.length > LIM
+    ? `<tr class="er"><td class="stick" colspan="${span}"><button class="eb" onclick="App.togExFS(${n})">${EXFS[n] ? "▲ Свернуть" : "▼ Все " + rows.length}</button></td></tr>`
+    : "";
+
   return `<table>
     <thead><tr>
       <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortFS(${n},'art')">Артикул${arrow('art')}</th>
@@ -206,6 +213,6 @@ export function fbsStocksTbl(n) {
       <th class="${cls('fbs')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'fbs')" data-tip="Остаток FBS по всем вашим складам">FBS общий${arrow('fbs')}</th>
       ${whHead}
     </tr></thead>
-    <tbody>${body || '<tr><td class="em" colspan="99">Нет FBS-остатков</td></tr>'}</tbody>
+    <tbody>${body || '<tr><td class="em" colspan="99">Нет FBS-остатков</td></tr>'}${more}</tbody>
   </table>`;
 }
