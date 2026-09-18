@@ -1,6 +1,6 @@
 import { VERSION } from "./config.js";
 import {
-  D, EXP, EXS, EXD, EXA, OA, OAD, OAC, SS, DS, FSS, FA, FP,
+  D, EXP, EXS, EXFS, EXD, EXA, OA, OAD, OAC, SS, DS, FSS, FA, FP,
   CM, CV, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -211,6 +211,7 @@ const App = {
     FSS[n] = FSS[n].c === c ? { c, d: -FSS[n].d } : { c, d: -1 };
     repaintFbsStocks(n);
   },
+  togExFS(n) { EXFS[n] = !EXFS[n]; repaintFbsStocks(n); },
 
   /* дефицит — точечная перерисовка */
   sortD(n, c) {
