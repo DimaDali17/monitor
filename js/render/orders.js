@@ -25,7 +25,9 @@ export function ordersHTML(n, vm, type) {
     const wk = iso(Date.now() - 30 * 864e5);
     orders = (vm.allOrders || []).filter((o) => (timeOf(o) || "").slice(0, 10) >= wk);
   } else if (mode === "week") orders = vm.orders7 || [];
+  else if (mode === "yesterday") orders = vm.yestO || [];
   else orders = vm.todayO || [];
+  const ordTitle = weekMode ? "Заказы за период" : mode === "yesterday" ? "Заказы вчера" : "Заказы сегодня";
   const fm = OFM[n] || "all";
   const sortedAll = [...orders].sort((a, b) => new Date(timeOf(b)) - new Date(timeOf(a)));
   const sorted = type === "wb" && fm !== "all"
@@ -95,7 +97,7 @@ export function ordersHTML(n, vm, type) {
 
   return `<div class="sec">
     <div class="sh">
-      <span class="st">${weekMode ? "Заказы за период" : "Заказы сегодня"}</span>
+      <span class="st">${ordTitle}</span>
       <span style="display:flex;align-items:center;gap:8px">
         ${type === "wb" ? `<span class="ctog">
           <button class="${fm === "all" ? "on" : ""}" onclick="App.setOrdFilter(${n},'all')">Все</button>

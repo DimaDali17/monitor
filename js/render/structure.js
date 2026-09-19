@@ -2,7 +2,7 @@ import { VM, CM, GB } from "../state.js";
 import { esc, iso } from "../utils.js";
 import { artGroup } from "../api/sheets.js";
 
-/* Структура спроса за выбранный диапазон (день/неделя/месяц — как у графика),
+/* Структура спроса за выбранный диапазон (вчера/день/неделя/месяц — как у графика),
    заказы (штуки) сгруппированы по Предмету или по Кратко-группе.
    Переключатель Предмет/Группа — GB[n]. */
 export function structureHTML(n) {
@@ -11,7 +11,7 @@ export function structureHTML(n) {
   const mode = CM[n] || "day";
   const level = GB[n] || "predmet";
   const type = vm.isOz ? "oz" : "wb";
-  const modeName = mode === "day" ? "сегодня" : mode === "week" ? "неделя" : "месяц";
+  const modeName = mode === "day" ? "сегодня" : mode === "yesterday" ? "вчера" : mode === "week" ? "неделя" : "месяц";
 
   /* Заказы за диапазон — тот же принцип, что и в графике */
   let orders;
@@ -20,7 +20,8 @@ export function structureHTML(n) {
     const w = iso(Date.now() - 30 * 864e5);
     const dOf = (o) => ((type === "wb" ? o.date : o.in_process_at || o.created_at) || "").slice(0, 10);
     orders = (vm.allOrders || []).filter((o) => dOf(o) >= w);
-  } else orders = vm.todayO || [];
+  } else if (mode === "yesterday") orders = vm.yestO || [];
+  else orders = vm.todayO || [];
 
   /* Артикул поставщика: WB — supplierArticle; Ozon — база offer_id до последнего "_" */
   const baseOz = (oid) => {
