@@ -82,6 +82,46 @@ async function fetchOzon(force) {
     return out;
   });
 
+  /* FBS-остатки Ozon (склад продавца). Аналитика stock_on_warehouses их НЕ даёт —
+     берём канонический product/info/stocks (v4): по каждому offer_id в массиве stocks
+     есть запись type:"fbs" с present (физический остаток на складе продавца).
+     Складской разбивки этот метод не возвращает → кладём всё в один столбец «FBS».
+     Обёрнуто в try/catch: сбой FBS не должен ронять заказы и FBO-остатки. */
+  const fbsItems = await cached("oz:fbs", force, async () => {
+    const out = [];
+    try {
+      let cursor = "";
+      for (let p = 0; p < 40; p++) {
+        const d = await ozPost(`${OZ_BASE}/v4/product/info/stocks`, {
+          cursor,
+          filter: { visibility: "ALL" },
+          limit: 1000,
+        });
+        const items = d.items || d.result?.items || [];
+        out.push(...items);
+        cursor = d.cursor ?? d.result?.last_id ?? "";
+        if (!items.length || !cursor) break;
+      }
+    } catch (e) {
+      console.warn("Ozon FBS (product/info/stocks) недоступен:", e.message);
+    }
+    return out;
+  });
+
+  const fbs = {}, fbsCells = {}, fbsWh = {};
+  const FBS_WH = "FBS";
+  for (const it of fbsItems) {
+    const art = it.offer_id || it.item_code || "—";
+    const st = (it.stocks || []).find((s) => String(s.type || "").toLowerCase() === "fbs");
+    const qy = st ? (st.present ?? st.amount ?? 0) : 0;
+    if (!qy) continue;
+    const key = art + " · —";
+    fbs[key] = (fbs[key] || 0) + qy;
+    fbsWh[FBS_WH] = (fbsWh[FBS_WH] || 0) + qy;
+    (fbsCells[key] ||= {})[FBS_WH] = (fbsCells[key][FBS_WH] || 0) + qy;
+  }
+  console.log(`Ozon FBS: позиций ${Object.keys(fbs).length}, всего ${fbsWh[FBS_WH] || 0} шт`);
+
   const dayOf = (o) => (o.created_at || o.in_process_at || "").slice(0, 10);
 
   D[3] = {
@@ -91,6 +131,7 @@ async function fetchOzon(force) {
     yestO: postings.filter((o) => dayOf(o) === y),
     orders7: postings.filter((o) => dayOf(o) >= w),
     stocks,
+    fbs, fbsCells, fbsWh,
   };
   return D[3];
 }
