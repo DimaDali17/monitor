@@ -30,7 +30,7 @@ export function alertsHTML(n) {
 
   const over = [], low = [];
   for (const g of Object.values(byArt)) {
-    if (g.fbs > 0) {
+    if (!vm.isOz && g.fbs > 0) {
       const { sgp, raw } = getStocksForArt(g.art);
       if (g.fbs > sgp + raw) over.push({ art: g.art, fbs: g.fbs, base: sgp + raw });
     }

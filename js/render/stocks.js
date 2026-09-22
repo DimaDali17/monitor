@@ -191,7 +191,7 @@ export function fbsStocksTbl(n) {
   /* Свёрнуто до LIM строк, ниже — кнопка «Все N / Свернуть» (как в «Остатки по складам»). */
   const shown = EXFS[n] ? rows : rows.slice(0, LIM);
   const body = shown.map((r) => {
-    const over = r.fbs > r.base;
+    const over = !vm.isOz && r.fbs > r.base;
     const cells = whList.map((w) => { const qy = r.wh[w] || 0; return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`; }).join("");
     return `<tr>
       <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>

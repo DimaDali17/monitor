@@ -279,7 +279,7 @@ export function defTbl(n) {
     const dWb = effDr > 0 ? Math.round(g.stk / effDr) : null;
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
     const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
-    const fbsOver = fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё */
+    const fbsOver = !vm.isOz && fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника) */
     const dSeason = seasonalDays(artSeason(art), g.stk + fbsArt, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
@@ -392,7 +392,7 @@ export function defTbl(n) {
       trs += `<tr class="sz-row">
         <td style="padding-left:28px;font-weight:600">${esc(s.sz)}</td>
         <td class="${qc(s.total, 10)}" style="text-align:center;font-weight:600">${s.total}</td>
-        <td class="td-ref" style="text-align:center;font-size:11px" data-tip="${fbsWhTip(fbsCells[r.art + " · " + s.sz])}">${(fbsMap[r.art + " · " + s.sz] || 0) ? (fbsMap[r.art + " · " + s.sz] + ((fbsMap[r.art + " · " + s.sz] || 0) > sgp + raw ? fbsOverMark(fbsMap[r.art + " · " + s.sz], sgp + raw) : "")) : "—"}</td>
+        <td class="td-ref" style="text-align:center;font-size:11px" data-tip="${fbsWhTip(fbsCells[r.art + " · " + s.sz])}">${(fbsMap[r.art + " · " + s.sz] || 0) ? (fbsMap[r.art + " · " + s.sz] + (!vm.isOz && (fbsMap[r.art + " · " + s.sz] || 0) > sgp + raw ? fbsOverMark(fbsMap[r.art + " · " + s.sz], sgp + raw) : "")) : "—"}</td>
         <td class="${qc(sgp, 10)}" style="text-align:center;font-size:11px;color:var(--sgp)">${sgp || "—"}</td>
         <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${rawCellSz}</td>
         <td class="${qc(total, 15)}" style="text-align:center;font-weight:600;border-right:2px solid #C7BFB0">${total}</td>
