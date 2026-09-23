@@ -254,8 +254,8 @@ export function chartHTML(n, vm, type) {
       <div style="flex:1 1 0;min-width:0">
         <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
       </div>
-      <div style="flex:0 0 236px;min-width:0;max-height:170px;overflow:auto;padding-left:10px;border-left:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--ink3);margin-bottom:2px">Итоги за период · <span style="font-weight:700;color:var(--ink)">${fv(grand)}</span> ${unit}</div>
+      <div style="flex:0 0 240px;min-width:0;align-self:center;padding-left:12px;border-left:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--ink3);margin-bottom:4px">Итоги за период · <span style="font-weight:700;color:var(--ink)">${fv(grand)}</span> ${unit}</div>
         ${totals}
       </div>
     </div>
