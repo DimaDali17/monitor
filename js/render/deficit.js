@@ -242,6 +242,23 @@ export function defTbl(n) {
     g.sizes.push({ ...v, o7, msk });
   }
 
+  /* Ozon часто целиком на FBS: таких артикулов нет в стоках FBO (arts) → строк в
+     дефиците нет. Досеиваем их из FBS-остатков и из заказов, иначе таблица пуста.
+     Только для Ozon, чтобы не менять поведение дефицита WB. */
+  if (vm.isOz) {
+    const ensure = (art, name) => (byArt[art] ||= { name: name || art, stk: 0, o7: 0, msk: 0, sizes: [] });
+    const seedSz = (art, sz, o7) => {
+      if (!art || art === "—") return;
+      const g = ensure(art);
+      sz = sz || "—";
+      if (g.sizes.some((s) => (s.sz || "—") === sz)) return;   /* размер уже есть — не дублируем */
+      g.sizes.push({ art, sz, name: g.name, total: 0, wh: {}, o7, msk: 0 });
+      g.o7 += o7;
+    };
+    for (const key of Object.keys(fbsMap)) { const [a, s] = key.split(" · "); seedSz(a, s, orderMap[key] || 0); }
+    for (const [key, o7] of Object.entries(orderMap)) { const [a, s] = key.split(" · "); seedSz(a, s, o7); }
+  }
+
   /* Размеры, которых нет в стоках WB, но есть в СГП/сырье */
   for (const [mapKey] of Object.entries(sheets.map)) {
     const [wbArt, wbSz] = mapKey.split(";");
