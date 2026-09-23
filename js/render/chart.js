@@ -207,21 +207,34 @@ export function chartHTML(n, vm, type) {
     if (colTot > 0) bars += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600">${fv(colTot)}</text>`;
   }
 
-  /* Легенда слева: клик — глубже (или solo на листе) */
+  /* Правый блок «Итоги за период»: гистограмма сумм по сериям за выбранный период + доля.
+     Клик по строке — глубже (или solo на листе), как раньше в легенде. */
   const drillable = level < 3;
   const otherTotal = ev.reduce((s, e) => s + (topSet.has(catOf(e)) ? 0 : e.val), 0);
-  const shortName = (s) => (s.length > 24 ? "…" + s.slice(-23) : s);   /* режем С НАЧАЛА — хвост различает */
-  const legend = segOrder.map((seg) => {
+  const shortName = (s) => (s.length > 22 ? "…" + s.slice(-21) : s);   /* режем С НАЧАЛА — хвост различает */
+  const segVal = (seg) => (seg === "Прочее" ? otherTotal : (catTotal[seg] || 0));
+  const grand = segOrder.reduce((s, seg) => s + segVal(seg), 0);
+  const maxVal = Math.max(1, ...segOrder.map(segVal));
+  const unit = isRev ? "₽" : "шт";
+  const totals = segOrder.map((seg) => {
     const clickable = seg !== "Прочее";
     const act = clickable ? `onclick="App.chartDrill(${n},'${q(seg)}')"` : "";
     const active = solo === seg;
-    const st = active ? "font-weight:700;" : (solo ? "opacity:.45;" : "");
-    const segVal = seg === "Прочее" ? otherTotal : (catTotal[seg] || 0);
+    const st = active ? "font-weight:700;" : (solo ? "opacity:.4;" : "");
+    const v = segVal(seg);
+    const w = Math.max(2, Math.round((v / maxVal) * 100));
+    const pct = grand ? Math.round((v / grand) * 100) : 0;
     const tip = clickable ? (drillable ? " — раскрыть" : " — только он") : "";
-    return `<div ${act} style="display:flex;align-items:center;gap:6px;font-size:10px;margin:2px 0;${clickable ? "cursor:pointer;" : "color:var(--ink3);"}${st}" title="${esc(seg)}${tip}">
-      <span style="flex:0 0 10px;width:10px;height:10px;border-radius:2px;background:${colorOf(seg)}"></span>
-      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(shortName(seg))}</span>
-      <span style="font-variant-numeric:tabular-nums;color:var(--ink3)">${fv(segVal)}</span>
+    return `<div ${act} title="${esc(seg)}${tip}" style="margin:4px 0;${clickable ? "cursor:pointer;" : "color:var(--ink3);"}${st}">
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;line-height:14px">
+        <span style="flex:0 0 9px;width:9px;height:9px;border-radius:2px;background:${colorOf(seg)}"></span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(shortName(seg))}</span>
+        <span style="font-variant-numeric:tabular-nums;font-weight:600">${fv(v)}</span>
+        <span style="flex:0 0 30px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums">${pct}%</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:3px;height:6px;margin:2px 0 0 14px">
+        <div style="width:${w}%;height:100%;background:${colorOf(seg)};border-radius:3px"></div>
+      </div>
     </div>`;
   }).join("");
 
@@ -236,13 +249,14 @@ export function chartHTML(n, vm, type) {
   return `<div class="sec" style="margin-bottom:14px">
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName}</span></span>${controls}</div>
     <div style="font-size:11px;margin:2px 2px 8px">${crumbs}
-      <span style="color:var(--ink3);font-size:10px;margin-left:8px">${drillable ? "клик по легенде — глубже" : "клик по легенде — оставить только его"}</span></div>
-    <div class="tw" style="padding:8px;display:flex;gap:10px;align-items:stretch">
-      <div style="flex:0 0 188px;max-height:150px;overflow:auto;padding-right:2px">
-        ${legend}
-      </div>
-      <div style="flex:1;min-width:0">
+      <span style="color:var(--ink3);font-size:10px;margin-left:8px">${drillable ? "клик по строке справа — глубже" : "клик по строке справа — оставить только его"}</span></div>
+    <div class="tw" style="padding:8px;display:flex;gap:12px;align-items:stretch">
+      <div style="flex:1 1 0;min-width:0">
         <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
+      </div>
+      <div style="flex:0 0 236px;min-width:0;max-height:170px;overflow:auto;padding-left:10px;border-left:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--ink3);margin-bottom:2px">Итоги за период · <span style="font-weight:700;color:var(--ink)">${fv(grand)}</span> ${unit}</div>
+        ${totals}
       </div>
     </div>
   </div>`;
