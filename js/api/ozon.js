@@ -51,7 +51,7 @@ export function loadOZ({ force = false } = {}) {
 async function fetchOzon(force) {
   const t = td(), y = yd(), w = wd(), from = daysAgo(ORDERS_DAYS);
 
-  const postings = await cached("oz:orders", force, async () => {
+  const postingsFbo = await cached("oz:orders", force, async () => {
     const out = [];
     for (let p = 0, offset = 0; p < 10; p++, offset += 1000) {
       const d = await ozPost(`${OZ_BASE}/v2/posting/fbo/list`, {
@@ -66,6 +66,32 @@ async function fetchOzon(force) {
     }
     return out;
   });
+
+  /* FBS-заказы (свой склад) — отдельная ручка posting/fbs/list, раньше не грузились.
+     Формат postings тот же (products, in_process_at/created_at), поэтому просто
+     объединяем с FBO в общий список. try/catch: сбой FBS не рушит FBO. */
+  const postingsFbs = await cached("oz:orders_fbs", force, async () => {
+    const out = [];
+    try {
+      for (let p = 0, offset = 0; p < 10; p++, offset += 1000) {
+        const d = await ozPost(`${OZ_BASE}/v3/posting/fbs/list`, {
+          dir: "DESC",
+          filter: { since: from + "T00:00:00.000Z", to: t + "T23:59:59.999Z" },
+          limit: 1000,
+          offset,
+        });
+        const arr = d.result?.postings || (Array.isArray(d.result) ? d.result : []);
+        out.push(...arr.map((o) => ({ ...o, _fbs: true })));
+        if (arr.length < 1000) break;
+      }
+    } catch (e) {
+      console.warn("Ozon FBS-заказы недоступны:", e.message);
+    }
+    return out;
+  });
+
+  const postings = [...postingsFbo, ...postingsFbs];
+  console.log(`Ozon заказы: FBO ${postingsFbo.length} + FBS ${postingsFbs.length} = ${postings.length}`);
 
   const stocks = await cached("oz:stocks", force, async () => {
     const out = [];
