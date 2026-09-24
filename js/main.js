@@ -190,6 +190,13 @@ const App = {
   },
   rmFG(n, i) { FG[n].splice(i, 1); renderCabinet(n); },
   clearFilters(n) { FA[n] = []; FP[n] = []; FG[n] = []; renderCabinet(n); },
+  /* Подъём по крошкам «Структуры спроса»: очищаем фильтры глубже выбранного уровня */
+  structUp(n, lvl) {
+    if (lvl === "root") { FA[n] = []; FP[n] = []; FG[n] = []; }
+    else if (lvl === "sub") { FA[n] = []; FG[n] = []; }
+    else if (lvl === "grp") { FA[n] = []; }
+    renderCabinet(n);
+  },
   setOrdFilter(n, v) { OFM[n] = v; renderCabinet(n); },
 
   /* заказы */
