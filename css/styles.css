@@ -85,12 +85,12 @@ tbody tr:hover{background:var(--bg3)}
 .sz-row td:first-child{padding-left:28px}
 .tog{display:inline-block;width:16px;text-align:center;font-size:10px;color:var(--ink3);margin-right:4px}
 .fb{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;position:relative}
-.fb input{flex:1;min-width:160px;padding:7px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0}
+.fb input{flex:1;min-width:100px;padding:7px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--ink);font-family:inherit;outline:0}
 .fb input:focus{border-color:var(--ink)}
 .filter-bar{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:0;box-shadow:0 2px 8px rgba(0,0,0,.04)}
 .filter-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
 .filter-row:last-of-type{margin-bottom:0}
-.filter-label{font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;padding-top:7px;min-width:90px}
+.filter-label{font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;padding-top:7px;min-width:72px}
 .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:var(--ink);color:var(--bg3);border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
 .chip .cx{cursor:pointer;opacity:.7;font-size:13px;line-height:1}.chip .cx:hover{opacity:1}
 .ddrop{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.1);display:none}
