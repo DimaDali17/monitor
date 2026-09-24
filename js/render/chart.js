@@ -1,4 +1,4 @@
-import { CM, CV, CD } from "../state.js";
+import { CM, CV, CD, FP, FG } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
 
@@ -138,10 +138,14 @@ export function chartHTML(n, vm, type) {
     </div>`;
   }
 
-  /* ══════════ ГЛУБЖЕ — стек по уровням ══════════ */
-  const level = cd.group ? 3 : cd.predmet ? 2 : 1;
+  /* ══════════ ГЛУБЖЕ — стек по уровням ══════════
+     Уровень берём из ОБЩИХ фильтров (как в «Структуре спроса»), а не из своего drill:
+     нет предмета → по предметам; выбран предмет → по группам; предмет+группа → по артикулам.
+     VM уже отфильтрован по FP/FG/FA, поэтому дополнительный фокус не нужен. */
+  const level = FP[n].length && FG[n].length ? 3 : FP[n].length ? 2 : 1;
 
-  /* Классификация заказа: {predmet, group, art} + значение (шт/₽) */
+  /* Классификация заказа: {predmet, group, art} + значение (шт/₽).
+     Предмет = o.subject (WB) / первое слово name (Ozon) — так же, как в фильтре и «Структуре». */
   const baseOz = (oid) => { const s = oid || ""; const i = s.lastIndexOf("_"); return i > 0 ? s.slice(0, i) : s; };
   const classify = [];
   ordersFor().forEach((o) => {
@@ -150,7 +154,7 @@ export function chartHTML(n, vm, type) {
     if (type === "wb") {
       const art = o.supplierArticle || "—";
       const g = artGroup(art);
-      classify.push({ i, predmet: (g && g.predmet) || o.subject || o.category || "—", group: (g && g.kratko) || "— без группы —", art, val: isRev ? price(o) : (o.quantity || 1) });
+      classify.push({ i, predmet: o.subject || o.category || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art, val: isRev ? price(o) : (o.quantity || 1) });
     } else {
       const items = o.products || [];
       const tot = items.reduce((s, p) => s + (p.quantity || 1), 0) || 1;
@@ -159,14 +163,12 @@ export function chartHTML(n, vm, type) {
         const art = baseOz(p.offer_id);
         const g = artGroup(art);
         const qy = p.quantity || 1;
-        classify.push({ i, predmet: (g && g.predmet) || (p.name || "").split(" ")[0] || "—", group: (g && g.kratko) || "— без группы —", art: art || "—", val: isRev ? orev * (qy / tot) : qy });
+        classify.push({ i, predmet: (p.name || "").split(" ")[0] || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art: art || "—", val: isRev ? orev * (qy / tot) : qy });
       }
     }
   });
 
-  /* Фокус текущего drill + выбор поля категории */
-  const ev = classify.filter((e) =>
-    (!cd.predmet || e.predmet === cd.predmet) && (!cd.group || e.group === cd.group));
+  const ev = classify;   /* VM уже отфильтрован общими фильтрами */
   const catOf = (e) => (level === 1 ? e.predmet : level === 2 ? e.group : e.art);
 
   /* Тотал по категориям → топ-5, остальное в «Прочее» */
@@ -187,19 +189,16 @@ export function chartHTML(n, vm, type) {
     if (level === 3) { const c = artColor(seg); if (c) return c; }   /* цвет из справочника (по артикулу) */
     return PAL[top.indexOf(seg) % PAL.length];
   };
-  /* На листе клик по артикулу оставляет ТОЛЬКО его (solo) */
-  const solo = level === 3 && cd.hi && topSet.has(cd.hi) ? cd.hi : null;
-  const visSegs = solo ? [solo] : segOrder;
 
-  /* Максимум высоты столбца = макс сумма по интервалу (из видимых сегментов) */
+  /* Максимум высоты столбца = макс сумма по интервалу */
   let max = 1;
-  for (let i = 0; i < N; i++) { let s = 0; visSegs.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
+  for (let i = 0; i < N; i++) { let s = 0; segOrder.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
 
   let bars = "";
   for (let i = 0; i < N; i++) {
     const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.6)), bx = gx + (gW - bW) / 2;
     let yAcc = T + cH, colTot = 0;
-    visSegs.forEach((seg) => {
+    segOrder.forEach((seg) => {
       const v = per[seg][i]; if (v <= 0) return;
       const h = (v / max) * cH; yAcc -= h; colTot += v;
       bars += `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${h}" fill="${colorOf(seg)}" opacity="0.95"><title>${esc(seg)}: ${fv(v)}</title></rect>`;
@@ -207,57 +206,12 @@ export function chartHTML(n, vm, type) {
     if (colTot > 0) bars += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600">${fv(colTot)}</text>`;
   }
 
-  /* Правый блок «Итоги за период»: гистограмма сумм по сериям за выбранный период + доля.
-     Клик по строке — глубже (или solo на листе), как раньше в легенде. */
-  const drillable = level < 3;
-  const otherTotal = ev.reduce((s, e) => s + (topSet.has(catOf(e)) ? 0 : e.val), 0);
-  const shortName = (s) => (s.length > 22 ? "…" + s.slice(-21) : s);   /* режем С НАЧАЛА — хвост различает */
-  const segVal = (seg) => (seg === "Прочее" ? otherTotal : (catTotal[seg] || 0));
-  const grand = segOrder.reduce((s, seg) => s + segVal(seg), 0);
-  const maxVal = Math.max(1, ...segOrder.map(segVal));
-  const unit = isRev ? "₽" : "шт";
-  const totals = segOrder.map((seg) => {
-    const clickable = seg !== "Прочее";
-    const act = clickable ? `onclick="App.chartDrill(${n},'${q(seg)}')"` : "";
-    const active = solo === seg;
-    const st = active ? "font-weight:700;" : (solo ? "opacity:.4;" : "");
-    const v = segVal(seg);
-    const w = Math.max(2, Math.round((v / maxVal) * 100));
-    const pct = grand ? Math.round((v / grand) * 100) : 0;
-    const tip = clickable ? (drillable ? " — раскрыть" : " — только он") : "";
-    return `<div ${act} title="${esc(seg)}${tip}" style="margin:4px 0;${clickable ? "cursor:pointer;" : "color:var(--ink3);"}${st}">
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;line-height:14px">
-        <span style="flex:0 0 9px;width:9px;height:9px;border-radius:2px;background:${colorOf(seg)}"></span>
-        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(shortName(seg))}</span>
-        <span style="font-variant-numeric:tabular-nums;font-weight:600">${fv(v)}</span>
-        <span style="flex:0 0 30px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums">${pct}%</span>
-      </div>
-      <div style="background:var(--bg3);border-radius:3px;height:6px;margin:2px 0 0 14px">
-        <div style="width:${w}%;height:100%;background:${colorOf(seg)};border-radius:3px"></div>
-      </div>
-    </div>`;
-  }).join("");
-
-  /* Хлебные крошки уровней */
-  const crumb = (label, act, cur) =>
-    `<span ${act ? `onclick="${act}" style="cursor:pointer;color:var(--ink2);text-decoration:underline;text-decoration-style:dotted"` : `style="font-weight:700"`}>${esc(label)}</span>`;
-  let crumbs = crumb("Все предметы", cd.predmet ? `App.chartCrumb(${n},'root')` : "", !cd.predmet);
-  if (cd.predmet) crumbs += ` <span style="color:var(--ink3)">▸</span> ` + crumb(cd.predmet, cd.group ? `App.chartCrumb(${n},'predmet')` : "", !cd.group);
-  if (cd.group) crumbs += ` <span style="color:var(--ink3)">▸</span> ` + crumb(cd.group, "", true);
   const levelName = level === 1 ? "по предметам" : level === 2 ? "по группам" : "по артикулам";
 
   return `<div class="sec" style="margin-bottom:14px">
-    <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName}</span></span>${controls}</div>
-    <div style="font-size:11px;margin:2px 2px 8px">${crumbs}
-      <span style="color:var(--ink3);font-size:10px;margin-left:8px">${drillable ? "клик по строке справа — глубже" : "клик по строке справа — оставить только его"}</span></div>
-    <div class="tw" style="padding:8px;display:flex;gap:12px;align-items:stretch">
-      <div style="flex:1 1 0;min-width:0">
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
-      </div>
-      <div style="flex:0 0 240px;min-width:0;align-self:center;padding-left:12px;border-left:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--ink3);margin-bottom:4px">Итоги за период · <span style="font-weight:700;color:var(--ink)">${fv(grand)}</span> ${unit}</div>
-        ${totals}
-      </div>
+    <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName} · раскрывается сверху в «Структуре спроса»</span></span>${controls}</div>
+    <div class="tw" style="padding:8px">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
     </div>
   </div>`;
 }
