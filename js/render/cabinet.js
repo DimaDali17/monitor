@@ -20,7 +20,7 @@ export function renderCabinet(n) {
 
   el.innerHTML =
     `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
-       <div style="flex:0 1 230px;min-width:210px">${filterHTML(n)}</div>
+       <div style="flex:0 1 245px;min-width:225px">${filterHTML(n)}</div>
        <div style="flex:1 1 280px;min-width:260px">${alertsHTML(n)}</div>
        <div style="flex:1.6 1 360px;min-width:300px">${structureHTML(n)}</div>
      </div>` +
