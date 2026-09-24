@@ -50,9 +50,7 @@ export function structureHTML(n) {
   }
 
   const rows = Object.entries(grp).sort((a, b) => b[1] - a[1]);
-  const TOPN = 8;
-  const shown = rows.length > TOPN ? rows.slice(0, TOPN) : rows;
-  const rest = rows.length > TOPN ? rows.slice(TOPN).reduce((s, r) => s + r[1], 0) : 0;
+  const shown = rows;                                  /* показываем всё — без «Прочее» */
   const max = shown.length ? shown[0][1] : 1;
 
   /* Ряд: имя | дорожка с полосой | число | % — клик добавляет общий фильтр */
@@ -73,13 +71,14 @@ export function structureHTML(n) {
 
   const bars = shown.map(([name, v]) => row(name, v)).join("");
 
-  const restRow = rest
-    ? `<div style="display:grid;grid-template-columns:40% 1fr 34px 30px;gap:10px;align-items:center;height:22px;margin-top:2px;padding-top:4px;border-top:1px solid var(--border);font-size:11px;color:var(--ink3)">
-        <div>Прочее · ${rows.length - TOPN}</div><div></div>
-        <div style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${rest}</div>
-        <div style="text-align:right;font-variant-numeric:tabular-nums">${total ? Math.round((rest / total) * 100) : 0}%</div>
-      </div>`
-    : "";
+  /* Переключатель периода — над структурой, т.к. он влияет на неё (и на график) */
+  const onp = (k) => (mode === k ? "on" : "");
+  const periodTog = `<span class="ctog">
+      <button class="${onp("day")}" onclick="App.setChartMode(${n},'day')">День</button>
+      <button class="${onp("yesterday")}" onclick="App.setChartMode(${n},'yesterday')">Вчера</button>
+      <button class="${onp("week")}" onclick="App.setChartMode(${n},'week')">Неделя</button>
+      <button class="${onp("month")}" onclick="App.setChartMode(${n},'month')">Месяц</button>
+    </span>`;
 
   /* Крошки навигации по общим фильтрам (клик — подняться на уровень) */
   const anyFilter = FP[n].length || FG[n].length || FA[n].length;
@@ -91,13 +90,14 @@ export function structureHTML(n) {
   const crumbs = parts.join(' <span style="color:var(--ink3)">▸</span> ');
 
   return `<div class="filter-bar" style="margin-bottom:0">
-    <div class="sh" style="margin-bottom:6px">
+    <div class="sh" style="margin-bottom:6px;flex-wrap:wrap;gap:6px">
       <span class="st">Структура спроса
-        <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${modeName} · по ${lvlName} · ${total} шт</span></span>
+        <span style="color:var(--ink3);font-weight:400;font-size:11px">· по ${lvlName} · ${total} шт</span></span>
+      ${periodTog}
     </div>
     <div style="font-size:10px;margin-bottom:6px">${crumbs}${canDrill && shown.length ? `<span style="color:var(--ink3);margin-left:8px">клик по строке — глубже</span>` : ""}</div>
     <div style="max-height:230px;overflow:auto;padding-right:2px">
-      ${bars || '<div class="em">Нет заказов за период</div>'}${restRow}
+      ${bars || '<div class="em">Нет заказов за период</div>'}
     </div>
   </div>`;
 }

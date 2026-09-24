@@ -208,9 +208,17 @@ export function chartHTML(n, vm, type) {
 
   const levelName = level === 1 ? "по предметам" : level === 2 ? "по группам" : "по артикулам";
 
+  /* Легенда: цвет сегмента → имя (некликабельная — раскрытие теперь в «Структуре») */
+  const shortName = (s) => (s.length > 22 ? "…" + s.slice(-21) : s);
+  const legend = segOrder.map((seg) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink2);white-space:nowrap">
+      <span style="flex:0 0 9px;width:9px;height:9px;border-radius:2px;background:${colorOf(seg)}"></span>${esc(shortName(seg))}</span>`
+  ).join("");
+
   return `<div class="sec" style="margin-bottom:14px">
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName} · раскрывается сверху в «Структуре спроса»</span></span>${controls}</div>
     <div class="tw" style="padding:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${legend}</div>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
     </div>
   </div>`;
