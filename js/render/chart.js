@@ -1,4 +1,4 @@
-import { CM, CV, CD, FP, FG } from "../state.js";
+import { CM, CV, CD, GB, FP, FG } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
 
@@ -139,10 +139,9 @@ export function chartHTML(n, vm, type) {
   }
 
   /* ══════════ ГЛУБЖЕ — стек по уровням ══════════
-     Уровень берём из ОБЩИХ фильтров (как в «Структуре спроса»), а не из своего drill:
-     нет предмета → по предметам; выбран предмет → по группам; предмет+группа → по артикулам.
-     VM уже отфильтрован по FP/FG/FA, поэтому дополнительный фокус не нужен. */
-  const level = FP[n].length && FG[n].length ? 3 : FP[n].length ? 2 : 1;
+     Уровень берём из переключателя «Структуры спроса» (GB) — он общий для структуры и графика.
+     Область (какие заказы) задаётся общими фильтрами FP/FG/FA (VM уже отфильтрован). */
+  const level = GB[n] === "art" ? 3 : GB[n] === "grp" ? 2 : 1;
 
   /* Классификация заказа: {predmet, group, art} + значение (шт/₽).
      Предмет = o.subject (WB) / первое слово name (Ozon) — так же, как в фильтре и «Структуре». */

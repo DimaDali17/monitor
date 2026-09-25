@@ -1,4 +1,4 @@
-import { VM, CM, FP, FG, FA } from "../state.js";
+import { VM, CM, GB, FP, FG, FA } from "../state.js";
 import { esc, iso, q } from "../utils.js";
 import { artGroup } from "../api/sheets.js";
 
@@ -28,9 +28,10 @@ export function structureHTML(n) {
 
   const baseOz = (oid) => { const s = oid || ""; const i = s.lastIndexOf("_"); return i > 0 ? s.slice(0, i) : s; };
 
-  /* Текущий уровень навигации из общих фильтров */
-  const lvl = FP[n].length && FG[n].length ? "art" : FP[n].length ? "grp" : "sub";
-  const nextAdd = lvl === "sub" ? "addFP" : lvl === "grp" ? "addFG" : "addFA";
+  /* Уровень среза выбирается переключателем Предмет/Группа/Артикул (GB), а не выводится
+     из фильтров. Фильтры FP/FG/FA — это ОБЛАСТЬ (scope): клик по строке добавляет фильтр
+     и опускает уровень на шаг (drill), а весь дашборд следует за фильтрами. */
+  const lvl = GB[n] || "sub";
   const lvlName = lvl === "sub" ? "предметам" : lvl === "grp" ? "группам" : "артикулам";
   /* Ozon-артикул фильтром не изолируем (FA ждёт полный offer_id) — на этом уровне только показываем */
   const canDrill = !(lvl === "art" && type === "oz");
@@ -58,7 +59,7 @@ export function structureHTML(n) {
     const w = Math.max(2, Math.round((v / max) * 100));
     const pct = total ? Math.round((v / total) * 100) : 0;
     const clickable = canDrill && name !== "— без группы —";
-    const act = clickable ? `onclick="App.${nextAdd}(${n},'${q(name)}')"` : "";
+    const act = clickable ? `onclick="App.structDrill(${n},'${q(name)}')"` : "";
     return `<div ${act} title="${esc(name)}${clickable ? " — раскрыть" : ""}" style="display:grid;grid-template-columns:40% 1fr 34px 30px;align-items:center;gap:10px;height:19px;font-size:11px;${clickable ? "cursor:pointer" : ""}">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)">${esc(name)}</div>
       <div style="background:var(--bg3);border-radius:4px;height:12px">
@@ -80,6 +81,14 @@ export function structureHTML(n) {
       <button class="${onp("month")}" onclick="App.setChartMode(${n},'month')">Месяц</button>
     </span>`;
 
+  /* Срез Предмет/Группа/Артикул — прямой выбор уровня (влияет и на график) */
+  const onl = (k) => (lvl === k ? "on" : "");
+  const levelTog = `<span class="ctog">
+      <button class="${onl("sub")}" onclick="App.setGroupBy(${n},'sub')">Предмет</button>
+      <button class="${onl("grp")}" onclick="App.setGroupBy(${n},'grp')">Группа</button>
+      <button class="${onl("art")}" onclick="App.setGroupBy(${n},'art')">Артикул</button>
+    </span>`;
+
   /* Крошки навигации по общим фильтрам (клик — подняться на уровень) */
   const anyFilter = FP[n].length || FG[n].length || FA[n].length;
   const crumbLink = (label, upto) => `<span onclick="App.structUp(${n},'${upto}')" style="cursor:pointer;color:var(--blue)">${esc(label)}</span>`;
@@ -95,7 +104,10 @@ export function structureHTML(n) {
         <span style="color:var(--ink3);font-weight:400;font-size:11px">· по ${lvlName} · ${total} шт</span></span>
       ${periodTog}
     </div>
-    <div style="font-size:10px;margin-bottom:6px">${crumbs}${canDrill && shown.length ? `<span style="color:var(--ink3);margin-left:8px">клик по строке — глубже</span>` : ""}</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      ${levelTog}
+      <span style="font-size:10px;min-width:0">${crumbs}${canDrill && shown.length ? `<span style="color:var(--ink3);margin-left:6px">клик — глубже</span>` : ""}</span>
+    </div>
     <div style="max-height:230px;overflow:auto;padding-right:2px">
       ${bars || '<div class="em">Нет заказов за период</div>'}
     </div>

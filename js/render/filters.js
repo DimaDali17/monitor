@@ -20,29 +20,29 @@ export function filterHTML(n) {
     : "";
 
   return `<div class="filter-bar">
-    <div class="filter-row">
-      <span class="filter-label">📁 Предмет</span>
-      <div class="fb" style="flex:1">
+    <div class="filter-row" style="display:flex;flex-direction:column;align-items:stretch;gap:3px;margin-bottom:8px">
+      <span class="filter-label" style="min-width:0;padding-top:0">📁 Предмет</span>
+      <div class="fb" style="flex:1;min-width:0;margin-bottom:0">
         ${subjChips}
-        <input id="fpi${n}" placeholder="${FP[n].length ? "+ ещё предмет…" : "все предметы…"}"
+        <input id="fpi${n}" style="min-width:0" placeholder="${FP[n].length ? "+ ещё предмет…" : "все предметы…"}"
                oninput="App.fpInput(${n})" onfocus="App.fpInput(${n})" autocomplete="off">
         <div class="ddrop" id="fpdd${n}"></div>
       </div>
     </div>
-    <div class="filter-row">
-      <span class="filter-label">🏷️ Группа</span>
-      <div class="fb" style="flex:1">
+    <div class="filter-row" style="display:flex;flex-direction:column;align-items:stretch;gap:3px;margin-bottom:8px">
+      <span class="filter-label" style="min-width:0;padding-top:0">🏷️ Группа</span>
+      <div class="fb" style="flex:1;min-width:0;margin-bottom:0">
         ${groupChips}
-        <input id="fgi${n}" placeholder="${FG[n].length ? "+ ещё группа…" : "все группы…"}"
+        <input id="fgi${n}" style="min-width:0" placeholder="${FG[n].length ? "+ ещё группа…" : "все группы…"}"
                oninput="App.fgInput(${n})" onfocus="App.fgInput(${n})" autocomplete="off">
         <div class="ddrop" id="fgdd${n}"></div>
       </div>
     </div>
-    <div class="filter-row">
-      <span class="filter-label">🔖 Артикул</span>
-      <div class="fb" style="flex:1">
+    <div class="filter-row" style="display:flex;flex-direction:column;align-items:stretch;gap:3px;margin-bottom:8px">
+      <span class="filter-label" style="min-width:0;padding-top:0">🔖 Артикул</span>
+      <div class="fb" style="flex:1;min-width:0;margin-bottom:0">
         ${artChips}
-        <input id="fai${n}" placeholder="${FA[n].length ? "+ ещё артикул…" : "все артикулы…"}"
+        <input id="fai${n}" style="min-width:0" placeholder="${FA[n].length ? "+ ещё артикул…" : "все артикулы…"}"
                oninput="App.faInput(${n})" onfocus="App.faInput(${n})" autocomplete="off">
         <div class="ddrop" id="fdd${n}"></div>
       </div>
