@@ -190,11 +190,19 @@ const App = {
   },
   rmFG(n, i) { FG[n].splice(i, 1); renderCabinet(n); },
   clearFilters(n) { FA[n] = []; FP[n] = []; FG[n] = []; renderCabinet(n); },
-  /* Подъём по крошкам «Структуры спроса»: очищаем фильтры глубже выбранного уровня */
-  structUp(n, lvl) {
-    if (lvl === "root") { FA[n] = []; FP[n] = []; FG[n] = []; }
-    else if (lvl === "sub") { FA[n] = []; FG[n] = []; }
-    else if (lvl === "grp") { FA[n] = []; }
+  /* Подъём по крошкам «Структуры спроса»: чистим фильтры глубже уровня и ставим уровень */
+  structUp(n, upto) {
+    if (upto === "root") { FA[n] = []; FP[n] = []; FG[n] = []; GB[n] = "sub"; }
+    else if (upto === "sub") { FA[n] = []; FG[n] = []; GB[n] = "grp"; }
+    else if (upto === "grp") { FA[n] = []; GB[n] = "art"; }
+    renderCabinet(n);
+  },
+  /* Клик по строке «Структуры»: добавить фильтр текущего уровня и опустить уровень на шаг */
+  structDrill(n, value) {
+    const lvl = GB[n] || "sub";
+    if (lvl === "sub") { if (value && !FP[n].includes(value)) FP[n].push(value); GB[n] = "grp"; }
+    else if (lvl === "grp") { if (value && !FG[n].includes(value)) FG[n].push(value); GB[n] = "art"; }
+    else if (value && !FA[n].includes(value)) FA[n].push(value);
     renderCabinet(n);
   },
   setOrdFilter(n, v) { OFM[n] = v; renderCabinet(n); },

@@ -37,7 +37,7 @@ export const FSZ = { 1: "", 2: "", 3: "" }; /* поиск по размеру */
 export const OFM = { 1: "all", 2: "all", 3: "all" }; /* фильтр заказов: all | fbw | fbs */
 export const CM = { 1: "day", 2: "day", 3: "day" };  /* day | week | month */
 export const CV = { 1: "ord", 2: "ord", 3: "ord" };  /* ord | rev */
-export const GB = { 1: "predmet", 2: "predmet", 3: "predmet" }; /* predmet | kratko — уровень структуры спроса */
+export const GB = { 1: "sub", 2: "sub", 3: "sub" }; /* sub | grp | art — уровень «Структуры спроса» и графика */
 
 /* Детализация графика («Глубже»): стек по предметам → группам → артикулам.
    deep — режим вкл/выкл; predmet/group — текущий фокус (drill); hi — подсветка листа. */
