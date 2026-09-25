@@ -308,7 +308,10 @@ export function defTbl(n) {
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
       sev: dWb == null ? 99999 : dWb,
     };
-  });
+  })
+    /* Прячем полностью пустые строки: общий сток < 1 И мес. потребность < 1 И FBS < 1
+       (строку с любым остатком или спросом оставляем). */
+    .filter((r) => !(r.total < 1 && r.need < 1 && r.fbsArt < 1));
 
   const { c, d: dir } = DS[n];
   rows.sort((a, b) => {
