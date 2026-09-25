@@ -3,12 +3,10 @@ import { esc, iso, q } from "../utils.js";
 import { artGroup } from "../api/sheets.js";
 
 /* Структура спроса = навигатор по заказам за период (вчера/день/неделя/месяц).
-   Уровень выводится из ОБЩИХ фильтров: нет предмета → показываем предметы,
-   выбран предмет → группы внутри, выбраны предмет+группа → артикулы.
-   Клик по строке добавляет соответствующий общий фильтр (FP/FG/FA) — за ним
-   следует весь дашборд, включая график. Ключи группировки согласованы с
-   applyFilters: предмет = o.subject (WB) / первое слово name (Ozon),
-   группа = artGroup.kratko, артикул = supplierArticle (WB) / offer_id (Ozon). */
+   Уровень выбирается переключателем Предмет/Группа/Артикул (GB); фильтры FP/FG/FA — область (scope).
+   Ключи группировки согласованы с applyFilters:
+   предмет = o.subject (WB) / первое слово name (Ozon), группа = artGroup.kratko,
+   артикул = supplierArticle (WB) / offer_id (Ozon). */
 export function structureHTML(n) {
   const vm = VM[n];
   if (!vm) return "";
@@ -108,7 +106,7 @@ export function structureHTML(n) {
       ${levelTog}
       <span style="font-size:10px;min-width:0">${crumbs}${canDrill && shown.length ? `<span style="color:var(--ink3);margin-left:6px">клик — глубже</span>` : ""}</span>
     </div>
-    <div style="max-height:230px;overflow:auto;padding-right:2px">
+    <div style="padding-right:2px">
       ${bars || '<div class="em">Нет заказов за период</div>'}
     </div>
   </div>`;
