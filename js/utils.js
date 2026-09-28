@@ -1,5 +1,3 @@
-import { SPP_COEF } from "./config.js";
-
 /* ── Даты ── */
 export const iso = (d) => new Date(d).toISOString().slice(0, 10);
 export const td = () => iso(Date.now());
@@ -36,8 +34,8 @@ export const wbPrice = (o) =>
 export const wbQty = (s) => s.quantity || 0;
 export const ozRev = (o) =>
   (o.products || []).reduce((s, p) => s + parseFloat(p.price || p.offer_price || 0) * (p.quantity || 1), 0);
-/* Приблизительная цена на витрине с учётом среднего СПП */
-export const sitePrice = (p) => (p > 0 ? Math.round(p * SPP_COEF) : 0);
+/* Цена на витрине = финиш-прайс как есть (без коэффициента) */
+export const sitePrice = (p) => (p > 0 ? Math.round(p) : 0);
 
 /* ── Размеры ── */
 const SZ_ORDER = {

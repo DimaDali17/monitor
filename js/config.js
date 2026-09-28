@@ -43,8 +43,7 @@ export const ORDERS_DAYS = 62;
 /* Сколько строк показываем до «Показать все» */
 export const LIM = 10;
 
-/* Средний СПП — коэффициент для колонки «Цена на сайте» */
-export const SPP_COEF = 0.8;
+
 
 /* Выкупаемость по умолчанию, если артикула нет в таблице */
 export const DEFAULT_BUYRATE = 0.7;
