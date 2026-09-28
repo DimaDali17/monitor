@@ -111,7 +111,7 @@ export function ordersHTML(n, vm, type) {
     <div class="tw"><table>
       <thead><tr>
         <th>Дата</th><th>Время</th><th>Артикул</th><th>Размер</th><th>Товар</th><th>Кол-во</th>
-        <th data-tip="finishedPrice × 0.80 — приблизительная цена на витрине с учётом среднего СПП ~20%">Цена на сайте</th>
+        <th data-tip="Финиш-прайс — цена на витрине">Цена на сайте</th>
         <th>Склад</th>
       </tr></thead>
       <tbody>${rows || '<tr><td colspan="8" class="em">Нет заказов</td></tr>'}${more}</tbody>
