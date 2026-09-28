@@ -297,7 +297,7 @@ export function defTbl(n) {
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
     const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
     const fbsOver = !vm.isOz && fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника) */
-    const dSeason = seasonalDays(artSeason(art), g.stk + fbsArt, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);
+    const dSeason = seasonalDays(artSeason(art), total, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);   /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
@@ -337,7 +337,7 @@ export function defTbl(n) {
     <th class="th-group thg-total" style="border-right:2px solid #C7BFB0">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
     <th colspan="2" class="th-group thg-need" style="border-right:2px solid #C7BFB0">⚡ Дефицит</th>
-    <th colspan="5" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
+    <th colspan="4" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
   </tr>
   <tr>
     ${TH("stk", "FBW", "Остаток на складах Wildberries (FBW)", "th-wb")}
@@ -352,9 +352,8 @@ export function defTbl(n) {
     <th class="th-need" style="text-align:center;border-right:2px solid #C7BFB0" data-tip="Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше">Статус</th>
     ${TH("days", "FBW×", "Хватит дней: остаток FBW ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
     ${THF("FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
-    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток ВБ + FBS списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
-    ${THF("Без сырья×", "Хватит дней: ВБ + СГП ÷ дневной темп", "th-days")}
     ${THF("Общий×", "Хватит дней: ВБ + СГП + Сырьё ÷ дневной темп", "th-days")}
+    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: ОБЩИЙ остаток (ВБ + СГП + Сырьё) списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
   </tr>`;
 
   const shown = EXD[n] ? rows : rows.slice(0, LIM);
@@ -388,9 +387,8 @@ export function defTbl(n) {
       <td style="border-right:2px solid #C7BFB0">${statusCell(r.dStock, r.dSeason)}</td>
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
       <td class="td-ref" style="text-align:center">${fmtDays(r.dFbs)}</td>
-      <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
-      <td style="text-align:center">${fmtDays(r.dNoRaw)}</td>
       <td style="text-align:center">${fmtDays(r.dAll)}</td>
+      <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
     </tr>`;
 
     if (!open) continue;
@@ -423,16 +421,15 @@ export function defTbl(n) {
         <td style="border-right:2px solid #C7BFB0">${statusChip(dStockSz, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
-        <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
-        <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((s.total + sgp) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round(total / eff) : null)}</td>
+        <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
       </tr>`;
     }
   }
 
   const more = rows.length > LIM
-    ? `<tr class="er"><td class="stick" colspan="16"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
+    ? `<tr class="er"><td class="stick" colspan="15"><button class="eb" onclick="App.togExD(${n})">${EXD[n] ? "▲ Свернуть" : "▼ Все " + rows.length + " артикулов"}</button></td></tr>`
     : "";
 
-  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="16">Нет данных</td></tr>'}${more}</tbody></table>`;
+  return `<table><thead>${head}</thead><tbody>${trs || '<tr><td class="em" colspan="15">Нет данных</td></tr>'}${more}</tbody></table>`;
 }
