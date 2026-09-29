@@ -21,6 +21,11 @@ import { normSz } from "../utils.js";
    Если среди «Арт ВБ» кандидатов нет — тогда берём наименьший из «Арт ВБ2».
    Пример: пул с «Арт ВБ»=Pantal.SK.blacknew.02 и «Арт ВБ2»=Pantal.SK.black.01 —
    главный = blacknew.02 (хотя .01 < .02, но .01 лежит только в «Арт ВБ2»).
+   РУЧНОЙ OVERRIDE: колонка «Пул на» (или «Главный») в листе «Арт производ».
+   «TS21num4» — весь остаток сырья вешаем на нум4 всегда.
+   «TS21num4:862» — вешаем на нум4, ПОКА сырья ≤ 862; станет больше (докупили — материал
+   смешался) → авто-правило само вернёт пул на главного (нум1). Ставится один раз.
+   Пусто → авто. Артикул должен быть участником пула.
    ══════════════════════════════════════════════════════════ */
 
 const COLOR_MAP = {
@@ -72,6 +77,7 @@ export const sheets = {
   rawUsers: {},     /* ключ сырья → Set(wbArt) — кто связан с пулом (size>1 ⇒ общий) */
   rawPrimaryCol: {},/* ключ сырья → Set(wbArt) — кто пришёл из колонки «Арт ВБ» (приоритет для главного) */
   rawPrimary: {},   /* ключ сырья → wbArt-главный, кому отнесён остаток пула */
+  rawPrimaryForce: {}, /* ключ сырья → wbArt: ручной override главного (колонка «Пул на» в «Арт производ») */
   setByRawKey: {},  /* ключ сырья → «В наборе штук»: сырьё(штук) / set = наборы */
 };
 
@@ -119,7 +125,7 @@ export function loadExternal() {
         [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON].map((u) => fetch(u).then((r) => r.text()))
       );
 
-      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {}; sheets.nomen = {}; sheets.seasonWk = { winter: {}, summer: {} };
+      sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {}; sheets.rawPrimaryForce = {}; sheets.nomen = {}; sheets.seasonWk = { winter: {}, summer: {} };
       buyrateCache.clear();
 
       /* Выкупаемость */
@@ -180,6 +186,20 @@ export function loadExternal() {
         };
         pushLinks(row["Арт ВБ"], 1);
         pushLinks(row["Арт ВБ2"], 2);
+
+        /* Ручной override главного пула: колонка «Пул на» (или «Главный»).
+           Формат «АртВБ» — весь пул на этот артикул всегда.
+           Формат «АртВБ:МаксШт» — вешаем на артикул, ПОКА сырья ≤ МаксШт; как только
+           докупят и станет больше (материал смешался) — авто-правило само вернёт пул
+           на главного. Кейс: «862 сырья A1905 сейчас — остаток нум4» → пишем
+           «TS21num4:862», ставим один раз и не трогаем. Пусто → авто-логика. */
+        const forceRaw = String(row["Пул на"] || row["Главный"] || "").trim();
+        if (artPr && forceRaw) {
+          const [fa, fc] = forceRaw.split(":");
+          const rkF = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+          const cap = fc != null && String(fc).trim() !== "" ? (parseInt(fc, 10) || null) : null;
+          sheets.rawPrimaryForce[rkF] = { art: (fa || "").trim().toLowerCase(), cap };
+        }
       });
 
       /* Остатки сводная: сырьё + СГП в одном листе.
@@ -280,6 +300,14 @@ function buildIndexes() {
      — выбираем среди всех участников. Так остаток пула лежит на «настоящем»
      артикуле ВБ, а не на том, что случайно оказался в «Арт ВБ2» с меньшим номером. */
   for (const [rk, users] of Object.entries(sheets.rawUsers)) {
+    /* ручной override («Пул на») — только если артикул реально участник пула (иначе
+       остаток «повис» бы ни на ком). С порогом «:МаксШт» действует, пока сырья не больше
+       порога; сверх порога (докупили) — авто-логика вернёт пул на главного. */
+    const force = sheets.rawPrimaryForce[rk];
+    if (force && force.art && users.has(force.art)) {
+      const qty = Math.floor((sheets.raw[rk] || 0) / (sheets.setByRawKey[rk] || 1));
+      if (force.cap == null || qty <= force.cap) { sheets.rawPrimary[rk] = force.art; continue; }
+    }
     const col1 = sheets.rawPrimaryCol[rk];
     const pool = col1 && col1.size ? [...col1] : [...users];
     sheets.rawPrimary[rk] = primaryOf(pool);
