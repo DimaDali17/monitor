@@ -359,6 +359,29 @@ export function getStocksForArt(wbArt) {
   return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
 }
 
+/* Диагностика: из чего складывается «Сырьё» артикула. В консоли браузера:
+   rawDebug("TermSocks.Al-ESS.black.01") — покажет все ключи сырья, их остаток,
+   делитель «В наборе штук», кто назначен главным и что реально идёт в сумму. */
+export function rawDebug(wbArt) {
+  const ka = (wbArt || "").toLowerCase();
+  const keys = sheets.rawKeysByArt[ka] ? [...sheets.rawKeysByArt[ka]].sort() : [];
+  console.log(`=== Сырьё для «${wbArt}» ===  (rawByArt = ${sheets.rawByArt[ka] || 0})`);
+  let total = 0;
+  for (const rk of keys) {
+    const rawQ = sheets.raw[rk] || 0;
+    const setN = sheets.setByRawKey[rk] || 1;
+    const sets = Math.floor(rawQ / setN);
+    const prim = sheets.rawPrimary[rk] || "—";
+    const users = sheets.rawUsers[rk] ? [...sheets.rawUsers[rk]] : [];
+    const mine = prim === ka;
+    if (mine) total += sets;
+    console.log(`  ${rk} | сырьё ${rawQ} ÷ набор ${setN} = ${sets} | главный: ${prim}${mine ? "  ← идёт в сумму" : ""} | делят: ${users.join(", ") || "—"}`);
+  }
+  console.log(`  — ИТОГО в «Сырьё» у ${wbArt}: ${total} шт`);
+  return total;
+}
+if (typeof window !== "undefined") window.rawDebug = rawDebug;
+
 /* ── Общий пул сырья ── */
 
 /* Как артикул записан в справочнике (для подсказок). */
