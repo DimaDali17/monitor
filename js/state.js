@@ -16,6 +16,9 @@ export const EXFS = { 1: false, 2: false, 3: false }; /* остатки по FBS
 export const EXD = { 1: false, 2: false, 3: false }; /* дефицит */
 export const EXA = { 1: false, 2: false, 3: false }; /* внимание по остаткам (развернуть) */
 
+/* Дефицит: «Запас дней» с сырьём (true, по умолчанию) или без сырья (только FBW+СГП) */
+export const DRW = { 1: true, 2: true, 3: true };
+
 /* Открытые артикулы (аккордеон по размерам) */
 export const OA = { 1: new Set(), 2: new Set(), 3: new Set() };  /* остатки */
 export const OAD = { 1: new Set(), 2: new Set(), 3: new Set() }; /* дефицит */

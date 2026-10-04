@@ -1,6 +1,6 @@
 import { VERSION } from "./config.js";
 import {
-  D, EXP, EXS, EXFS, EXD, EXA, OA, OAD, OAC, SS, DS, FSS, FA, FP,
+  D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAC, SS, DS, FSS, FA, FP,
   CM, CV, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -238,6 +238,12 @@ const App = {
     repaintDeficit(n);
   },
   togExD(n) { EXD[n] = !EXD[n]; repaintDeficit(n); },
+  /* «С сырьём / Без сырья» в «Запас дней» */
+  setRawD(n, on) {
+    if (DRW[n] === on) return;
+    DRW[n] = on;
+    repaintDeficit(n);
+  },
   togAlerts(n) { EXA[n] = !EXA[n]; renderCabinet(n); },
   /* Раскрыть все артикулы до размеров разом — или свернуть обратно.
      Заодно показываем все строки (EXD), иначе часть артикулов скрыта
