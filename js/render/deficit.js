@@ -1,4 +1,4 @@
-import { VM, DS, OAD, EXD, FA } from "../state.js";
+import { VM, DS, OAD, EXD, FA, DRW } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, fmtDays, pct } from "../utils.js";
 import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason } from "../api/sheets.js";
@@ -72,6 +72,7 @@ export function deficitHTML(n) {
         ${statusLegend("ok", "21–45 дней — норма")}
         ${statusLegend("enough", "45–90 дней — достаточно")}
         ${statusLegend("over", "Больше 90 дней — залежался")}
+        <span id="drw${n}">${rawModeTog(n)}</span>
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.togAllSizesD(${n})" data-tip="Раскрыть все артикулы до размеров или свернуть обратно">${allSizesOpen(n) ? "▲ Свернуть размеры" : "▼ Все размеры"}</button>
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Дефицит','deficit')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
@@ -86,6 +87,15 @@ export function deficitHTML(n) {
     </div>
     <div class="sw" id="dtbl${n}">${defTbl(n)}</div>
   </div>`;
+}
+
+/* Тумблер «С сырьём / Без сырья» для колонок «Общий×» и «ВБ сезон» */
+export function rawModeTog(n) {
+  const on = DRW[n];
+  return `<span class="ctog" data-tip="Запас дней «Общий×» и «ВБ сезон»: с сырьём (FBW+СГП+Сырьё) или без сырья — только готовое (FBW+СГП)">
+    <button class="${on ? "on" : ""}" onclick="App.setRawD(${n},true)">С сырьём</button>
+    <button class="${on ? "" : "on"}" onclick="App.setRawD(${n},false)">Без сырья</button>
+  </span>`;
 }
 
 /* Все ли артикулы дефицита раскрыты */
@@ -297,12 +307,14 @@ export function defTbl(n) {
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
     const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
     const fbsOver = !vm.isOz && fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника) */
-    const dSeason = seasonalDays(artSeason(art), total, br.val, wk3[art.toLowerCase()] || [0, 0, 0], nowMon, g.o7);   /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
+    const wkA = wk3[art.toLowerCase()] || [0, 0, 0];
+    const dSeason = seasonalDays(artSeason(art), total, br.val, wkA, nowMon, g.o7);              /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
+    const dSeasonNoRaw = seasonalDays(artSeason(art), g.stk + sgp, br.val, wkA, nowMon, g.o7);  /* сезон без сырья (ВБ+СГП) */
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
       def: Math.max(0, need - total),
-      dWb, dFbs, dStock, dSeason, fbsArt, fbsOver,
+      dWb, dFbs, dStock, dSeason, dSeasonNoRaw, fbsArt, fbsOver,
       dAll: effDr > 0 ? Math.round(total / effDr) : null,
       dNoRaw: effDr > 0 ? Math.round((g.stk + sgp) / effDr) : null,
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
@@ -328,6 +340,12 @@ export function defTbl(n) {
     `<th class="${klass}" style="text-align:center" data-tip="${tip}">${label}</th>`;
   const qc = (v, lo) => (v === 0 ? "qx" : v < lo ? "ql" : "qo");
 
+  /* Режим «С сырьём / Без сырья» — меняются только значения «Общий×» и «ВБ сезон» */
+  const withRaw = DRW[n];
+  const pickAll = (r) => (withRaw ? r.dAll : r.dNoRaw);
+  const pickSeason = (r) => (withRaw ? r.dSeason : r.dSeasonNoRaw);
+  const baseTxt = withRaw ? "ВБ + СГП + Сырьё" : "ВБ + СГП (без сырья)";
+
   const head = `<tr>
     <th rowspan="2" data-sort style="text-align:left;vertical-align:middle;background:var(--bg3)"
         onclick="App.sortD(${n},'art')" data-tip="Артикул WB. Клик — сортировка">Артикул${arrow("art")}</th>
@@ -337,7 +355,7 @@ export function defTbl(n) {
     <th class="th-group thg-total" style="border-right:2px solid #C7BFB0">📊 Общий</th>
     <th colspan="3" class="th-group thg-need">📈 Потребность</th>
     <th colspan="2" class="th-group thg-need" style="border-right:2px solid #C7BFB0">⚡ Дефицит</th>
-    <th colspan="4" class="th-group thg-days">⏱ Запас дней (×выкуп)</th>
+    <th colspan="4" class="th-group thg-days">⏱ Запас дней (×выкуп)${withRaw ? "" : " · без сырья"}</th>
   </tr>
   <tr>
     ${TH("stk", "FBW", "Остаток на складах Wildberries (FBW)", "th-wb")}
@@ -352,8 +370,8 @@ export function defTbl(n) {
     <th class="th-need" style="text-align:center;border-right:2px solid #C7BFB0" data-tip="Алерт по запасу дней (ВБ + FBS вместе). Через «/» — доп. флаг, если с учётом сезона запас требует внимания раньше">Статус</th>
     ${TH("days", "FBW×", "Хватит дней: остаток FBW ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
     ${THF("FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
-    ${THF("Общий×", "Хватит дней: ВБ + СГП + Сырьё ÷ дневной темп", "th-days")}
-    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: ОБЩИЙ остаток (ВБ + СГП + Сырьё) списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
+    ${THF("Общий×", "Хватит дней: " + baseTxt + " ÷ дневной темп", "th-days")}
+    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток (" + baseTxt + ") списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
   </tr>`;
 
   const shown = EXD[n] ? rows : rows.slice(0, LIM);
@@ -384,11 +402,11 @@ export function defTbl(n) {
       <td style="text-align:center;color:var(--ink2)">${r.need || "—"}</td>
       <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(r.o7, totalO7)}</td>
       <td style="text-align:center;color:${r.def > 0 ? "var(--red)" : "var(--green)"};font-weight:700">${r.def > 0 ? "−" + r.def : "✓"}</td>
-      <td style="border-right:2px solid #C7BFB0">${statusCell(r.dStock, r.dSeason)}</td>
+      <td style="border-right:2px solid #C7BFB0">${statusCell(r.dStock, pickSeason(r))}</td>
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
       <td class="td-ref" style="text-align:center">${fmtDays(r.dFbs)}</td>
-      <td style="text-align:center">${fmtDays(r.dAll)}</td>
-      <td style="text-align:center;font-weight:600">${fmtSeason(r.dSeason)}</td>
+      <td style="text-align:center">${fmtDays(pickAll(r))}</td>
+      <td style="text-align:center;font-weight:600">${fmtSeason(pickSeason(r))}</td>
     </tr>`;
 
     if (!open) continue;
@@ -421,7 +439,7 @@ export function defTbl(n) {
         <td style="border-right:2px solid #C7BFB0">${statusChip(dStockSz, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
-        <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round(total / eff) : null)}</td>
+        <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((withRaw ? total : s.total + sgp) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
       </tr>`;
     }

@@ -7,7 +7,7 @@ import { metricsHTML } from "./metrics.js";
 import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
 import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl } from "./stocks.js";
-import { deficitHTML, defTbl } from "./deficit.js";
+import { deficitHTML, defTbl, rawModeTog } from "./deficit.js";
 
 /* Раньше renderWB и renderOZ были почти одинаковыми копиями.
    Разница между кабинетами сводится к типу — 'wb' или 'oz'. */
@@ -41,6 +41,8 @@ export function repaintStocks(n) {
 export function repaintDeficit(n) {
   const el = document.getElementById("dtbl" + n);
   if (el && VM[n]) el.innerHTML = defTbl(n);
+  const tg = document.getElementById("drw" + n);   /* тумблер «С сырьём / Без сырья» */
+  if (tg) tg.innerHTML = rawModeTog(n);
 }
 
 export function repaintFbsStocks(n) {
