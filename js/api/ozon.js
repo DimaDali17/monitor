@@ -155,7 +155,7 @@ async function fetchOzon(force) {
     allOrders: postings,
     todayO: postings.filter((o) => dayOf(o) === t),
     yestO: postings.filter((o) => dayOf(o) === y),
-    orders7: postings.filter((o) => dayOf(o) >= w),
+    orders7: postings.filter((o) => { const d = dayOf(o); return d >= w && d < t; }),   /* ровно 7 полных дней, без сегодня */
     stocks,
     fbs, fbsCells, fbsWh,
   };

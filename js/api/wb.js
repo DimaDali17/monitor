@@ -419,7 +419,7 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     allOrders: all,
     todayO:  all.filter((o) => (o.date || "").startsWith(t)),
     yestO:   all.filter((o) => (o.date || "").startsWith(y)),
-    orders7: all.filter((o) => (o.date || "") >= w),
+    orders7: all.filter((o) => { const d = o.date || ""; return d >= w && d < t; }),   /* ровно 7 полных дней, без сегодня */
     stocks:  Array.isArray(stk) ? stk : [],
     fbs:     fbsRes.fbs || {},
     fbsWh:   fbsRes.fbsWh || {},
