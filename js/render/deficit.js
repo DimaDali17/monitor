@@ -140,11 +140,6 @@ function statusCell(dWb, dSeason, small) {
     `<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;font-weight:600;background:${s.bg};color:${s.fg};cursor:help" data-tip="С учётом сезона запас ~${dSeason} дн — «${s.label}»">${s.icon || "❗"}</span>`;
 }
 const DAY = 864e5;
-function mondayMs(ms) {
-  const d = new Date(ms); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getTime();
-}
 function isoWeekNum(ms) {
   const d = new Date(ms); d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);       /* четверг этой недели */
@@ -152,48 +147,65 @@ function isoWeekNum(ms) {
   ft.setDate(ft.getDate() - ((ft.getDay() + 6) % 7) + 3);
   return 1 + Math.round((d - ft) / (7 * DAY));
 }
-/* «ВБ сезон»: за сколько дней кончится сток ВБ с учётом сезонной кривой.
-   Динамика по ТЗ: сглаженный спрос-на-коэффициент по 3 закрытым неделям
-   (веса 50/30/20), затем списание будущих недель, масштабированных кривой.
-   Только факт текущего сезона, без прогнозов. */
-function seasonalDays(season, stk, buyrate, weeks, nowMon, curWeekly) {
+/* «ВБ сезон»: за сколько дней кончится остаток с учётом сезонной кривой.
+   База — заказы за последние 10 полных дней (вчера … 10 дней назад), свежие дни весят
+   больше: вес 10 у вчера, 9 у позавчера … 1 у самого старого. Каждый день делим на
+   коэффициент кривой своей недели → «спрос на коэф. 1» в день; затем списываем остаток
+   день за днём, умножая этот спрос на коэффициент будущих недель и на выкупаемость.
+   Только факт, без прогнозов. */
+const BASE_DAYS = 10;
+function dayStart(ms) { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function seasonalDays(season, stk, buyrate, days10, today, info) {
   if (!season || stk <= 0) return null;
   const curve = sheets.seasonWk[season];
   if (!curve || !Object.keys(curve).length) return null;
-  const Wt = [0.5, 0.3, 0.2];
-  let dpu = 0, wsum = 0;
-  for (let i = 0; i < 3; i++) {
-    const H = curve[isoWeekNum(nowMon - (i + 1) * 7 * DAY)] || 0;
-    if (H > 0) { dpu += Wt[i] * ((weeks[i] || 0) / H); wsum += Wt[i]; }
+  const Hd = (ms) => curve[isoWeekNum(ms)] || 0;
+  let num = 0, wsum = 0;
+  for (let i = 0; i < BASE_DAYS; i++) {
+    const H = Hd(today - (i + 1) * DAY);
+    if (H <= 0) continue;                       /* день вне сезона — в базу не берём */
+    const w = BASE_DAYS - i;                    /* 10 … 1 — свежие дни весят больше */
+    num += w * ((days10[i] || 0) / H); wsum += w;
   }
-  let sdpu;
-  if (wsum > 0) {
-    sdpu = dpu / wsum;                            /* сглаженный спрос-на-коэффициент */
-  } else {
-    /* Начало сезона: закрытые недели ещё вне сезона — опираемся на текущую неделю */
-    const Hnow = curve[isoWeekNum(nowMon)] || 0;
-    if (Hnow > 0 && curWeekly > 0) sdpu = curWeekly / Hnow;
-    else return "off";                           /* реально вне сезона / нет спроса */
-  }
+  if (wsum === 0) return "off";                 /* все 10 дней вне сезона */
+  const sdpu = num / wsum;                      /* спрос в день на коэф. 1 */
   if (sdpu <= 0) return null;
-  let rem = stk, days = 0;
-  for (let k = 0; k < 156; k++) {
-    const H = curve[isoWeekNum(nowMon + k * 7 * DAY)] || 0;
-    const sales = sdpu * H * buyrate;            /* заказы → продажи через выкупаемость */
-    if (sales <= 0) { days += 7; continue; }
-    if (sales >= rem) { days += Math.round((rem / sales) * 7); rem = 0; break; }
-    rem -= sales; days += 7;
+  if (info) {   /* разбор для подсказки в ячейке */
+    const raw = days10.slice(0, BASE_DAYS);
+    info.days = raw.map((x) => x || 0);
+    info.plain = info.days.reduce((x, y) => x + y, 0) / BASE_DAYS;
+    info.wavg = (() => { let n = 0, ws = 0; for (let i = 0; i < BASE_DAYS; i++) { n += (BASE_DAYS - i) * (info.days[i]); ws += BASE_DAYS - i; } return n / ws; })();
+    info.hNow = Hd(today);
+    info.hNext = [0, 1, 2, 3].map((k) => Hd(today + k * 7 * DAY));
+    info.sdpu = sdpu; info.buyrate = buyrate; info.stk = stk;
   }
-  return rem > 0 ? Infinity : days;
+  let rem = stk, d = 0;
+  for (let k = 0; k < 1095; k++) {             /* до 3 лет вперёд */
+    const sales = sdpu * Hd(today + k * DAY) * buyrate;   /* заказы → продажи через выкупаемость */
+    if (sales <= 0) { d += 1; continue; }
+    if (sales >= rem) { d += rem / sales; rem = 0; break; }
+    rem -= sales; d += 1;
+  }
+  return rem > 0 ? Infinity : Math.round(d);
 }
 function fbsOverMark(fbs, base) {
   return `<span style="color:#B3261E;font-weight:700;cursor:help" data-tip="FBS-остаток (${fbs}) больше, чем СГП+Сырьё (${base}) — возможно, остаток FBS на WB завышен">❗</span>`;
 }
-function fmtSeason(d) {
+function fmtSeason(d, info) {
   if (d == null) return "—";
   if (d === "off") return `<span style="color:var(--ink3);cursor:help" data-tip="Сейчас вне сезона — оценить нельзя">—</span>`;
-  if (d === Infinity) return "∞";
-  return fmtDays(d);
+  const txt = d === Infinity ? "∞" : fmtDays(d);
+  if (!info || info.sdpu == null) return txt;
+  return `<span style="cursor:help;border-bottom:1px dotted var(--ink3)" data-tip="${esc(seasonTip(info))}">${txt}</span>`;
+}
+/* Подсказка: из чего получился «ВБ сезон» */
+function seasonTip(i) {
+  const f = (x) => (Math.round(x * 100) / 100).toLocaleString("ru");
+  const nowDay = i.sdpu * i.hNow * i.buyrate;
+  return `Заказы за 10 дней (вчера → 10 дн назад): ${i.days.join(" / ")}. ` +
+    `Среднее в день: ${f(i.plain)}, взвешенное (свежие дни весомее, 10…1): ${f(i.wavg)}. ` +
+    `Спрос на коэф. 1: ${f(i.sdpu)} в день. Кривая: сейчас ${f(i.hNow)}, по неделям вперёд ${i.hNext.map(f).join(" / ")}. ` +
+    `Продаж сейчас по модели ~${f(nowDay)}/день (выкуп ${Math.round(i.buyrate * 100)}%). Остаток ${i.stk} шт.`;
 }
 
 function statusKey(days) {
@@ -282,23 +294,24 @@ export function defTbl(n) {
     }
   }
 
-  /* Недельный факт по артикулам (последние 3 закрытые недели) — для «ВБ сезон» */
-  const nowMon = mondayMs(Date.now());
-  const wk3 = {};
-  const wk3sz = {};   /* то же по «арт|размер» — для «ВБ сезон» в строках размеров */
+  /* Дневной факт заказов за 10 полных дней (индекс 0 = вчера) — для «ВБ сезон» */
+  const today = dayStart(Date.now());
+  const d10 = {};
+  const d10sz = {};   /* то же по «арт|размер» — для «ВБ сезон» в строках размеров */
   const szKey = (art, sz) => (art || "").toLowerCase() + "|" + normSz(sz || "—");
   for (const o of (vm.allOrders || [])) {
     const art = (o.supplierArticle || "").toLowerCase();
     if (!art || !o.date) continue;
     const t = Date.parse(o.date);
     if (isNaN(t)) continue;
-    const ago = Math.round((nowMon - mondayMs(t)) / (7 * DAY));
-    if (ago >= 1 && ago <= 3) {
+    const ago = Math.round((today - dayStart(t)) / DAY);
+    if (ago >= 1 && ago <= BASE_DAYS) {
       const qn = o.quantity || 1;
-      (wk3[art] ||= [0, 0, 0])[ago - 1] += qn;
-      (wk3sz[szKey(art, o.techSize)] ||= [0, 0, 0])[ago - 1] += qn;
+      (d10[art] ||= Array(BASE_DAYS).fill(0))[ago - 1] += qn;
+      (d10sz[szKey(art, o.techSize)] ||= Array(BASE_DAYS).fill(0))[ago - 1] += qn;
     }
   }
+  const zero10 = Array(BASE_DAYS).fill(0);
 
   /* Расчёт по артикулам */
   const rows = Object.entries(byArt).map(([art, g]) => {
@@ -313,14 +326,15 @@ export function defTbl(n) {
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
     const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
     const fbsOver = !vm.isOz && fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника) */
-    const wkA = wk3[art.toLowerCase()] || [0, 0, 0];
-    const dSeason = seasonalDays(artSeason(art), total, br.val, wkA, nowMon, g.o7);              /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
-    const dSeasonNoRaw = seasonalDays(artSeason(art), g.stk + sgp, br.val, wkA, nowMon, g.o7);  /* сезон без сырья (ВБ+СГП) */
+    const dA = d10[art.toLowerCase()] || zero10;
+    const sInfo = {}, sInfoNoRaw = {};
+    const dSeason = seasonalDays(artSeason(art), total, br.val, dA, today, sInfo);              /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
+    const dSeasonNoRaw = seasonalDays(artSeason(art), g.stk + sgp, br.val, dA, today, sInfoNoRaw);  /* сезон без сырья (ВБ+СГП) */
     return {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
       def: Math.max(0, need - total),
-      dWb, dFbs, dStock, dSeason, dSeasonNoRaw, fbsArt, fbsOver,
+      dWb, dFbs, dStock, dSeason, dSeasonNoRaw, sInfo, sInfoNoRaw, fbsArt, fbsOver,
       dAll: effDr > 0 ? Math.round(total / effDr) : null,
       dNoRaw: effDr > 0 ? Math.round((g.stk + sgp) / effDr) : null,
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
@@ -377,7 +391,7 @@ export function defTbl(n) {
     ${TH("days", "FBW×", "Хватит дней: остаток FBW ÷ дневной темп заказов, с учётом выкупаемости", "th-days")}
     ${THF("FBS×", "Хватит дней: остаток на вашем FBS-складе ÷ тот же дневной темп", "th-days")}
     ${THF("Общий×", "Хватит дней: " + baseTxt + " ÷ дневной темп", "th-days")}
-    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток (" + baseTxt + ") списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
+    ${THF("ВБ сезон", "Хватит дней с учётом сезонности: остаток (" + baseTxt + ") ÷ продажи по сезонной кривой. База — заказы за последние 10 дней, свежие дни весят больше (10…1), с поправкой на кривую и выкупаемость. «—» — сезон не задан или сейчас вне сезона" + baseTxt + ") списывается по будущим неделям сезонной кривой (динамика от факта, только продажи). «—» — сезон не задан или сейчас вне сезона", "th-days")}
   </tr>`;
 
   const shown = EXD[n] ? rows : rows.slice(0, LIM);
@@ -412,7 +426,7 @@ export function defTbl(n) {
       <td style="text-align:center">${fmtDays(r.dWb)}</td>
       <td class="td-ref" style="text-align:center">${fmtDays(r.dFbs)}</td>
       <td style="text-align:center">${fmtDays(pickAll(r))}</td>
-      <td style="text-align:center;font-weight:600">${fmtSeason(pickSeason(r))}</td>
+      <td style="text-align:center;font-weight:600">${fmtSeason(pickSeason(r), withRaw ? r.sInfo : r.sInfoNoRaw)}</td>
     </tr>`;
 
     if (!open) continue;
@@ -429,7 +443,8 @@ export function defTbl(n) {
       const dStockSz = eff > 0 ? Math.round((s.total + fbsSz) / eff) : null;
       /* «ВБ сезон» размера: та же сезонная кривая артикула, но факт недель и остаток — по размеру */
       const stkSz = withRaw ? total : s.total + sgp;
-      const dSeasonSz = seasonalDays(artSeason(r.art), stkSz, r.br.val, wk3sz[szKey(r.art, s.sz)] || [0, 0, 0], nowMon, s.o7);
+      const sInfoSz = {};
+      const dSeasonSz = seasonalDays(artSeason(r.art), stkSz, r.br.val, d10sz[szKey(r.art, s.sz)] || zero10, today, sInfoSz);
       const rawCellSz = raw
         ? `${raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
         : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
@@ -449,7 +464,7 @@ export function defTbl(n) {
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((withRaw ? total : s.total + sgp) / eff) : null)}</td>
-        <td style="text-align:center;font-size:11px;font-weight:600">${fmtSeason(dSeasonSz)}</td>
+        <td style="text-align:center;font-size:11px;font-weight:600">${fmtSeason(dSeasonSz, sInfoSz)}</td>
       </tr>`;
     }
   }
