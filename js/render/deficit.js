@@ -1,6 +1,6 @@
 import { VM, DS, OAD, EXD, FA, DRW } from "../state.js";
 import { LIM } from "../config.js";
-import { esc, q, szCmp, fmtDays, pct } from "../utils.js";
+import { esc, q, szCmp, fmtDays, pct, normSz } from "../utils.js";
 import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason } from "../api/sheets.js";
 
 /* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
@@ -130,8 +130,8 @@ const STATUS = {
 };
 const RANK = { urgent: 0, soon: 1, ok: 2, enough: 3, over: 4, none: 5 };
 /* Статус по ВБ× + доп. флаг «/ ❗», если с учётом сезона (ВБ сезон) запас требует внимания раньше */
-function statusCell(dWb, dSeason) {
-  const main = statusChip(dWb);
+function statusCell(dWb, dSeason, small) {
+  const main = statusChip(dWb, small);
   if (typeof dSeason !== "number" || !isFinite(dSeason)) return main;
   const sk = statusKey(dSeason);
   if (RANK[sk] >= RANK[statusKey(dWb)]) return main;   /* сезон не срочнее — не дублируем */
@@ -285,13 +285,19 @@ export function defTbl(n) {
   /* Недельный факт по артикулам (последние 3 закрытые недели) — для «ВБ сезон» */
   const nowMon = mondayMs(Date.now());
   const wk3 = {};
+  const wk3sz = {};   /* то же по «арт|размер» — для «ВБ сезон» в строках размеров */
+  const szKey = (art, sz) => (art || "").toLowerCase() + "|" + normSz(sz || "—");
   for (const o of (vm.allOrders || [])) {
     const art = (o.supplierArticle || "").toLowerCase();
     if (!art || !o.date) continue;
     const t = Date.parse(o.date);
     if (isNaN(t)) continue;
     const ago = Math.round((nowMon - mondayMs(t)) / (7 * DAY));
-    if (ago >= 1 && ago <= 3) (wk3[art] ||= [0, 0, 0])[ago - 1] += (o.quantity || 1);
+    if (ago >= 1 && ago <= 3) {
+      const qn = o.quantity || 1;
+      (wk3[art] ||= [0, 0, 0])[ago - 1] += qn;
+      (wk3sz[szKey(art, o.techSize)] ||= [0, 0, 0])[ago - 1] += qn;
+    }
   }
 
   /* Расчёт по артикулам */
@@ -421,6 +427,9 @@ export function defTbl(n) {
       const dWb = eff > 0 ? Math.round(s.total / eff) : null;
       const fbsSz = fbsMap[r.art + " · " + s.sz] || 0;
       const dStockSz = eff > 0 ? Math.round((s.total + fbsSz) / eff) : null;
+      /* «ВБ сезон» размера: та же сезонная кривая артикула, но факт недель и остаток — по размеру */
+      const stkSz = withRaw ? total : s.total + sgp;
+      const dSeasonSz = seasonalDays(artSeason(r.art), stkSz, r.br.val, wk3sz[szKey(r.art, s.sz)] || [0, 0, 0], nowMon, s.o7);
       const rawCellSz = raw
         ? `${raw}${amPrimary ? rawPoolBadge(r.art, rawSibs) : ""}`
         : (amSibling ? rawPoolDash(rawPrimaryFor(r.art)) : "—");
@@ -436,11 +445,11 @@ export function defTbl(n) {
         <td style="text-align:center;font-size:11px">${need || "—"}</td>
         <td style="text-align:center;font-size:11px;color:var(--blue)">${pct(s.o7, r.o7)}</td>
         <td style="text-align:center;font-size:11px;color:${def > 0 ? "var(--red)" : "var(--green)"}">${def > 0 ? "−" + def : "✓"}</td>
-        <td style="border-right:2px solid #C7BFB0">${statusChip(dStockSz, true)}</td>
+        <td style="border-right:2px solid #C7BFB0">${statusCell(dStockSz, dSeasonSz, true)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(dWb)}</td>
         <td class="td-ref" style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((fbsMap[r.art + " · " + s.sz] || 0) / eff) : null)}</td>
         <td style="text-align:center;font-size:11px">${fmtDays(eff > 0 ? Math.round((withRaw ? total : s.total + sgp) / eff) : null)}</td>
-        <td style="text-align:center;font-size:11px;color:var(--ink3)">—</td>
+        <td style="text-align:center;font-size:11px;font-weight:600">${fmtSeason(dSeasonSz)}</td>
       </tr>`;
     }
   }
