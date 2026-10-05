@@ -1,7 +1,7 @@
 import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
-import { getStocksForArt } from "../api/sheets.js";
+import { getStocksForArt, getStocksForSz } from "../api/sheets.js";
 
 /* Каркас секции. Тело таблицы рисуется отдельно — сортировка
    и раскрытие артикула перерисовывают только #stbl, а не весь экран. */
@@ -20,7 +20,7 @@ export function stocksHTML(n) {
 
   return `<div class="sec">
     <div class="sh">
-      <span class="st">Остатки по складам</span>
+      <span class="st" data-tip="Итого = FBW (склады WB) + FBS (склады продавца). СГП и сырьё сюда не входят — поэтому «Итого» не совпадает с «Общий» в дефиците">Остатки FBW + FBS (без сырья и СГП)</span>
       <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span class="sm2">${count} позиций · ${whCount} складов</span>${fbsNote}${msk}
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Остатки','ostatki')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
@@ -28,6 +28,12 @@ export function stocksHTML(n) {
     </div>
     <div class="sw" id="stbl${n}">${stocksTbl(n)}</div>
   </div>`;
+}
+
+/* ❗ у «Итого», если FBW+FBS больше общего остатка из дефицита (FBW+СГП+Сырьё),
+   т.е. FBS больше, чем СГП+Сырьё, — FBS на WB, вероятно, завышен (как ❗ в других таблицах) */
+function totalOverMark(itogo, fbw, fbs, base) {
+  return ` <span style="color:#B3261E;font-weight:700;cursor:help" data-tip="Итого FBW+FBS (${fbw} + ${fbs} = ${itogo}) больше общего остатка из дефицита FBW+СГП+Сырьё (${fbw} + ${base} = ${fbw + base}): FBS (${fbs}) больше, чем СГП+Сырьё (${base}) — возможно, остаток FBS на WB завышен">❗</span>`;
 }
 
 export function stocksTbl(n) {
@@ -48,13 +54,13 @@ export function stocksTbl(n) {
   for (const v of Object.values(arts)) {
     if (fa && !v.art.toLowerCase().includes(fa) && !(v.name || "").toLowerCase().includes(fa)) continue;
     if (fz && !v.sz.toLowerCase().includes(fz)) continue;
-    const g = (byArt[v.art] ||= { name: v.name, total: 0, wh: {}, fbsWh: {}, sizes: [] });
-    g.total += v.total;
+    const g = (byArt[v.art] ||= { name: v.name, total: 0, fbw: 0, fbs: 0, wh: {}, fbsWh: {}, sizes: [] });
+    g.total += v.total; g.fbw += v.total;
     g.sizes.push(v);
     for (const [w, qy] of Object.entries(v.wh)) g.wh[w] = (g.wh[w] || 0) + qy;
     /* FBS для этого артикул·размера */
     const fc = fbsCells[v.art + " · " + v.sz] || {};
-    for (const [w, qy] of Object.entries(fc)) { g.fbsWh[w] = (g.fbsWh[w] || 0) + qy; g.total += qy; }
+    for (const [w, qy] of Object.entries(fc)) { g.fbsWh[w] = (g.fbsWh[w] || 0) + qy; g.total += qy; g.fbs += qy; }
   }
 
   const getSort = (o) => (c === "total" ? o.total : (o.wh[c] ?? o.fbsWh[c] ?? 0));
@@ -93,9 +99,17 @@ export function stocksTbl(n) {
       return `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;color:#8B4513">${qy || "—"}</td>`;
     }).join("");
 
+    /* сверка с дефицитом — только для WB и без фильтра по размеру (иначе суммы неполные) */
+    let mark = "";
+    if (!vm.isOz && !fz && g.fbs > 0) {
+      const st = getStocksForArt(a);
+      const base = st.sgp + st.raw;
+      if (g.fbs > base) mark = totalOverMark(g.total, g.fbw, g.fbs, base);
+    }
+
     rows += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArt(${n},'${q(a)}')"` : ""}>
       <td style="white-space:nowrap">${tog}<span class="art">${esc(a)}</span><span style="font-size:10px;color:var(--ink3);margin-left:6px">${esc(g.name.slice(0, 22))}</span></td>
-      <td class="tc ${qc(g.total, 10)}">${g.total}</td>${cells}${cellsF}
+      <td class="tc ${qc(g.total, 10)}"${mark ? ' style="color:#B3261E"' : ""}>${g.total}${mark}</td>${cells}${cellsF}
     </tr>`;
 
     if (open) {
@@ -110,9 +124,15 @@ export function stocksTbl(n) {
           const qy = fc[w] || 0;
           return `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
         }).join("");
+        let markSz = "";
+        if (!vm.isOz && szFbs > 0) {
+          const st = getStocksForSz(a, sv.sz);
+          const base = st.sgp + st.raw;
+          if (szFbs > base) markSz = totalOverMark(sv.total + szFbs, sv.total, szFbs, base);
+        }
         rows += `<tr class="sz-row">
           <td style="padding-left:28px">${esc(sv.sz)}</td>
-          <td class="${qc(sv.total + szFbs, 10)}" style="text-align:center;font-weight:600">${sv.total + szFbs}</td>${sc}${scF}
+          <td class="${qc(sv.total + szFbs, 10)}" style="text-align:center;font-weight:600${markSz ? ";color:#B3261E" : ""}">${sv.total + szFbs}${markSz}</td>${sc}${scF}
         </tr>`;
       }
     }
