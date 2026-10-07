@@ -70,8 +70,11 @@ async function fetchOzon(force) {
   /* FBS-заказы (свой склад) — отдельная ручка posting/fbs/list, раньше не грузились.
      Формат postings тот же (products, in_process_at/created_at), поэтому просто
      объединяем с FBO в общий список. try/catch: сбой FBS не рушит FBO. */
+  const issues = [];   /* что не загрузилось — для плашки */
+  let fbsOrdErr = null;
   const postingsFbs = await cached("oz:orders_fbs", force, async () => {
     const out = [];
+    fbsOrdErr = null;
     try {
       for (let p = 0, offset = 0; p < 10; p++, offset += 1000) {
         const d = await ozPost(`${OZ_BASE}/v3/posting/fbs/list`, {
@@ -86,9 +89,11 @@ async function fetchOzon(force) {
       }
     } catch (e) {
       console.warn("Ozon FBS-заказы недоступны:", e.message);
+      fbsOrdErr = e.message;
     }
     return out;
-  });
+  }, () => !fbsOrdErr);
+  if (fbsOrdErr) issues.push({ what: "FBS-заказы Ozon", why: fbsOrdErr, effect: "заказы только FBO — продажи занижены" });
 
   const postings = [...postingsFbo, ...postingsFbs];
   console.log(`Ozon заказы: FBO ${postingsFbo.length} + FBS ${postingsFbs.length} = ${postings.length}`);
@@ -113,8 +118,10 @@ async function fetchOzon(force) {
      есть запись type:"fbs" с present (физический остаток на складе продавца).
      Складской разбивки этот метод не возвращает → кладём всё в один столбец «FBS».
      Обёрнуто в try/catch: сбой FBS не должен ронять заказы и FBO-остатки. */
+  let fbsStkErr = null;
   const fbsItems = await cached("oz:fbs", force, async () => {
     const out = [];
+    fbsStkErr = null;
     try {
       let cursor = "";
       for (let p = 0; p < 40; p++) {
@@ -130,9 +137,11 @@ async function fetchOzon(force) {
       }
     } catch (e) {
       console.warn("Ozon FBS (product/info/stocks) недоступен:", e.message);
+      fbsStkErr = e.message;
     }
     return out;
-  });
+  }, () => !fbsStkErr);
+  if (fbsStkErr) issues.push({ what: "FBS-остатки Ozon", why: fbsStkErr, effect: "колонки FBS пустые" });
 
   const fbs = {}, fbsCells = {}, fbsWh = {};
   const FBS_WH = "FBS";
@@ -158,16 +167,18 @@ async function fetchOzon(force) {
     orders7: postings.filter((o) => { const d = dayOf(o); return d >= w && d < t; }),   /* ровно 7 полных дней, без сегодня */
     stocks,
     fbs, fbsCells, fbsWh,
+    issues,
   };
   return D[3];
 }
 
-async function cached(key, force, fn) {
+/* ok() === false ⇒ результат неполный, в кэш не кладём */
+async function cached(key, force, fn, ok) {
   if (!force) {
     const hit = cacheGet(key);
     if (hit) return hit;
   }
   const data = await fn();
-  cacheSet(key, data);
+  if (!ok || ok(data)) cacheSet(key, data);
   return data;
 }

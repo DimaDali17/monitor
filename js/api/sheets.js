@@ -62,6 +62,7 @@ function primaryOf(users) {
 
 export const sheets = {
   loaded: false,
+  error: null,      /* текст ошибки, если справочники не загрузились */
   buyrate: {},      /* artLower → 0..1 */
   sgp: {},          /* "wbArt;wbSz(norm)" → шт */
   raw: {},          /* "artPr;szPr(norm)" → шт */
@@ -122,7 +123,13 @@ export function loadExternal() {
   inflight = (async () => {
     try {
       const [rB, rR, rM, rN, rS] = await Promise.all(
-        [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON].map((u) => fetch(u).then((r) => r.text()))
+        [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON].map((u, i) => fetch(u).then(async (r) => {
+          const nm = ["Выкупаемость", "Остатки сводная (СГП+сырьё)", "Арт производ", "Номенклатура", "Сезон"][i];
+          if (!r.ok) throw new Error(`${nm}: HTTP ${r.status}`);
+          const txt = await r.text();
+          if (/^\s*<(!doctype|html)/i.test(txt)) throw new Error(`${nm}: Google вернул страницу вместо CSV`);
+          return txt;
+        }))
       );
 
       sheets.buyrate = {}; sheets.sgp = {}; sheets.raw = {}; sheets.map = {}; sheets.artDisplay = {}; sheets.setByRawKey = {}; sheets.rawPrimaryForce = {}; sheets.nomen = {}; sheets.seasonWk = { winter: {}, summer: {} };
@@ -229,6 +236,7 @@ export function loadExternal() {
 
       buildIndexes();
       sheets.loaded = true;
+      sheets.error = null;
       console.log(
         `Справочники: выкупаемость=${Object.keys(sheets.buyrate).length} ` +
         `СГП=${Object.keys(sheets.sgp).length} сырьё=${Object.keys(sheets.raw).length} ` +
@@ -236,6 +244,7 @@ export function loadExternal() {
       );
     } catch (e) {
       console.warn("Справочники не загрузились:", e);
+      sheets.error = e.message || String(e);   /* покажем плашкой; при следующем ↻ попробуем снова */
     } finally {
       inflight = null;
     }

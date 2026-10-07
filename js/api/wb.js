@@ -278,7 +278,10 @@ const MP_BASE = "https://marketplace-api.wildberries.ru";
 const FBS_GAP = 700; /* marketplace-api мягче Statistics, свой лимит */
 
 async function loadFBS(cab, onRetry) {
-  const empty = { fbs: {}, fbsWh: {}, fbsCells: {}, sridWh: {} };
+  /* problems — что не загрузилось. Непустой список ⇒ результат НЕ кэшируем
+     и показываем пользователю плашку «загрузилось не всё». */
+  const problems = [];
+  const empty = () => ({ fbs: {}, fbsWh: {}, fbsCells: {}, sridWh: {}, problems });
 
   /* 1. Склады FBS продавца (id → название) */
   let whs = [];
@@ -287,7 +290,8 @@ async function loadFBS(cab, onRetry) {
     whs = Array.isArray(w) ? w : (w?.warehouses || w?.data || []);
   } catch (e) {
     console.warn(`Кабинет ${cab}: FBS-склады не загрузились — ${e.message}`);
-    return empty;
+    problems.push({ what: "FBS-остатки: список складов", why: e.message, effect: "колонки FBS пустые" });
+    return empty();
   }
   const whName = {};
   (Array.isArray(whs) ? whs : []).forEach((x) => {
@@ -295,12 +299,16 @@ async function loadFBS(cab, onRetry) {
     if (id != null) { const nm = String(x.name || x.officeName || "").replace(/^\s*мой\s+склад\s*/i, "").trim(); whName[id] = nm || ("Склад " + id); }
   });
   const whIds = Object.keys(whName);
-  if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return empty; }
+  if (!whIds.length) { console.warn(`Кабинет ${cab}: нет складов FBS`); return empty(); }   /* складов нет — это не ошибка */
 
   /* 2. Баркоды товаров из карточек */
   const cards = cardsOf(cab);
   const barcodes = Object.keys(cards.byBarcode || {});
-  if (!barcodes.length) { console.warn(`Кабинет ${cab}: нет баркодов (нужны карточки) — FBS пропущен`); return empty; }
+  if (!barcodes.length) {
+    console.warn(`Кабинет ${cab}: нет баркодов (нужны карточки) — FBS пропущен`);
+    problems.push({ what: "FBS-остатки", why: "нет баркодов товаров (справочник карточек пуст)", effect: "колонки FBS пустые" });
+    return empty();
+  }
 
   /* 3. Остатки по каждому складу, батчами по 1000 баркодов.
      fbs    — "арт · размер" → шт (сумма по складам, для дефицита);
@@ -315,6 +323,7 @@ async function loadFBS(cab, onRetry) {
         data = await wbPost(`${MP_BASE}/api/v3/stocks/${wid}`, { skus }, cab, onRetry, FBS_GAP);
       } catch (e) {
         console.warn(`Кабинет ${cab}: FBS-остатки склад ${wid} — ${e.message}`);
+        problems.push({ what: `FBS-остатки склада «${nm}»`, why: e.message, effect: "FBS занижен — нет этого склада" });
         continue;
       }
       const rows = data?.stocks || data?.data?.stocks || [];
@@ -356,6 +365,7 @@ async function loadFBS(cab, onRetry) {
     console.log(`Кабинет ${cab}: FBS-заказы со складом: ${Object.keys(sridWh).length}`);
   } catch (e) {
     console.warn(`Кабинет ${cab}: FBS-заказы (склады) не загрузились — ${e.message}`);
+    problems.push({ what: "FBS-заказы: склад отгрузки", why: e.message, effect: "у FBS-заказов не будет названия склада" });
   }
 
   return { fbs, fbsWh, fbsCells, sridWh };
@@ -364,6 +374,7 @@ async function loadFBS(cab, onRetry) {
 /* ══════════ Основная загрузка кабинета ══════════ */
 
 export async function loadWB(n, { force = false, onRetry } = {}) {
+  const issues = [];   /* что не загрузилось (кабинет при этом работает) */
   const ordFrom  = daysAgo(ORDERS_DAYS) + "T00:00:00Z";
   const urlOrders = `${WB_BASE}/orders?dateFrom=${ordFrom}&flag=0`;
 
@@ -377,17 +388,22 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
      Если токена «Контент» нет, воркер вернёт понятную 500: тогда
      работаем на артикулах из заказов, без размеров. */
   try {
-    const hit = force ? null : cacheGet(`wb${n}:cards`);
+    /* старый кэш без byBarcode не годится — из-за него FBS пропускался */
+    const hit0 = force ? null : cacheGet(`wb${n}:cards`);
+    const hit = hit0 && hit0.byBarcode && Object.keys(hit0.byBarcode).length ? hit0 : null;
     if (hit) {
-      CARDS[n] = { byChrt: hit.byChrt, byNm: hit.byNm, ready: true, degraded: false };
+      /* byBarcode тоже из кэша: без него FBS-остатки молча пропускались («нет баркодов») */
+      CARDS[n] = { byChrt: hit.byChrt, byNm: hit.byNm, byBarcode: hit.byBarcode || {}, ready: true, degraded: false };
       console.log(`Кабинет ${n}: каталог из кэша, ${Object.keys(hit.byChrt).length} размеров`);
     } else {
       onRetry?.("загружаю справочник артикулов", 0, 0);
       const c = await loadCards(n, onRetry);
-      cacheSet(`wb${n}:cards`, { byChrt: c.byChrt, byNm: c.byNm });
+      cacheSet(`wb${n}:cards`, { byChrt: c.byChrt, byNm: c.byNm, byBarcode: c.byBarcode });
     }
   } catch (e) {
     cardsOf(n).degraded = true;
+    issues.push({ what: "Справочник карточек (Content API)", why: e.message,
+      effect: "артикулы и размеры взяты из заказов, FBS-остатки не загрузятся" });
     console.warn(`Кабинет ${n}: справочник не загрузился — ${e.message}`);
     onRetry?.("справочник недоступен, беру артикулы из заказов", 0, 0);
   }
@@ -398,12 +414,17 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     () => loadStocksNew(n, onRetry));
 
   /* Остатки FBS (склад продавца) — best-effort, справочно.
-     Если воркер/ключ не готов — вернётся {}, колонка покажет «—». */
+     Сбой не роняет кабинет, но и НЕ молчит: попадает в issues → плашка
+     в дашборде. Неполный результат не кэшируем, иначе «↻» 10 минут
+     отдавал бы те же пустые FBS. */
   let fbsRes = { fbs: {}, fbsWh: {}, fbsCells: {}, sridWh: {} };
   try {
-    fbsRes = await cached(`wb${n}:fbs2`, force, () => loadFBS(n, onRetry));
+    fbsRes = await cached(`wb${n}:fbs3`, force, () => loadFBS(n, onRetry),
+      (r) => !(r.problems && r.problems.length));
+    issues.push(...(fbsRes.problems || []));
   } catch (e) {
     console.warn(`Кабинет ${n}: FBS не загрузился — ${e.message}`);
+    issues.push({ what: "FBS-остатки", why: e.message, effect: "колонки FBS пустые" });
   }
 
   /* Обогащаем FBS-заказы именем склада продавца (по srid ↔ v3/orders) */
@@ -424,16 +445,18 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     fbs:     fbsRes.fbs || {},
     fbsWh:   fbsRes.fbsWh || {},
     fbsCells: fbsRes.fbsCells || {},
+    issues,                                   /* что не загрузилось — для плашки */
   };
   return D[n];
 }
 
-async function cached(key, force, fn) {
+/* ok(data) === false ⇒ результат неполный, в кэш не кладём */
+async function cached(key, force, fn, ok) {
   if (!force) {
     const hit = cacheGet(key);
     if (hit) return hit;
   }
   const data = await fn();
-  cacheSet(key, data);
+  if (!ok || ok(data)) cacheSet(key, data);
   return data;
 }
