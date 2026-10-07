@@ -8,6 +8,7 @@ import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
 import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl } from "./stocks.js";
 import { deficitHTML, defTbl, rawModeTog } from "./deficit.js";
+import { issuesHTML } from "./issues.js";
 
 /* Раньше renderWB и renderOZ были почти одинаковыми копиями.
    Разница между кабинетами сводится к типу — 'wb' или 'oz'. */
@@ -19,6 +20,7 @@ export function renderCabinet(n) {
   const type = vm.isOz ? "oz" : "wb";
 
   el.innerHTML =
+    issuesHTML(n) +
     `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
        <div style="flex:0 1 245px;min-width:225px">${filterHTML(n)}</div>
        <div style="flex:1 1 280px;min-width:260px">${alertsHTML(n)}</div>
