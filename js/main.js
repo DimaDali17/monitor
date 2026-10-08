@@ -1,7 +1,7 @@
 import { VERSION } from "./config.js";
 import {
   D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAC, SS, DS, FSS, FA, FP,
-  CM, CV, GB, CD, FG, OFM, CONSO, cabName,
+  CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
@@ -145,6 +145,7 @@ const App = {
   /* график */
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
   setChartVal(n, v) { CV[n] = v; renderCabinet(n); },
+  togChartPrice(n) { CP[n] = !CP[n]; renderCabinet(n); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {
