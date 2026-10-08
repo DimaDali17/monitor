@@ -8,6 +8,7 @@ const OTHER = "#B8B2A7";
 const BAR = "#6B6357", FUT = "#E8E4DC", GHOST = "#C7C2B6";
 const PRICE = "#1F1B16";   /* линия «Цена на сайте» */
 const rub = (v) => Math.round(v).toLocaleString("ru") + " ₽";
+const PRICE_MIN_SPAN = 0.6;   /* минимальный размах шкалы цены: 60% от средней (±30%) */
 
 export function chartHTML(n, vm, type) {
   if (!vm) return "";
@@ -96,9 +97,14 @@ export function chartHTML(n, vm, type) {
     const pts = [];
     for (let i = 0; i < N; i++) { const v = avgAt(i); if (v != null) pts.push({ i, v }); }
     if (!pts.length) return "";
-    let lo = Math.min(...pts.map((p) => p.v)), hi = Math.max(...pts.map((p) => p.v));
-    const pad = Math.max((hi - lo) * 0.15, hi * 0.03, 1);
-    lo = Math.max(0, lo - pad); hi = hi + pad;
+    /* Шкала не «зумится» в узкий коридор: размах — не меньше ±30% от середины.
+       Иначе +5–10% цены рисуется как взлёт на всю высоту графика. */
+    const dMin = Math.min(...pts.map((p) => p.v)), dMax = Math.max(...pts.map((p) => p.v));
+    const mid = (dMin + dMax) / 2;
+    const span = Math.max((dMax - dMin) * 1.3, mid * PRICE_MIN_SPAN);
+    let lo = Math.max(0, mid - span / 2), hi = lo + span;
+    const step = span > 2000 ? 100 : span > 400 ? 50 : 10;            /* круглые отметки шкалы */
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
     const y = (v) => T + cH - ((v - lo) / (hi - lo)) * cH;
     const x = (i) => L + i * gW + gW / 2;
 
@@ -136,10 +142,18 @@ export function chartHTML(n, vm, type) {
     const span = mode === "week" ? 7 : 30;
     return new Date(iso(Date.now() - (span - 1 - i) * 864e5) + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" });
   };
+  /* «640 → 799 ₽, разброс 25%» — чтобы масштаб читался цифрой, а не на глаз */
+  const rangeNote = () => {
+    const vs = []; for (let i = 0; i < N; i++) { const v = avgAt(i); if (v != null) vs.push(v); }
+    if (vs.length < 2) return "";
+    const mn = Math.min(...vs), mx = Math.max(...vs);
+    const pct = Math.round((mx / mn - 1) * 100);
+    return `<span style="color:var(--ink3);margin-left:6px">· ${Math.round(mn).toLocaleString("ru")}–${Math.round(mx).toLocaleString("ru")} ₽, разброс ${pct}%</span>`;
+  };
   const priceLegend = (inline) => {
     if (!showPrice || !pQty.some((q) => q > 0)) return "";
     const item = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink2);white-space:nowrap">
-      <svg width="16" height="9"><line x1="0" y1="4.5" x2="16" y2="4.5" stroke="${PRICE}" stroke-width="1.4"/><circle cx="8" cy="4.5" r="2.3" fill="#fff" stroke="${PRICE}" stroke-width="1.2"/></svg>Цена на сайте, ₽/шт (шкала справа)</span>`;
+      <svg width="16" height="9"><line x1="0" y1="4.5" x2="16" y2="4.5" stroke="${PRICE}" stroke-width="1.4"/><circle cx="8" cy="4.5" r="2.3" fill="#fff" stroke="${PRICE}" stroke-width="1.2"/></svg>Цена на сайте, ₽/шт (шкала справа)${rangeNote()}</span>`;
     return inline ? item : `<div style="display:flex;gap:14px;margin-bottom:6px">${item}</div>`;
   };
 
