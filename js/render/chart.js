@@ -1,4 +1,4 @@
-import { CM, CV, CD, GB, FP, FG } from "../state.js";
+import { CM, CV, CP, CD, GB, FP, FG } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
 
@@ -6,6 +6,8 @@ import { artGroup, artColor } from "../api/sheets.js";
 const PAL = ["#C0504D", "#4F81BD", "#9BBB59", "#8064A2", "#E0A030"];
 const OTHER = "#B8B2A7";
 const BAR = "#6B6357", FUT = "#E8E4DC", GHOST = "#C7C2B6";
+const PRICE = "#1F1B16";   /* линия «Цена на сайте» */
+const rub = (v) => Math.round(v).toLocaleString("ru") + " ₽";
 
 export function chartHTML(n, vm, type) {
   if (!vm) return "";
@@ -51,7 +53,17 @@ export function chartHTML(n, vm, type) {
     : mode === "yesterday" ? (vm.yestO || [])
     : (vm.allOrders || []);
 
-  const W = 700, H = 155, L = 38, R = 10, T = 13, B = 20;
+  /* ── Цена на сайте: средняя цена за штуку по интервалу (взвешенно по штукам) ── */
+  const showPrice = CP[n] !== false;
+  const pSum = Array(N).fill(0), pQty = Array(N).fill(0);
+  const pSeg = {};   /* сегмент «Глубже» → интервал → [сумма, шт] (для подсказки) */
+  const addPrice = (i, rubles, qty, seg) => {
+    if (i < 0 || i >= N || !(rubles > 0) || !(qty > 0)) return;
+    pSum[i] += rubles; pQty[i] += qty;
+    if (seg != null) { const a = ((pSeg[seg] ||= {})[i] ||= [0, 0]); a[0] += rubles; a[1] += qty; }
+  };
+
+  const W = 700, H = 155, L = 38, R = showPrice ? 40 : 10, T = 13, B = 20;
   const cW = W - L - R, cH = H - T - B;
   const gW = cW / N;
 
@@ -76,12 +88,70 @@ export function chartHTML(n, vm, type) {
     return out;
   };
 
+  /* Линия цены + правая шкала. Шкала своя (мин…макс цены с запасом), иначе
+     колебания цены не видны на фоне штук. Интервалы без заказов — разрыв линии. */
+  const avgAt = (i) => (pQty[i] > 0 ? pSum[i] / pQty[i] : null);
+  const priceLine = (segs) => {
+    if (!showPrice) return "";
+    const pts = [];
+    for (let i = 0; i < N; i++) { const v = avgAt(i); if (v != null) pts.push({ i, v }); }
+    if (!pts.length) return "";
+    let lo = Math.min(...pts.map((p) => p.v)), hi = Math.max(...pts.map((p) => p.v));
+    const pad = Math.max((hi - lo) * 0.15, hi * 0.03, 1);
+    lo = Math.max(0, lo - pad); hi = hi + pad;
+    const y = (v) => T + cH - ((v - lo) / (hi - lo)) * cH;
+    const x = (i) => L + i * gW + gW / 2;
+
+    /* правая шкала: 3 отметки */
+    let out = "";
+    [lo, (lo + hi) / 2, hi].forEach((v) => {
+      out += `<text x="${W - R + 3}" y="${y(v) + 3}" text-anchor="start" font-size="7" fill="${PRICE}" opacity=".75">${Math.round(v).toLocaleString("ru")}</text>`;
+    });
+    out += `<text x="${W - 2}" y="${T - 4}" text-anchor="end" font-size="7" fill="${PRICE}" opacity=".75">₽/шт</text>`;
+
+    /* отрезки: соседние интервалы соединяем, пропуск — разрыв */
+    let d = "", prev = -2;
+    for (const p of pts) { d += (p.i === prev + 1 ? " L" : " M") + x(p.i).toFixed(1) + " " + y(p.v).toFixed(1); prev = p.i; }
+    out += `<path d="${d}" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round" opacity=".85"/>`;
+    out += `<path d="${d}" fill="none" stroke="${PRICE}" stroke-width="1.4" stroke-linejoin="round"/>`;
+
+    /* точки с подсказкой; подписи — у первой, последней, мин и макс */
+    const vs = pts.map((p) => p.v);
+    const iMin = pts[vs.indexOf(Math.min(...vs))].i, iMax = pts[vs.indexOf(Math.max(...vs))].i;
+    const lbl = new Set([pts[0].i, pts[pts.length - 1].i, iMin, iMax]);
+    for (const p of pts) {
+      let tip = `${labelOf(p.i)} · цена на сайте: ${rub(p.v)} (среднее по ${pQty[p.i]} шт)`;
+      if (segs) {
+        const parts = segs.map((sg) => { const a = pSeg[sg] && pSeg[sg][p.i]; return a && a[1] ? `${sg}: ${rub(a[0] / a[1])}` : null; }).filter(Boolean);
+        if (parts.length > 1) tip += "\n" + parts.join("\n");
+      }
+      out += `<circle cx="${x(p.i)}" cy="${y(p.v)}" r="2.3" fill="#fff" stroke="${PRICE}" stroke-width="1.2"><title>${esc(tip)}</title></circle>`;
+      if (lbl.has(p.i)) out += `<text x="${x(p.i)}" y="${y(p.v) + 9}" text-anchor="middle" font-size="6.5" fill="${PRICE}" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="2">${Math.round(p.v).toLocaleString("ru")}</text>`;
+    }
+    return out;
+  };
+  /* полная подпись интервала для подсказки */
+  const labelOf = (i) => {
+    if (isHourly) return i + ":00";
+    const span = mode === "week" ? 7 : 30;
+    return new Date(iso(Date.now() - (span - 1 - i) * 864e5) + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" });
+  };
+  const priceLegend = (inline) => {
+    if (!showPrice || !pQty.some((q) => q > 0)) return "";
+    const item = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink2);white-space:nowrap">
+      <svg width="16" height="9"><line x1="0" y1="4.5" x2="16" y2="4.5" stroke="${PRICE}" stroke-width="1.4"/><circle cx="8" cy="4.5" r="2.3" fill="#fff" stroke="${PRICE}" stroke-width="1.2"/></svg>Цена на сайте, ₽/шт (шкала справа)</span>`;
+    return inline ? item : `<div style="display:flex;gap:14px;margin-bottom:6px">${item}</div>`;
+  };
+
   const on = (v, k) => (v === k ? "on" : "");
   const modeName = mode === "day" ? "день" : mode === "yesterday" ? "вчера" : mode === "week" ? "неделя" : "месяц";
   const controls = `<span style="display:flex;align-items:center;gap:8px">
       <span class="ctog">
         <button class="${cd.deep ? "" : "on"}" onclick="App.chartDeep(${n},false)">Обычный</button>
         <button class="${cd.deep ? "on" : ""}" onclick="App.chartDeep(${n},true)">Глубже</button>
+      </span>
+      <span class="ctog">
+        <button class="${showPrice ? "on" : ""}" onclick="App.togChartPrice(${n})" data-tip="Линия — средняя цена на сайте за штуку (финиш-прайс) по каждому интервалу, шкала справа">— Цена</button>
       </span>
       <span class="ctog">
         <button class="${on(CV[n], "ord")}" onclick="App.setChartVal(${n},'ord')">Шт</button>
@@ -99,7 +169,13 @@ export function chartHTML(n, vm, type) {
   if (!cd.deep) {
     const valOf = (o) => isRev ? price(o) : (type === "wb" ? (o.quantity || 1) : (o.products || []).reduce((s, p) => s + (p.quantity || 1), 0));
     const cur = Array(N).fill(0);
-    ordersFor().forEach((o) => { const i = idxOf(o); if (i >= 0) cur[i] += valOf(o); });
+    ordersFor().forEach((o) => {
+      const i = idxOf(o);
+      if (i < 0) return;
+      cur[i] += valOf(o);
+      if (type === "wb") addPrice(i, price(o), o.quantity || 1);
+      else (o.products || []).forEach((p) => addPrice(i, parseFloat(p.price || p.offer_price || 0) * (p.quantity || 1), p.quantity || 1));
+    });
 
     /* Вчерашние продажи по тем же часам — бледно-серые «призрачные» колонки рядом.
        Только на срезе «День»: видно, как шло в это же время вчера. */
@@ -108,7 +184,7 @@ export function chartHTML(n, vm, type) {
 
     const max = Math.max(...cur, ...(ghost || []), 1);
     const lblFs = mode === "month" ? 6 : 7;
-    let bars = "";
+    let bars = "", tops = "";   /* tops — подписи над столбиками, рисуются поверх линии цены */
 
     if (ghost) {
       /* Пара колонок в часе: слева бледная «вчера», справа обычная «сегодня». */
@@ -118,22 +194,23 @@ export function chartHTML(n, vm, type) {
         const gH = (ghost[i] / max) * cH, tH = (cur[i] / max) * cH;
         const future = i > nowH;
         bars += `<rect x="${gx}" y="${T + cH - gH}" width="${pW}" height="${gH}" rx="2" fill="${GHOST}" opacity=".6"><title>вчера: ${fv(ghost[i])}</title></rect>`;
-        if (ghost[i] > 0) bars += `<text x="${gx + pW / 2}" y="${T + cH - gH - 3}" text-anchor="middle" font-size="${lblFs - 1}" fill="var(--ink3)">${fv(ghost[i])}</text>`;
+        if (ghost[i] > 0) tops += `<text x="${gx + pW / 2}" y="${T + cH - gH - 3}" text-anchor="middle" font-size="${lblFs - 1}" fill="var(--ink3)" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(ghost[i])}</text>`;
         bars += `<rect x="${tx}" y="${T + cH - tH}" width="${pW}" height="${tH}" rx="2" fill="${future ? FUT : BAR}" opacity=".9"><title>сегодня: ${fv(cur[i])}</title></rect>`;
-        if (cur[i] > 0) bars += `<text x="${tx + pW / 2}" y="${T + cH - tH - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fv(cur[i])}</text>`;
+        if (cur[i] > 0) tops += `<text x="${tx + pW / 2}" y="${T + cH - tH - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(cur[i])}</text>`;
       }
     } else {
       const bW = Math.max(2, Math.floor(gW * 0.55));
       for (let i = 0; i < N; i++) {
         const bH = (cur[i] / max) * cH, bx = L + i * gW + (gW - bW) / 2, by = T + cH - bH;
         bars += `<rect x="${bx}" y="${by}" width="${bW}" height="${bH}" rx="2" fill="${BAR}" opacity=".9"/>`;
-        if (cur[i] > 0) bars += `<text x="${bx + bW / 2}" y="${by - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600">${fv(cur[i])}</text>`;
+        if (cur[i] > 0) tops += `<text x="${bx + bW / 2}" y="${by - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(cur[i])}</text>`;
       }
     }
     return `<div class="sec" style="margin-bottom:14px">
       <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName}${ghost ? ` <span style="color:var(--ink3);font-weight:400;font-size:11px">· серым — вчера</span>` : ""}</span>${controls}</div>
       <div class="tw" style="padding:8px">
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
+        ${priceLegend()}
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${priceLine()}${tops}${xLabels()}</svg>
       </div>
     </div>`;
   }
@@ -153,7 +230,7 @@ export function chartHTML(n, vm, type) {
     if (type === "wb") {
       const art = o.supplierArticle || "—";
       const g = artGroup(art);
-      classify.push({ i, predmet: o.subject || o.category || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art, val: isRev ? price(o) : (o.quantity || 1) });
+      classify.push({ i, predmet: o.subject || o.category || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art, val: isRev ? price(o) : (o.quantity || 1), pr: price(o), qy: o.quantity || 1 });
     } else {
       const items = o.products || [];
       const tot = items.reduce((s, p) => s + (p.quantity || 1), 0) || 1;
@@ -162,7 +239,7 @@ export function chartHTML(n, vm, type) {
         const art = baseOz(p.offer_id);
         const g = artGroup(art);
         const qy = p.quantity || 1;
-        classify.push({ i, predmet: (p.name || "").split(" ")[0] || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art: art || "—", val: isRev ? orev * (qy / tot) : qy });
+        classify.push({ i, predmet: (p.name || "").split(" ")[0] || (g && g.predmet) || "—", group: (g && g.kratko) || "— без группы —", art: art || "—", val: isRev ? orev * (qy / tot) : qy, pr: parseFloat(p.price || p.offer_price || 0) * qy, qy });
       }
     }
   });
@@ -180,7 +257,11 @@ export function chartHTML(n, vm, type) {
 
   /* per-категория по интервалам */
   const per = {}; [...top, ...(hasOther ? ["Прочее"] : [])].forEach((k) => (per[k] = Array(N).fill(0)));
-  ev.forEach((e) => { const k = topSet.has(catOf(e)) ? catOf(e) : "Прочее"; per[k][e.i] += e.val; });
+  ev.forEach((e) => {
+    const k = topSet.has(catOf(e)) ? catOf(e) : "Прочее";
+    per[k][e.i] += e.val;
+    addPrice(e.i, e.pr, e.qy, k);
+  });
 
   const segOrder = [...top, ...(hasOther ? ["Прочее"] : [])];
   const colorOf = (seg) => {
@@ -193,7 +274,7 @@ export function chartHTML(n, vm, type) {
   let max = 1;
   for (let i = 0; i < N; i++) { let s = 0; segOrder.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
 
-  let bars = "";
+  let bars = "", tops = "";
   for (let i = 0; i < N; i++) {
     const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.6)), bx = gx + (gW - bW) / 2;
     let yAcc = T + cH, colTot = 0;
@@ -202,7 +283,7 @@ export function chartHTML(n, vm, type) {
       const h = (v / max) * cH; yAcc -= h; colTot += v;
       bars += `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${h}" fill="${colorOf(seg)}" opacity="0.95"><title>${esc(seg)}: ${fv(v)}</title></rect>`;
     });
-    if (colTot > 0) bars += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600">${fv(colTot)}</text>`;
+    if (colTot > 0) tops += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(colTot)}</text>`;
   }
 
   const levelName = level === 1 ? "по предметам" : level === 2 ? "по группам" : "по артикулам";
@@ -217,8 +298,8 @@ export function chartHTML(n, vm, type) {
   return `<div class="sec" style="margin-bottom:14px">
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName} · раскрывается сверху в «Структуре спроса»</span></span>${controls}</div>
     <div class="tw" style="padding:8px">
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${legend}</div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${xLabels()}</svg>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${legend}${priceLegend(true)}</div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${priceLine(segOrder)}${tops}${xLabels()}</svg>
     </div>
   </div>`;
 }
