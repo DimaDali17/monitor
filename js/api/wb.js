@@ -169,10 +169,12 @@ async function loadCards(cab, onRetry) {
           techSize: sz.techSize || "—",
           subject: subj,
         };
-        /* Баркоды нужны для запроса остатков FBS (marketplace v3/stocks) */
+        /* Баркоды нужны для запроса остатков FBS (marketplace v3/stocks).
+           У размера их может быть несколько (наш + GTIN из «Честного знака») —
+           берём все, размер один и тот же (chrt). */
         for (const bc of sz.skus || []) {
           if (bc) cards.byBarcode[String(bc)] = {
-            supplierArticle: art, techSize: sz.techSize || "—", subject: subj,
+            supplierArticle: art, techSize: sz.techSize || "—", subject: subj, chrt: String(chrt),
           };
         }
       }
@@ -314,8 +316,13 @@ async function loadFBS(cab, onRetry) {
      fbs    — "арт · размер" → шт (сумма по складам, для дефицита);
      fbsWh  — название склада → шт (сумма по товарам, для «Остатки по складам»). */
   const fbs = {}, fbsWh = {}, fbsCells = {};
+  let dupSizes = 0;
   for (const wid of whIds) {
     const nm = whName[wid];
+    /* Остатки склада собираем по РАЗМЕРУ: у размера бывает 2 баркода (наш + GTIN).
+       Если WB вернул одно и то же количество по обоим — это один и тот же остаток,
+       считаем один раз; разные количества — разные остатки, складываем. */
+    const bySize = {};   /* chrt (или «арт · размер») → { key, amts: [] } */
     for (let i = 0; i < barcodes.length; i += 1000) {
       const skus = barcodes.slice(i, i + 1000);
       let data;
@@ -334,12 +341,19 @@ async function loadFBS(cab, onRetry) {
         const meta = cards.byBarcode[bc];
         if (!meta) continue; /* баркод не из нашего каталога */
         const key = meta.supplierArticle + " · " + (meta.techSize || "—");
-        fbs[key] = (fbs[key] || 0) + amt;
-        fbsWh[nm] = (fbsWh[nm] || 0) + amt;
-        (fbsCells[key] ||= {})[nm] = (fbsCells[key][nm] || 0) + amt;
+        (bySize[meta.chrt || key] ||= { key, amts: [] }).amts.push(amt);
       }
     }
+    for (const { key, amts } of Object.values(bySize)) {
+      const same = amts.length > 1 && amts.every((a) => a === amts[0]);
+      if (same) dupSizes++;
+      const amt = same ? amts[0] : amts.reduce((x, y) => x + y, 0);
+      fbs[key] = (fbs[key] || 0) + amt;
+      fbsWh[nm] = (fbsWh[nm] || 0) + amt;
+      (fbsCells[key] ||= {})[nm] = (fbsCells[key][nm] || 0) + amt;
+    }
   }
+  if (dupSizes) console.log(`Кабинет ${cab}: FBS — у ${dupSizes} размеров два баркода с одинаковым остатком, посчитан один раз`);
   console.log(`Кабинет ${cab}: FBS-остатки по ${Object.keys(fbs).length} позициям, складов ${whIds.length}`);
 
   /* Сборочные задания FBS (Marketplace) — чтобы у каждого FBS-заказа знать склад.
