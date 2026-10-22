@@ -53,47 +53,49 @@ export function loadOZ({ force = false } = {}) {
 async function fetchOzon(force) {
   const t = td(), y = yd(), w = wd(), from = daysAgo(ORDERS_DAYS);
 
-  const postingsFbo = await cached("oz:orders", force, async () => {
+  /* Списки отправлений. 31.08.2026 Ozon отключил /v2/posting/fbo/list и /v3/posting/fbs/list.
+     Новые /v3/posting/fbo/list и /v4/posting/fbs/list: не больше 100 за запрос,
+     дальше — по cursor, пока has_next; postings лежат в корне ответа (не в result);
+     price приходит объектом { amount, currency }. Приводим к прежнему виду ниже (normPosting). */
+  const since = from + "T00:00:00.000Z", to = t + "T23:59:59.999Z";
+  const fetchPostings = async (path) => {
     const out = [];
-    for (let p = 0, offset = 0; p < 10; p++, offset += 1000) {
-      const d = await ozPost(`${OZ_BASE}/v2/posting/fbo/list`, {
-        dir: "DESC",
-        filter: { since: from + "T00:00:00.000Z", to: t + "T23:59:59.999Z" },
-        limit: 1000,
-        offset,
+    let cursor = "";
+    const seen = new Set();
+    for (let p = 0; p < 400; p++) {              /* до 40 000 отправлений за период */
+      const d = await ozPost(`${OZ_BASE}${path}`, {
+        cursor,
+        filter: { since, to },
+        limit: 100,
+        sort_dir: "DESC",
+        with: { analytics_data: true },
       });
-      const arr = Array.isArray(d.result) ? d.result : d.result?.postings || [];
+      const arr = d.postings || d.result?.postings || (Array.isArray(d.result) ? d.result : []);
       out.push(...arr);
-      if (arr.length < 1000) break;
+      const hasNext = d.has_next ?? d.result?.has_next;
+      const next = d.cursor ?? d.result?.cursor ?? "";
+      if (!hasNext || !next || !arr.length || seen.has(next)) break;
+      seen.add(next);
+      cursor = next;
     }
     return out;
-  });
+  };
 
-  /* FBS-заказы (свой склад) — отдельная ручка posting/fbs/list, раньше не грузились.
-     Формат postings тот же (products, in_process_at/created_at), поэтому просто
-     объединяем с FBO в общий список. try/catch: сбой FBS не рушит FBO. */
+  /* FBO-заказы — без них кабинет не имеет смысла, поэтому ошибка здесь роняет загрузку */
+  const postingsFbo = await cached("oz:orders_v3", force, () => fetchPostings("/v3/posting/fbo/list"));
+
+  /* FBS-заказы (свой склад). try/catch: сбой FBS не рушит FBO. */
   const issues = [];   /* что не загрузилось — для плашки */
   let fbsOrdErr = null;
-  const postingsFbs = await cached("oz:orders_fbs", force, async () => {
-    const out = [];
+  const postingsFbs = await cached("oz:orders_fbs_v4", force, async () => {
     fbsOrdErr = null;
     try {
-      for (let p = 0, offset = 0; p < 10; p++, offset += 1000) {
-        const d = await ozPost(`${OZ_BASE}/v3/posting/fbs/list`, {
-          dir: "DESC",
-          filter: { since: from + "T00:00:00.000Z", to: t + "T23:59:59.999Z" },
-          limit: 1000,
-          offset,
-        });
-        const arr = d.result?.postings || (Array.isArray(d.result) ? d.result : []);
-        out.push(...arr.map((o) => ({ ...o, _fbs: true })));
-        if (arr.length < 1000) break;
-      }
+      return (await fetchPostings("/v4/posting/fbs/list")).map((o) => ({ ...o, _fbs: true }));
     } catch (e) {
       console.warn("Ozon FBS-заказы недоступны:", e.message);
       fbsOrdErr = e.message;
+      return [];
     }
-    return out;
   }, () => !fbsOrdErr);
   if (fbsOrdErr) issues.push({ what: "FBS-заказы Ozon", why: fbsOrdErr, effect: "заказы только FBO — продажи занижены" });
 
@@ -193,6 +195,19 @@ async function fetchOzon(force) {
     });
   }
   console.log(`Ozon FBO-остатки: ${stocksFinal.length} строк (${stocks.length ? "по складам" : "из v4, без складов"})`);
+
+  /* Приводим отправления новых версий к прежнему виду, которым пользуется дашборд:
+     price { amount } → число; если в товаре нет offer_id — берём по sku из остатков v4. */
+  const offerBySku = {};
+  for (const it of fbsItems) for (const st of (it.stocks || [])) if (st.sku && it.offer_id) offerBySku[String(st.sku)] = it.offer_id;
+  const money = (v) => (v && typeof v === "object" ? (v.amount ?? v.value ?? 0) : v);
+  for (const o of [...postingsFbo, ...postingsFbs]) {
+    for (const pr of (o.products || [])) {
+      pr.price = money(pr.price);
+      if (pr.offer_price != null) pr.offer_price = money(pr.offer_price);
+      if (!pr.offer_id && pr.sku != null && offerBySku[String(pr.sku)]) pr.offer_id = offerBySku[String(pr.sku)];
+    }
+  }
 
   const fbs = {}, fbsCells = {}, fbsWh = {};
   const FBS_WH = "FBS";
