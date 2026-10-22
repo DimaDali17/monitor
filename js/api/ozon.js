@@ -33,7 +33,9 @@ async function ozPost(url, body) {
   }
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`Ozon ${res.status}: ${t.slice(0, 300)}`);
+    /* В тексте — какой метод упал: Ozon периодически отключает старые версии */
+    const path = String(url).replace(OZ_BASE, "");
+    throw new Error(`Ozon ${res.status} (${path}): ${t.slice(0, 300)}`);
   }
 
   const txt = await res.text().catch(() => "");
@@ -98,26 +100,9 @@ async function fetchOzon(force) {
   const postings = [...postingsFbo, ...postingsFbs];
   console.log(`Ozon заказы: FBO ${postingsFbo.length} + FBS ${postingsFbs.length} = ${postings.length}`);
 
-  const stocks = await cached("oz:stocks", force, async () => {
-    const out = [];
-    for (let p = 0, offset = 0; p < 6; p++, offset += 500) {
-      const d = await ozPost(`${OZ_BASE}/v2/analytics/stock_on_warehouses`, {
-        warehouse_type: "FBO",
-        limit: 500,
-        offset,
-      });
-      const rows = d.result?.rows || [];
-      out.push(...rows);
-      if (rows.length < 500) break;
-    }
-    return out;
-  });
-
-  /* FBS-остатки Ozon (склад продавца). Аналитика stock_on_warehouses их НЕ даёт —
-     берём канонический product/info/stocks (v4): по каждому offer_id в массиве stocks
-     есть запись type:"fbs" с present (физический остаток на складе продавца).
-     Складской разбивки этот метод не возвращает → кладём всё в один столбец «FBS».
-     Обёрнуто в try/catch: сбой FBS не должен ронять заказы и FBO-остатки. */
+  /* Остатки по товарам — канонический product/info/stocks (v4): по каждому offer_id
+     записи type:"fbo" и type:"fbs" с present/reserved и sku. Нужен и для FBS-остатков,
+     и как список SKU для аналитики FBO по складам. Сбой не роняет кабинет. */
   let fbsStkErr = null;
   const fbsItems = await cached("oz:fbs", force, async () => {
     const out = [];
@@ -136,12 +121,78 @@ async function fetchOzon(force) {
         if (!items.length || !cursor) break;
       }
     } catch (e) {
-      console.warn("Ozon FBS (product/info/stocks) недоступен:", e.message);
+      console.warn("Ozon product/info/stocks недоступен:", e.message);
       fbsStkErr = e.message;
     }
     return out;
   }, () => !fbsStkErr);
-  if (fbsStkErr) issues.push({ what: "FBS-остатки Ozon", why: fbsStkErr, effect: "колонки FBS пустые" });
+  if (fbsStkErr) issues.push({ what: "Остатки Ozon (product/info/stocks)", why: fbsStkErr, effect: "остатки FBS и FBO могут быть пустыми" });
+
+  /* FBO-остатки по складам Ozon. Старый /v2/analytics/stock_on_warehouses Ozon отключил
+     («obsolete method cannot be used»). Новый — /v1/analytics/stocks: по списку SKU
+     (до 100 за запрос) отдаёт строки «SKU × склад» с available_stock_count.
+     Приводим к прежнему формату строк (item_code / warehouse_name / free_to_sell_amount),
+     чтобы остальной дашборд не менять. */
+  const typeOf = (s) => String(s.type || "").toLowerCase();
+  const fboSkus = [...new Set(fbsItems.flatMap((it) =>
+    (it.stocks || []).filter((s) => typeOf(s) === "fbo" && s.sku).map((s) => String(s.sku))))];
+  /* все SKU товара тоже: у части товаров FBO-запись может прийти без sku */
+  const allSkus = [...new Set(fbsItems.flatMap((it) => (it.stocks || []).map((s) => s.sku).filter(Boolean).map(String)))];
+  const skuList = fboSkus.length ? fboSkus : allSkus;
+
+  /* Запасной вариант без разбивки по складам — из того же v4 (fbo: present − reserved) */
+  const fboFromV4 = () => {
+    const rows = [];
+    for (const it of fbsItems) {
+      const st = (it.stocks || []).find((s) => typeOf(s) === "fbo");
+      const qy = st ? Math.max(0, (st.present ?? 0) - (st.reserved ?? 0)) : 0;
+      if (qy > 0) rows.push({ item_code: it.offer_id, offer_id: it.offer_id, warehouse_name: "Ozon FBO", free_to_sell_amount: qy, item_name: "" });
+    }
+    return rows;
+  };
+
+  let stkErr = null;
+  const stocks = await cached("oz:stocks2", force, async () => {
+    stkErr = null;
+    const out = [];
+    if (!skuList.length) return out;
+    try {
+      for (let i = 0; i < skuList.length; i += 100) {
+        const d = await ozPost(`${OZ_BASE}/v1/analytics/stocks`, { skus: skuList.slice(i, i + 100) });
+        const items = d.items || d.result?.items || d.result || [];
+        for (const r of (Array.isArray(items) ? items : [])) {
+          const qy = r.available_stock_count ?? r.valid_stock_count ?? r.free_to_sell_amount ?? 0;
+          if (!qy) continue;
+          out.push({
+            item_code: r.offer_id || r.item_code || String(r.sku || ""),
+            offer_id: r.offer_id,
+            sku: r.sku,
+            warehouse_name: r.warehouse_name || r.cluster_name || "Ozon FBO",
+            free_to_sell_amount: qy,
+            item_name: r.name || r.item_name || "",
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Ozon /v1/analytics/stocks недоступен:", e.message);
+      stkErr = e.message;
+    }
+    return out;
+  }, (rows) => !stkErr && rows.length > 0);
+
+  /* Аналитика не ответила или пуста, а в v4 FBO-остаток есть — берём v4 (итог верный,
+     но без разбивки по складам) и честно говорим об этом в плашке. */
+  let stocksFinal = stocks;
+  const v4rows = fboFromV4();
+  if (!stocks.length && v4rows.length) {
+    stocksFinal = v4rows;
+    issues.push({
+      what: "Остатки FBO Ozon по складам",
+      why: stkErr || "аналитика остатков вернула пусто",
+      effect: "итог FBO верный, но без разбивки по складам (одна колонка «Ozon FBO»)",
+    });
+  }
+  console.log(`Ozon FBO-остатки: ${stocksFinal.length} строк (${stocks.length ? "по складам" : "из v4, без складов"})`);
 
   const fbs = {}, fbsCells = {}, fbsWh = {};
   const FBS_WH = "FBS";
@@ -165,7 +216,7 @@ async function fetchOzon(force) {
     todayO: postings.filter((o) => dayOf(o) === t),
     yestO: postings.filter((o) => dayOf(o) === y),
     orders7: postings.filter((o) => { const d = dayOf(o); return d >= w && d < t; }),   /* ровно 7 полных дней, без сегодня */
-    stocks,
+    stocks: stocksFinal,
     fbs, fbsCells, fbsWh,
     issues,
   };
