@@ -60,6 +60,32 @@ function primaryOf(users) {
   })[0];
 }
 
+/* ── Кабинет, в котором смотрим сырьё ──
+   Общий пул сырья показывается у одного «главного» артикула. Но главный может
+   продаваться в другом кабинете (TB.EF.black.01 — Easyform, а TB.EF.black.02 — EZFR),
+   и тогда в этом кабинете сырьё не видно никому. Поэтому при отрисовке кабинета
+   задаём набор его артикулов: если главного здесь нет — пул достаётся следующему
+   участнику, который в кабинете есть. В «Консо» набор не задан — всё как раньше. */
+let rawScope = null;
+const effCache = new Map();
+export function setRawScope(arts) {
+  rawScope = arts ? new Set([...arts].map((a) => String(a || "").toLowerCase()).filter(Boolean)) : null;
+  effCache.clear();
+}
+function effPrimary(rk) {
+  const base = sheets.rawPrimary[rk];
+  if (!rawScope || !base || rawScope.has(base)) return base;
+  if (effCache.has(rk)) return effCache.get(rk);
+  const here = [...(sheets.rawUsers[rk] || [])].filter((u) => rawScope.has(u));
+  let res = base;
+  if (here.length) {
+    const col1 = [...(sheets.rawPrimaryCol[rk] || [])].filter((u) => rawScope.has(u));
+    res = primaryOf(col1.length ? col1 : here);
+  }
+  effCache.set(rk, res);
+  return res;
+}
+
 export const sheets = {
   loaded: false,
   error: null,      /* текст ошибки, если справочники не загрузились */
@@ -357,7 +383,8 @@ export function getStocksForSz(wbArt, wbSz) {
   let raw = 0;
   for (const { artPr, szPr } of sheets.map[ka + ";" + kzRaw] || []) {
     const rk = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
-    if (sheets.rawPrimary[rk] && sheets.rawPrimary[rk] !== ka) continue; /* пул — у главного */
+    const pr = effPrimary(rk);
+    if (pr && pr !== ka) continue; /* пул — у главного (в пределах кабинета) */
     raw += rawSets(rk); /* в наборах */
   }
   return { sgp, raw };
@@ -365,7 +392,10 @@ export function getStocksForSz(wbArt, wbSz) {
 
 export function getStocksForArt(wbArt) {
   const ka = (wbArt || "").toLowerCase();
-  return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
+  if (!rawScope) return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
+  let raw = 0;
+  for (const rk of sheets.rawKeysByArt[ka] || []) if (effPrimary(rk) === ka) raw += rawSets(rk);
+  return { sgp: sheets.sgpByArt[ka] || 0, raw };
 }
 
 /* Диагностика: из чего складывается «Сырьё» артикула. В консоли браузера:
@@ -433,9 +463,8 @@ export function rawPrimaryFor(wbArt) {
   const ka = (wbArt || "").toLowerCase();
   for (const rk of sheets.rawKeysByArt[ka] || []) {
     const users = sheets.rawUsers[rk];
-    if (users && users.size > 1 && sheets.rawPrimary[rk] && sheets.rawPrimary[rk] !== ka) {
-      return sheets.rawPrimary[rk];
-    }
+    const pr = effPrimary(rk);
+    if (users && users.size > 1 && pr && pr !== ka) return pr;
   }
   return ka;
 }

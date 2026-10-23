@@ -2,6 +2,7 @@ import { D, OAC, CONSO, cabShort } from "../state.js";
 import { MSK_RE } from "../config.js";
 import { fmt, esc, q, szCmp, fmtDays, sitePrice, wbPrice, pct } from "../utils.js";
 import { issuesHTML } from "./issues.js";
+import { setRawScope } from "../api/sheets.js";
 import { getBuyrate, getStocksForArt, getStocksForSz, parseOzonArt, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
 
 const CABS = [
@@ -74,6 +75,7 @@ function buildConsoData() {
 export function renderConso() {
   const el = document.getElementById("v4");
   if (!el) return;
+  setRawScope(null);   /* сводно по всем кабинетам — пул у общего главного */
 
   const loaded = CABS.filter((c) => D[c.n]);
   el.innerHTML = loaded.length
