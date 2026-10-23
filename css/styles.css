@@ -118,3 +118,48 @@ thead th[data-sort][data-tip]{cursor:pointer}
 .ver-old{background:#FEE8E8;color:#B84040;animation:pulse 2s infinite}
 .ver-check{background:var(--bg3);color:var(--ink3)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ══════════ Телефон (узкий экран) ══════════
+   Шапка в 3 строки, карточки по 2, график и таблицы листаются вбок,
+   колонка с артикулом прилипает слева. На компьютере ничего не меняется. */
+@media (max-width: 760px) {
+  body{font-size:12px}
+  .header{height:auto;flex-wrap:wrap;padding:8px 12px;gap:8px;position:static}
+  .header .logo{width:30px;height:30px}
+  .tabs{order:2;width:100%;margin-left:0!important;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{flex:1 0 auto;padding:7px 10px;font-size:12px}
+  .hright{order:3;width:100%;margin-left:0;flex-wrap:wrap;gap:6px}
+  .hright .clock,.hright .ver-badge{display:none}
+  .hright .upd{width:100%}
+  .b{padding:6px 10px}
+  .main{padding:12px}
+
+  /* три карточки сверху — во всю ширину, друг под другом */
+  .top3c{flex:1 1 100%!important;min-width:0!important}
+
+  /* сводные карточки — по 2 в ряд (у части сетка задана прямо в разметке) */
+  .mg{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .mc{padding:12px}
+  .mv{font-size:20px}
+
+  /* заголовки блоков: кнопки и переключатели переносятся */
+  .sh>span{flex-wrap:wrap}
+  .ctog button{padding:6px 10px;font-size:11px}
+
+  /* график и список заказов — листаются вбок, а не ужимаются в нечитаемое */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tw>svg,.tw svg[viewBox]{min-width:640px}
+
+  /* широкие таблицы: колонка «Артикул» прилипает слева при прокрутке */
+  .sw{-webkit-overflow-scrolling:touch}
+  .sw tbody td:first-child,.sw thead tr:first-child th:first-child{position:sticky;left:0;z-index:4;background:var(--card)}
+  .sw tbody tr.ar-row td:first-child{background:var(--bg3)}
+  .sw thead tr:first-child th:first-child{z-index:6;background:var(--bg3)}
+  .sw tbody td:first-child{box-shadow:1px 0 0 var(--border2);max-width:46vw;overflow:hidden;text-overflow:ellipsis}
+  /* серая подпись предмета рядом с артикулом — на телефоне лишняя, место нужно цифрам */
+  .sw tbody td:first-child>span[style*="font-size:10px"]{display:none}
+  .sw .art{font-size:10px}
+
+  .sc{padding:20px}
+  #tip-box{width:220px}
+}
