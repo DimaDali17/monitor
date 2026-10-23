@@ -33,10 +33,15 @@ function applyFilters(n, d) {
   const baseOz = (oid) => { const x = oid || ""; const i = x.lastIndexOf("_"); return i > 0 ? x.slice(0, i) : x; };
   const grpOf = (a) => { const g = artGroup(a); return g ? (g.kratko || "") : ""; };
 
+  /* артикулы сравниваем без учёта регистра и пробелов (WB местами пишет black / Black) */
+  const nA = (x) => String(x || "").trim().toLowerCase();
+  const artsL = arts.map(nA);
+  const hasArt = (x) => artsL.includes(nA(x));
+
   const orderOk = (o) => {
     const artOk = !arts.length || (isOz
-      ? (o.products || []).some((p) => arts.includes(p.offer_id))
-      : arts.includes(o.supplierArticle));
+      ? (o.products || []).some((p) => hasArt(p.offer_id))
+      : hasArt(o.supplierArticle));
     const subOk = !subs.length || (isOz
       ? (o.products || []).some((p) => subs.some((s) => (p.name || "").startsWith(s)))
       : subs.includes(o.subject || o.category || ""));
@@ -48,19 +53,32 @@ function applyFilters(n, d) {
 
   const stockOk = (s) => {
     const artOk = !arts.length || (isOz
-      ? arts.includes(s.item_code || s.offer_id)
-      : arts.includes(s.supplierArticle));
+      ? hasArt(s.item_code || s.offer_id)
+      : hasArt(s.supplierArticle));
     const subOk = isOz || !subs.length || subs.includes(s.subject || s.category || "");
     const grpOk = !groups.length || groups.includes(grpOf(isOz ? (s.item_code || s.offer_id) : s.supplierArticle));
     return artOk && subOk && grpOk;
   };
 
-  /* FBS-данные (ключ "артикул · размер") — фильтруем по тем же Предмет/Группа/Артикул */
+  /* FBS-данные (ключ "артикул · размер") — фильтруем по тем же Предмет/Группа/Артикул.
+     Предмет берём тот же, что у заказов и остатков FBW, — из карточек WB (subject),
+     а не из номенклатуры: там предмет может быть записан иначе или артикула нет,
+     и тогда FBS молча пропадал при фильтре. Артикулы сравниваем без учёта регистра
+     и пробелов: WB местами отдаёт «black» и «Black» для одного артикула. */
+  const norm = (x) => String(x || "").trim().toLowerCase();
+  const artsN = arts.map(norm), subsN = subs.map(norm), groupsN = groups.map(norm);
+  const subjByArt = {};
+  if (!isOz) {
+    for (const r of (d.stocks || [])) { const k = norm(r.supplierArticle); const sj = r.subject || r.category; if (k && sj && !subjByArt[k]) subjByArt[k] = sj; }
+    for (const o of (d.allOrders || [])) { const k = norm(o.supplierArticle); const sj = o.subject || o.category; if (k && sj && !subjByArt[k]) subjByArt[k] = sj; }
+  }
   const fbsOk = (art) => {
+    const a = norm(art);
     const g = artGroup(art) || {};
-    const artOk = !arts.length || arts.includes(art);
-    const subOk = !subs.length || subs.includes(g.predmet || "");
-    const grpOk = !groups.length || groups.includes(g.kratko || "");
+    const artOk = !artsN.length || artsN.includes(a);
+    const subj = subjByArt[a] || g.predmet || "";
+    const subOk = isOz || !subsN.length || subsN.includes(norm(subj));   /* у Ozon предмет к остаткам не применяется — как и для FBO */
+    const grpOk = !groupsN.length || groupsN.includes(norm(g.kratko));
     return artOk && subOk && grpOk;
   };
   const fbs = {}, fbsCells = {}, fbsWh = {};
