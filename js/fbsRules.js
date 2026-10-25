@@ -6,36 +6,41 @@
    rule:  "all"   — на всех складах
           "exMsk" — на всех, кроме Москвы (МСК не обязателен)
           "pyat"  — только Пятигорск
-   cab:   если задан — правило действует только в этом кабинете
-          (1 = Easyform, 2 = EZFR). Термобельё и леггинсы — только EZFR.
+   cab:   в каком кабинете действует правило (1 = Easyform / ИП1, 2 = EZFR / ИП2).
    ══════════════════════════════════════════════════════════ */
 
 export const FBS_LOW = 3;   /* «мало» — 3 шт и меньше на обязательном складе */
 
+/* arts: точный артикул или префикс со звёздочкой ("TermoMai.*" — все термомайки).
+   exclude: артикулы, которые правило не трогает (сняты с продажи). */
 export const FBS_RULES = [
-  { name: "Нум1,3",      rule: "exMsk", arts: ["TS21num1", "TS26num3new"] },
-  { name: "Нум4",        rule: "exMsk", arts: ["TS21num4"] },
-  { name: "rab1, rab4",  rule: "exMsk", arts: ["TermSocks.EF.Rab.01", "TermSocks.EF.Rab.04"] },
-  { name: "rab2, rab3",  rule: "all",   arts: ["TermSocks.EF.Rab.02", "TermSocks.EF.Rab.03"] },
-  { name: "Каш01",       rule: "all",   arts: ["TermSocks.Kash.Assor.01"] },
-  { name: "Каш02",       rule: "all",   arts: ["TermSocks.Kash.Assor.02"] },
-  { name: "Каш04",       rule: "all",   arts: ["TermSocks.Kash.Assor.04"] },
-  { name: "Аляска",      rule: "exMsk", arts: ["TermSocks.Al-ESS.black.01", "TermSocks.Al-ESS.grey.01", "TermSocks.Al-ESS.purp.01"] },
-  { name: "Муж т/ш",     rule: "all",   arts: ["Termshort.men.EF.black"] },
-  { name: "Т/ш беж",     rule: "all",   arts: ["TermShort.new.SK.beige.01"] },
-  { name: "Т/ш черн",    rule: "all",   arts: ["TermShort.new.SK.black.01"] },
-  { name: "Верблюды",    rule: "exMsk", arts: ["Trus.EF.Verb.beige.01"] },
-  { name: "02 беж пант", rule: "pyat",  arts: ["Pantal.SK.bejnew.02"] },
-  /* Майку Brown больше не продаём — в правила не включена */
-  { name: "Термомайки",  rule: "all",   arts: ["TermoMai.EF.Beige1", "TermoMai.EF.Black1", "TermoMai.EF.Grey1", "TermoMai.ESS.Black.01", "TermoMai.ESS.Grey.01"] },
-  { name: "ТБ",          rule: "all",   arts: ["TB.EF.black.01", "TB.EF.black.02"], cab: 2 },
-  { name: "Легги",       rule: "all",   arts: ["LegW.EF.black.01"], cab: 2 },
+  /* ── ИП1 · Easyform ── */
+  { cab: 1, name: "Нум1,3",      rule: "exMsk", arts: ["TS21num1", "TS21num3", "TS26num3new"] },
+  { cab: 1, name: "Нум4",        rule: "exMsk", arts: ["TS21num4"] },
+  { cab: 1, name: "rab1, rab4",  rule: "exMsk", arts: ["TermSocks.EF.Rab.01", "TermSocks.EF.Rab.04"] },
+  { cab: 1, name: "rab2, rab3",  rule: "all",   arts: ["TermSocks.EF.Rab.02", "TermSocks.EF.Rab.03"] },
+  { cab: 1, name: "Каш01",       rule: "all",   arts: ["TermSocks.Kash.Assor.01"] },
+  { cab: 1, name: "Каш02",       rule: "all",   arts: ["TermSocks.Kash.Assor.02"] },
+  { cab: 1, name: "Каш04",       rule: "all",   arts: ["TermSocks.Kash.Assor.04"] },
+  { cab: 1, name: "Аляска",      rule: "exMsk", arts: ["TermSocks.Al-ESS.*"] },
+  { cab: 1, name: "Муж т/ш",     rule: "all",   arts: ["Termshort.men.EF.black"] },
+  { cab: 1, name: "Т/ш беж",     rule: "all",   arts: ["TermShort.new.SK.beige.01"] },
+  { cab: 1, name: "Т/ш черн",    rule: "all",   arts: ["TermShort.new.SK.black.01"] },
+  { cab: 1, name: "Верблюды",    rule: "exMsk", arts: ["Trus.EF.Verb.beige.01"] },
+  { cab: 1, name: "Волна пант",  rule: "pyat",  arts: ["Pantal.AN.Bej.01"] },
+  { cab: 1, name: "02 беж пант", rule: "pyat",  arts: ["Pantal.SK.bejnew.02"] },
+  { cab: 1, name: "Термомайки",  rule: "all",   arts: ["TermoMai.*"], exclude: ["TermoMai.EF.Brown1"] },   /* Brown сняли с продажи */
+
+  /* ── ИП2 · EZFR ── */
+  { cab: 2, name: "ТБ основное", rule: "all",   arts: ["TB.EF.black.02"] },
+  { cab: 2, name: "ТБ новое",    rule: "all",   arts: ["TBEssblack"] },
+  { cab: 2, name: "Легги",       rule: "all",   arts: ["EFlegblack", "Leg.Dov.black.gift01"] },
 ];
 
 /* Артикулы, которые шьются из одного сырья (общий пул), даже если в «Арт производ»
    это видно не целиком. Для «есть ли из чего пополнить» берём сырьё всего пула. */
 export const RAW_POOLS = [
-  ["TS21num1", "TS26num3new", "TS21num4"],
+  ["TS21num1", "TS21num3", "TS26num3new", "TS21num4"],
 ];
 
 const RULE_TEXT = { all: "все склады", exMsk: "кроме МСК", pyat: "только Пятигорск" };
@@ -49,7 +54,11 @@ export function ruleFor(art, n) {
   const a = String(art || "").trim().toLowerCase();
   for (const r of FBS_RULES) {
     if (r.cab && r.cab !== n) continue;
-    if (r.arts.some((x) => x.toLowerCase() === a)) return r;
+    if ((r.exclude || []).some((x) => x.toLowerCase() === a)) continue;
+    if (r.arts.some((x) => {
+      const p = x.toLowerCase();
+      return p.endsWith("*") ? a.startsWith(p.slice(0, -1)) : p === a;
+    })) return r;
   }
   return null;
 }
