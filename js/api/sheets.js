@@ -481,6 +481,21 @@ export function dedupRawTotal(wbArts) {
   return sum;
 }
 
+/* Сырьё пула для размера — у всех артикулов из списка, каждый пул один раз и
+   независимо от того, у какого артикула пул «показан». Для проверки «FBS завышен». */
+export function rawPoolForSz(wbArts, wbSz) {
+  const kz = (wbSz || "").toLowerCase();
+  const keys = new Set();
+  for (const a of wbArts) {
+    for (const { artPr, szPr } of sheets.map[(a || "").toLowerCase() + ";" + kz] || []) {
+      keys.add(artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase());
+    }
+  }
+  let sum = 0;
+  for (const rk of keys) sum += rawSets(rk);
+  return sum;
+}
+
 /* ── Ozon: "Pantal.SK.bejnew.02_XL" → базовый артикул + размер в терминах WB ── */
 export function parseOzonArt(offerId) {
   const s = offerId || "";

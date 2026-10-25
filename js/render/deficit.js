@@ -1,6 +1,8 @@
 import { VM, DS, OAD, EXD, FA, DRW } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, fmtDays, pct, normSz } from "../utils.js";
+import { poolMates } from "../fbsRules.js";
+import { rawPoolForSz } from "../api/sheets.js";
 import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason } from "../api/sheets.js";
 
 /* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
@@ -325,7 +327,10 @@ export function defTbl(n) {
     const dWb = effDr > 0 ? Math.round(g.stk / effDr) : null;
     const dFbs = effDr > 0 ? Math.round(fbsArt / effDr) : null;
     const dStock = effDr > 0 ? Math.round((g.stk + fbsArt) / effDr) : null;   /* ВБ + FBS вместе */
-    const fbsOver = !vm.isOz && fbsArt > sgp + raw;   /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника) */
+    /* FBS завышен относительно СГП+Сырьё (только WB — у Ozon нет справочника).
+       Сырьё — всего пула: у «спутника» пула в колонке «—», но сырьё у него есть. */
+    const srcArt = sgp + dedupRawTotal(poolMates(art));
+    const fbsOver = !vm.isOz && fbsArt > srcArt;
     const dA = d10[art.toLowerCase()] || zero10;
     const sInfo = {}, sInfoNoRaw = {};
     const dSeason = seasonalDays(artSeason(art), total, br.val, dA, today, sInfo);              /* сезон от ОБЩЕГО остатка (ВБ+СГП+Сырьё) */
@@ -334,7 +339,7 @@ export function defTbl(n) {
       art, name: g.name, sizes: g.sizes, br, sgp, raw, total, need, dr,
       msk: g.msk, stk: g.stk, o7: g.o7,
       def: Math.max(0, need - total),
-      dWb, dFbs, dStock, dSeason, dSeasonNoRaw, sInfo, sInfoNoRaw, fbsArt, fbsOver,
+      dWb, dFbs, dStock, dSeason, dSeasonNoRaw, sInfo, sInfoNoRaw, fbsArt, fbsOver, srcArt,
       dAll: effDr > 0 ? Math.round(total / effDr) : null,
       dNoRaw: effDr > 0 ? Math.round((g.stk + sgp) / effDr) : null,
       dMsk: effDr > 0 ? Math.round(g.msk / effDr) : null,
@@ -414,7 +419,7 @@ export function defTbl(n) {
     trs += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArtD(${n},'${q(r.art)}')"` : ""}>
       <td style="white-space:nowrap">${tog}<span class="art">${esc(r.art)}</span>${brBadge}<span style="font-size:10px;color:var(--ink3);margin-left:5px">${esc(r.name.slice(0, 20))}</span></td>
       <td class="${qc(r.stk, 20)}" style="text-align:center;font-size:14px">${r.stk}</td>
-      <td class="td-ref" style="text-align:center" data-tip="${fbsWhTip(fbsWhByArt[r.art.toLowerCase()])}">${r.fbsArt || "—"}${r.fbsOver ? fbsOverMark(r.fbsArt, r.sgp + r.raw) : ""}</td>
+      <td class="td-ref" style="text-align:center" data-tip="${fbsWhTip(fbsWhByArt[r.art.toLowerCase()])}">${r.fbsArt || "—"}${r.fbsOver ? fbsOverMark(r.fbsArt, r.srcArt) : ""}</td>
       <td class="${qc(r.sgp, 20)}" style="text-align:center">${r.sgp || "—"}</td>
       <td class="${qc(r.raw, 20)}" style="text-align:center">${rawCell}</td>
       <td class="${qc(r.total, 30)}" style="text-align:center;font-size:14px;font-weight:700;border-right:2px solid #C7BFB0">${r.total}</td>
@@ -452,7 +457,7 @@ export function defTbl(n) {
       trs += `<tr class="sz-row">
         <td style="padding-left:28px;font-weight:600">${esc(s.sz)}</td>
         <td class="${qc(s.total, 10)}" style="text-align:center;font-weight:600">${s.total}</td>
-        <td class="td-ref" style="text-align:center;font-size:11px" data-tip="${fbsWhTip(fbsCells[r.art + " · " + s.sz])}">${(fbsMap[r.art + " · " + s.sz] || 0) ? (fbsMap[r.art + " · " + s.sz] + (!vm.isOz && (fbsMap[r.art + " · " + s.sz] || 0) > sgp + raw ? fbsOverMark(fbsMap[r.art + " · " + s.sz], sgp + raw) : "")) : "—"}</td>
+        <td class="td-ref" style="text-align:center;font-size:11px" data-tip="${fbsWhTip(fbsCells[r.art + " · " + s.sz])}">${(fbsMap[r.art + " · " + s.sz] || 0) ? (fbsMap[r.art + " · " + s.sz] + (!vm.isOz && (fbsMap[r.art + " · " + s.sz] || 0) > sgp + rawPoolForSz(poolMates(r.art), s.sz) ? fbsOverMark(fbsMap[r.art + " · " + s.sz], sgp + rawPoolForSz(poolMates(r.art), s.sz)) : "")) : "—"}</td>
         <td class="${qc(sgp, 10)}" style="text-align:center;font-size:11px;color:var(--sgp)">${sgp || "—"}</td>
         <td class="${qc(raw, 10)}" style="text-align:center;font-size:11px;color:var(--raw)">${rawCellSz}</td>
         <td class="${qc(total, 15)}" style="text-align:center;font-weight:600;border-right:2px solid #C7BFB0">${total}</td>

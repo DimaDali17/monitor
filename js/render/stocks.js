@@ -1,7 +1,13 @@
 import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
-import { getStocksForArt, getStocksForSz } from "../api/sheets.js";
+import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
+import { FBS_LOW, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+
+/* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
+   в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
+const srcForArt = (a) => getStocksForArt(a).sgp + dedupRawTotal(poolMates(a));
+const srcForSz = (a, sz) => getStocksForSz(a, sz).sgp + rawPoolForSz(poolMates(a), sz);
 
 /* Каркас секции. Тело таблицы рисуется отдельно — сортировка
    и раскрытие артикула перерисовывают только #stbl, а не весь экран. */
@@ -102,8 +108,7 @@ export function stocksTbl(n) {
     /* сверка с дефицитом — только для WB и без фильтра по размеру (иначе суммы неполные) */
     let mark = "";
     if (!vm.isOz && !fz && g.fbs > 0) {
-      const st = getStocksForArt(a);
-      const base = st.sgp + st.raw;
+      const base = srcForArt(a);
       if (g.fbs > base) mark = totalOverMark(g.total, g.fbw, g.fbs, base);
     }
 
@@ -126,8 +131,7 @@ export function stocksTbl(n) {
         }).join("");
         let markSz = "";
         if (!vm.isOz && szFbs > 0) {
-          const st = getStocksForSz(a, sv.sz);
-          const base = st.sgp + st.raw;
+          const base = srcForSz(a, sv.sz);
           if (szFbs > base) markSz = totalOverMark(sv.total + szFbs, sv.total, szFbs, base);
         }
         rows += `<tr class="sz-row">
@@ -156,20 +160,62 @@ export function stocksTbl(n) {
 /* ══════════ Остатки по FBS (отдельный блок) ══════════
    Артикул · Сырьё+СГП · FBS общий · FBS по складам (колонки).
    Каркас + тело: сортировка перерисовывает только #fbstbl, как и в остальных таблицах. */
+/* ── «Остатки по FBS» + правила наличия на складах (js/fbsRules.js) ── */
+function fbsRows(n) {
+  const vm = VM[n];
+  const fbsMap = vm.fbs || {};
+  const fbsCells = vm.fbsCells || {};
+  const whList = Object.keys(vm.fbsWh || {}).sort((a, b) => (vm.fbsWh[b] || 0) - (vm.fbsWh[a] || 0));
+
+  const byArt = {};
+  const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, fbs: 0, wh: {} });
+  for (const [k, v] of Object.entries(fbsMap)) { const g = add(k.split(" · ")[0]); g.art = k.split(" · ")[0]; g.fbs += v; }
+  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w, qy] of Object.entries(wm)) g.wh[w] = (g.wh[w] || 0) + qy; }
+
+  /* Артикулы с правилом, у которых FBS нет совсем, — тоже показываем (это и есть тревога).
+     Только те, что есть в кабинете (с учётом фильтров). */
+  if (!vm.isOz) {
+    const present = new Set();
+    for (const r of vm.stocks || []) present.add(r.supplierArticle);
+    for (const o of vm.allOrders || []) present.add(o.supplierArticle);
+    for (const art of present) if (art && ruleFor(art, n) && !byArt[art.toLowerCase()]) add(art);
+  }
+
+  const RANK = { red: 0, amber: 1, ok: 2, none: 3 };
+  const rows = Object.values(byArt).map((g) => {
+    const base = vm.isOz ? 0 : srcForArt(g.art);
+    const rule = vm.isOz ? null : ruleFor(g.art, n);
+    let empty = [], low = [], st = "none";
+    if (rule) {
+      const req = whList.filter((w) => whRequired(rule.rule, w));
+      empty = req.filter((w) => !(g.wh[w] > 0));
+      low = req.filter((w) => g.wh[w] > 0 && g.wh[w] <= FBS_LOW);
+      st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
+    }
+    return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, st, rank: RANK[st] };
+  });
+  return { rows, whList };
+}
+
 export function fbsStocksHTML(n) {
   const vm = VM[n];
   if (!vm) return "";
-  const fbsMap = vm.fbs || {};
-  if (!Object.keys(fbsMap).length) return "";          /* нет FBS-данных — блок не показываем */
+  const { rows, whList } = fbsRows(n);
+  if (!rows.length) return "";          /* нет FBS-данных и правил — блок не показываем */
 
-  const whCount = Object.keys(vm.fbsWh || {}).length;
-  const posCount = new Set(Object.keys(fbsMap).map((k) => k.split(" · ")[0].toLowerCase())).size;
+  const red = rows.filter((r) => r.st === "red").length, amber = rows.filter((r) => r.st === "amber").length;
+  const okN = rows.filter((r) => r.st === "ok").length;
+  const summary = (red || amber || okN)
+    ? `<span class="sm2" data-tip="По правилам наличия на FBS-складах (js/fbsRules.js): пусто или мало (≤${FBS_LOW} шт) на обязательном складе">Правила:
+         ${red ? `<b style="color:#B3261E">🔴 ${red}</b>` : ""} ${amber ? `<b style="color:#8A5A00">🟠 ${amber}</b>` : ""} ${okN ? `<span style="color:#2F7D55">✅ ${okN}</span>` : ""}</span>`
+    : "";
 
   return `<div class="sec">
     <div class="sh">
       <span class="st">Остатки по FBS</span>
       <span style="display:flex;align-items:center;gap:8px">
-        <span class="sm2">${posCount} позиций · ${whCount} складов</span>
+        ${summary}
+        <span class="sm2">${rows.length} позиций · ${whList.length} складов</span>
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'FBS','fbs')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
@@ -180,26 +226,16 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const fbsMap = vm.fbs || {};
-  const fbsCells = vm.fbsCells || {};
+  const { rows, whList } = fbsRows(n);
 
-  const whList = Object.keys(vm.fbsWh || {}).sort((a, b) => (vm.fbsWh[b] || 0) - (vm.fbsWh[a] || 0));
-
-  const byArt = {};
-  const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, fbs: 0, wh: {} });
-  for (const [k, v] of Object.entries(fbsMap)) { const g = add(k.split(" · ")[0]); g.art = k.split(" · ")[0]; g.fbs += v; }
-  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w, qy] of Object.entries(wm)) g.wh[w] = (g.wh[w] || 0) + qy; }
-
-  const rows = Object.values(byArt).map((g) => {
-    const s = getStocksForArt(g.art);
-    return { art: g.art, base: s.sgp + s.raw, fbs: g.fbs, wh: g.wh };
-  });
-
-  /* Сортировка по любому заголовку: артикул (строка), Сырьё+СГП, FBS общий и любой склад (числа). */
+  /* Сортировка: статус (сначала проблемы), артикул, Сырьё+СГП, FBS общий, любой склад. */
   const { c, d: dir } = FSS[n];
-  const keyOf = (r) => (c === "base" ? r.base : c === "fbs" ? r.fbs : (r.wh[c] || 0));
-  rows.sort((a, b) =>
-    c === "art" ? a.art.localeCompare(b.art) * dir : (keyOf(a) - keyOf(b)) * dir);
+  const keyOf = (r) => (c === "st" ? r.rank : c === "base" ? r.base : c === "fbs" ? r.fbs : (r.wh[c] || 0));
+  rows.sort((a, b) => {
+    if (c === "art") return a.art.localeCompare(b.art) * dir;
+    const d = (keyOf(a) - keyOf(b)) * dir;
+    return d || a.art.localeCompare(b.art);
+  });
 
   const arrow = (k) => (FSS[n].c === k ? (FSS[n].d < 0 ? " ↓" : " ↑") : " ↕");
   const cls = (k) => (FSS[n].c === k ? " sa" : "");
@@ -208,20 +244,42 @@ export function fbsStocksTbl(n) {
     `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513" onclick="App.sortFS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
     `<span style="font-size:9px">${esc(w)}</span>${arrow(w)}</th>`).join("");
 
+  const RED = "background:#F7DDD9;color:#B3261E;font-weight:700", AMB = "background:#FBEBCF;color:#8A5A00;font-weight:700";
+  const statusCell = (r) => {
+    if (!r.rule) return `<td style="text-align:center;color:var(--ink3)">—</td>`;
+    const noSrc = (r.st === "red" || r.st === "amber") && !(r.base > 0);
+    const srcNote = noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : "";
+    if (r.st === "red") {
+      const tip = r.empty.length ? "Пусто на обязательных складах: " + r.empty.join(", ") : "Нет обязательного склада среди FBS-складов";
+      return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}"><span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто ${r.empty.length || ""}</span>${srcNote}</td>`;
+    }
+    if (r.st === "amber") return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Мало (≤" + FBS_LOW + " шт): " + r.low.map((w) => w + " " + r.wh[w]).join(", "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>${srcNote}</td>`;
+    return `<td style="text-align:center"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅</span></td>`;
+  };
+
   /* Свёрнуто до LIM строк, ниже — кнопка «Все N / Свернуть» (как в «Остатки по складам»). */
   const shown = EXFS[n] ? rows : rows.slice(0, LIM);
   const body = shown.map((r) => {
     const over = !vm.isOz && r.fbs > r.base;
-    const cells = whList.map((w) => { const qy = r.wh[w] || 0; return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`; }).join("");
+    const cells = whList.map((w) => {
+      const qy = r.wh[w] || 0;
+      if (!r.rule) return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
+      const req = whRequired(r.rule.rule, w);
+      if (!req) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(r.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
+      const style = qy === 0 ? RED : qy <= FBS_LOW ? AMB : "color:#8B4513";
+      return `<td style="text-align:center;font-size:11px;${style}">${qy || "0"}</td>`;
+    }).join("");
     return `<tr>
       <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>
-      <td style="text-align:center">${r.base || "—"}</td>
-      <td class="tc" style="text-align:center;font-weight:700;${over ? "color:#B3261E" : ""}">${r.fbs}${over ? ` <span style="cursor:help" data-tip="FBS (${r.fbs}) больше, чем Сырьё+СГП (${r.base}) — возможно завышен">❗</span>` : ""}</td>
+      <td style="text-align:center;font-size:10px;color:var(--ink2);white-space:nowrap">${r.rule ? `<span data-tip="${esc(r.rule.name)}">${esc(ruleText(r.rule.rule))}</span>` : "—"}</td>
+      ${statusCell(r)}
+      <td style="text-align:center;${!(r.base > 0) && r.rule && r.st !== "ok" ? "color:#B3261E;font-weight:700" : ""}">${r.base || "—"}</td>
+      <td class="tc" style="text-align:center;font-weight:700;${over ? "color:#B3261E" : ""}">${r.fbs || "0"}${over ? ` <span style="cursor:help" data-tip="FBS (${r.fbs}) больше, чем Сырьё+СГП (${r.base}) — возможно завышен">❗</span>` : ""}</td>
       ${cells}
     </tr>`;
   }).join("");
 
-  const span = whList.length + 3;
+  const span = whList.length + 5;
   const more = rows.length > LIM
     ? `<tr class="er"><td class="stick" colspan="${span}"><button class="eb" onclick="App.togExFS(${n})">${EXFS[n] ? "▲ Свернуть" : "▼ Все " + rows.length}</button></td></tr>`
     : "";
@@ -229,7 +287,9 @@ export function fbsStocksTbl(n) {
   return `<table>
     <thead><tr>
       <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortFS(${n},'art')">Артикул${arrow('art')}</th>
-      <th class="${cls('base')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'base')" data-tip="Сырьё (в наборах) + СГП — реальное наличие">Сырьё+СГП${arrow('base')}</th>
+      <th style="text-align:center" data-tip="Где товар должен быть на FBS. Правила — в js/fbsRules.js">Правило</th>
+      <th class="${cls('st')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'st')" data-tip="🔴 пусто на обязательном складе · 🟠 мало (≤${FBS_LOW} шт) · ✅ правило выполняется. Клик — сортировка, проблемы сверху">Статус${arrow('st')}</th>
+      <th class="${cls('base')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'base')" data-tip="Из чего пополнить: СГП + сырьё (в наборах, всего пула)">Сырьё+СГП${arrow('base')}</th>
       <th class="${cls('fbs')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'fbs')" data-tip="Остаток FBS по всем вашим складам">FBS общий${arrow('fbs')}</th>
       ${whHead}
     </tr></thead>

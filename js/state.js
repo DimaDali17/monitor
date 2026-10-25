@@ -27,7 +27,7 @@ export const OAC = new Set();                                    /* консол
 /* Сортировки */
 export const SS = { 1: { c: "art", d: 1 }, 2: { c: "art", d: 1 }, 3: { c: "art", d: 1 } };
 export const DS = { 1: { c: "art", d: 1 }, 2: { c: "art", d: 1 }, 3: { c: "art", d: 1 } };
-export const FSS = { 1: { c: "art", d: 1 }, 2: { c: "art", d: 1 }, 3: { c: "art", d: 1 } }; /* «Остатки по FBS» */
+export const FSS = { 1: { c: "st", d: 1 }, 2: { c: "st", d: 1 }, 3: { c: "st", d: 1 } };   /* по статусу правил — проблемы сверху */ /* «Остатки по FBS» */
 
 /* Фильтры */
 export const FA = { 1: [], 2: [], 3: [] }; /* артикулы */
