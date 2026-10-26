@@ -1,6 +1,6 @@
-import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
+import { VM, SS, FSS, FS, FSZ, OA, OAF, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
-import { esc, q, szCmp } from "../utils.js";
+import { esc, q, szCmp, normSz } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
 import { ozBase, FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
 
@@ -8,6 +8,26 @@ import { ozBase, FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleTe
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
 const srcForArt = (a) => getStocksForArt(a).sgp + dedupRawTotal(poolMates(a));
 const srcForSz = (a, sz) => getStocksForSz(a, sz).sgp + rawPoolForSz(poolMates(a), sz);
+
+/* ── Кнопка «Все размеры / Свернуть размеры» (как в дефиците) ── */
+export function sizeBtn(id, open, onclick) {
+  return `<button class="b" id="${id}" style="padding:3px 9px;font-size:10px" onclick="${onclick}" data-tip="Раскрыть все артикулы до размеров или свернуть обратно">${open ? "▲ Свернуть размеры" : "▼ Все размеры"}</button>`;
+}
+/* Артикулы с несколькими размерами — в «Остатки FBW + FBS» */
+export function stocksSizeArts(n) {
+  const vm = VM[n];
+  if (!vm) return [];
+  const bySz = {};
+  for (const v of Object.values(vm.arts || {})) (bySz[v.art] ||= new Set()).add(v.sz);
+  return Object.keys(bySz).filter((a) => bySz[a].size > 1);
+}
+export const stocksAllOpen = (n) => { const a = stocksSizeArts(n); return a.length > 0 && a.every((x) => OA[n].has(x)); };
+/* …и в «Остатки по FBS» (там размеры есть только у артикулов с правилами, WB) */
+export function fbsSizeArts(n) {
+  if (!VM[n]) return [];
+  return fbsRows(n).rows.filter((r) => r.sizes && r.sizes.length > 1).map((r) => r.art);
+}
+export const fbsAllOpen = (n) => { const a = fbsSizeArts(n); return a.length > 0 && a.every((x) => OAF[n].has(x)); };
 
 /* Каркас секции. Тело таблицы рисуется отдельно — сортировка
    и раскрытие артикула перерисовывают только #stbl, а не весь экран. */
@@ -29,6 +49,7 @@ export function stocksHTML(n) {
       <span class="st" data-tip="Итого = FBW (склады WB) + FBS (склады продавца). СГП и сырьё сюда не входят — поэтому «Итого» не совпадает с «Общий» в дефиците">Остатки FBW + FBS (без сырья и СГП)</span>
       <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span class="sm2">${count} позиций · ${whCount} складов</span>${fbsNote}${msk}
+        ${stocksSizeArts(n).length ? sizeBtn("szs" + n, stocksAllOpen(n), `App.togAllSizesS(${n})`) : ""}
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'Остатки','ostatki')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
@@ -222,33 +243,85 @@ function fbsRows(n) {
   };
   const isLow = (art, w, qy) => qy > 0 && (hasWhData ? daysAt(art, w, qy) <= FBS_LOW_DAYS : qy <= FBS_LOW);
 
+  /* Темп по размеру и складу (WB): «артикул|размер» → склад → шт/день */
+  const rateSz = {};
+  if (!vm.isOz) for (const o of vm.orders7 || []) {
+    if (!o.fbsWarehouse) continue;
+    const k = (o.supplierArticle || "").toLowerCase() + "|" + normSz(o.techSize || "");
+    const w = canonWh(o.fbsWarehouse);
+    (rateSz[k] ||= {})[w] = ((rateSz[k] || {})[w] || 0) + (o.quantity || 1) / 7;
+  }
+  const rateOf = (art, sz, w) => sz == null ? ((rate[art.toLowerCase()] || {})[w] || 0) : ((rateSz[art.toLowerCase() + "|" + normSz(sz)] || {})[w] || 0);
+  const isLowU = (art, sz, w, qy) => {
+    if (!(qy > 0)) return false;
+    if (!hasWhData) return qy <= FBS_LOW;
+    const r = rateOf(art, sz, w);
+    return r > 0 && qy / r <= FBS_LOW_DAYS;
+  };
+
+  /* Оценка одной «единицы» — артикула целиком или одного размера */
+  const evalUnit = (art, sz, rule, wh, fbsQty) => {
+    let empty = [], low = [], extra = [], st = "none";
+    if (rule && rule.rule === "none") {
+      extra = vm.isOz ? (fbsQty > 0 ? ["всего"] : []) : whList.filter((w) => wh[w] > 0);
+      st = extra.length ? "amber" : "ok";
+    } else if (rule && vm.isOz) {
+      /* Ozon — по общему FBS: 0 → пусто; хватит на ≤2 дн. по FBS-заказам → мало */
+      const r = rateTot[art.toLowerCase()] || 0;
+      st = !(fbsQty > 0) ? "red" : (r > 0 && fbsQty / r <= FBS_LOW_DAYS) ? "amber" : "ok";
+      if (st === "amber") low = ["всего"];
+    } else if (rule && noBreakdown) {
+      st = fbsQty > 0 ? "nobd" : "red";
+    } else if (rule) {
+      const req = whList.filter((w) => whRequired(rule.rule, w));
+      empty = req.filter((w) => !(wh[w] > 0));
+      low = req.filter((w) => isLowU(art, sz, w, wh[w] || 0));
+      st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
+    }
+    return { empty, low, extra, st };
+  };
+
+  /* Размеры артикула (WB): из остатков FBW и из FBS. «—»/«0» — безразмерный товар. */
+  const sizesOf = {};
+  if (!vm.isOz) {
+    const addSz = (art, sz) => { if (!art || !sz || sz === "—" || sz === "0") return; (sizesOf[art.toLowerCase()] ||= new Set()).add(sz); };
+    for (const r of vm.stocks || []) addSz(r.supplierArticle, r.techSize);
+    for (const k of Object.keys(fbsCells)) { const [a, z] = k.split(" · "); addSz(a, z); }
+  }
+
   const RANK = { red: 0, amber: 1, nobd: 2, ok: 3, none: 4 };
   const rows = Object.values(byArt).map((g) => {
     const base = srcForArt(g.art);   /* у Ozon g.art уже базовый — те же СГП/сырьё, что у WB */
     const rule = ruleFor(g.art, n);
-    let empty = [], low = [], st = "none";
-    let extra = [];
-    if (rule && rule.rule === "none") {
-      /* «не держим на FBS»: норма — пусто везде; остаток где-то — жёлтый сигнал */
-      extra = vm.isOz ? (g.fbs > 0 ? ["всего"] : []) : whList.filter((w) => g.wh[w] > 0);
-      st = extra.length ? "amber" : "ok";
-    } else if (rule && vm.isOz) {
-      /* Ozon — по общему FBS: 0 → пусто; хватит на ≤2 дн. по FBS-заказам → мало */
-      const r = rateTot[g.art.toLowerCase()] || 0;
-      st = !(g.fbs > 0) ? "red" : (r > 0 && g.fbs / r <= FBS_LOW_DAYS) ? "amber" : "ok";
-      if (st === "amber") low = ["всего"];
-    } else if (rule && noBreakdown) {
-      /* разбивки по складам нет — по складам не судим: 0 всего = пусто, иначе «без разбивки» */
-      st = g.fbs > 0 ? "nobd" : "red";
-    } else if (rule) {
-      const req = whList.filter((w) => whRequired(rule.rule, w));
-      empty = req.filter((w) => !(g.wh[w] > 0));
-      low = req.filter((w) => isLow(g.art, w, g.wh[w] || 0));
-      st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
+    /* WB с размерами — правило проверяем по каждому размеру; строка артикула = худший размер */
+    const szSet = sizesOf[g.art.toLowerCase()];
+    let sizes = null;
+    if (rule && szSet && szSet.size > 1) {
+      sizes = [...szSet].sort(szCmp).map((sz) => {
+        /* размер у FBS-ключа может быть записан иначе (регистр) — ищем без учёта регистра */
+        const wh = {};
+        let fq = 0;
+        for (const [k, wm] of Object.entries(fbsCells)) {
+          const [a, z] = k.split(" · ");
+          if (a.toLowerCase() !== g.art.toLowerCase() || normSz(z) !== normSz(sz)) continue;
+          for (const [w0, qy] of Object.entries(wm)) { const w = canonWh(w0); wh[w] = (wh[w] || 0) + qy; fq += qy; }
+        }
+        const ev = evalUnit(g.art, sz, rule, wh, fq);
+        return { sz, wh, fbs: fq, base: srcForSz(g.art, sz), ...ev, rank: RANK[ev.st] };
+      });
     }
-    return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
+    let ev;
+    if (sizes) {
+      const worst = Math.min(...sizes.map((x) => x.rank));
+      const st = Object.keys(RANK).find((k) => RANK[k] === worst);
+      ev = { st, empty: [], low: [], extra: [],
+        badSizes: sizes.filter((x) => x.st === "red" || x.st === "amber") };
+    } else {
+      ev = evalUnit(g.art, null, rule, g.wh, g.fbs);
+    }
+    return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, sizes, ...ev, rank: RANK[ev.st] };
   });
-  return { rows, whList, whInCab, isLow, daysAt, rate, rateTot, hasWhData, noBreakdown };
+  return { rows, whList, whInCab, isLow, isLowU, rateOf, daysAt, rate, rateTot, hasWhData, noBreakdown };
 }
 
 export function fbsStocksHTML(n) {
@@ -270,6 +343,7 @@ export function fbsStocksHTML(n) {
       <span style="display:flex;align-items:center;gap:8px">
         ${summary}
         <span class="sm2">${rows.length} позиций · ${whList.length} складов</span>
+        ${rows.some((r) => r.sizes && r.sizes.length > 1) ? sizeBtn("szf" + n, fbsAllOpen(n), `App.togAllSizesF(${n})`) : ""}
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'FBS','fbs')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
@@ -280,10 +354,10 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const { rows, whList, whInCab, isLow, daysAt, rate, rateTot, hasWhData, noBreakdown } = fbsRows(n);
+  const { rows, whList, whInCab, isLowU, rateOf, rateTot, hasWhData, noBreakdown } = fbsRows(n);
   const lowTxt = hasWhData ? `хватит на ≤${FBS_LOW_DAYS} дн.` : `≤${FBS_LOW} шт`;
-  const daysTip = (art, w, qy) => {
-    const r = (rate[art.toLowerCase()] || {})[w] || 0;
+  const daysTip = (art, w, qy, sz = null) => {
+    const r = rateOf(art, sz, w);
     if (!hasWhData) return "";
     return r > 0 ? `${w}: ${qy} шт, FBS-заказов ~${(Math.round(r * 10) / 10).toLocaleString("ru")}/день → хватит на ~${Math.round(qy / r * 10) / 10} дн.`
                  : `${w}: ${qy} шт, FBS-заказов с этого склада за 7 дней не было`;
@@ -306,15 +380,24 @@ export function fbsStocksTbl(n) {
     `<span style="font-size:9px">${esc(w)}${whInCab.has(w) || noBreakdown ? "" : " ⚠"}</span>${arrow(w)}</th>`).join("");
 
   const RED = "background:#F7DDD9;color:#B3261E;font-weight:700", AMB = "background:#FBEBCF;color:#8A5A00;font-weight:700";
+  const chip = (style, txt) => `<span style="${style};padding:1px 8px;border-radius:10px;font-size:11px">${txt}</span>`;
   const statusCell = (r) => {
     if (!r.rule) return `<td style="text-align:center;color:var(--ink3)">—</td>`;
+    if (r.sizes && r.rule.rule !== "none") {
+      /* правило по размерам: сколько размеров с проблемой, подсказка — какие и где */
+      const red = r.sizes.filter((x) => x.st === "red"), amb = r.sizes.filter((x) => x.st === "amber");
+      if (!red.length && !amb.length) return `<td style="text-align:center">${chip("background:#E1EFE4;color:#2F7D55;font-weight:700", "✅")}</td>`;
+      const lines = [...red.map((x) => `${x.sz}: пусто — ${x.empty.join(", ")}`), ...amb.map((x) => `${x.sz}: мало — ${x.low.join(", ")}`)];
+      const parts = (red.length ? chip(RED, `🔴 ${red.length} разм.`) : "") + (amb.length ? " " + chip(AMB, `🟠 ${amb.length}`) : "");
+      return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(lines.join("; "))}">${parts}${!(r.base > 0) ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : ""}</td>`;
+    }
     if (r.rule.rule === "none") {
       return r.st === "amber"
         ? `<td style="text-align:center;white-space:nowrap" data-tip="${esc("По правилу на FBS должно быть 0 (всё на FBO), а есть: " + (vm.isOz ? r.fbs + " шт" : r.extra.map((w) => w + " " + r.wh[w]).join(", ")))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 есть на FBS</span></td>`
         : `<td style="text-align:center" data-tip="По правилу на FBS ничего нет — всё на FBO"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅ FBO</span></td>`;
     }
     if (r.st === "nobd") return `<td style="text-align:center;white-space:nowrap" data-tip="Маркетплейс не отдал FBS по складам — правило по складам проверить нельзя, всего на FBS ${r.fbs} шт"><span style="background:var(--bg2);color:var(--ink2);font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">без разбивки</span></td>`;
-    const noSrc = (r.st === "red" || r.st === "amber") && !(r.base > 0);
+    const noSrc = r.sz == null && (r.st === "red" || r.st === "amber") && !(r.base > 0);   /* только у артикула, не у размера */
     const srcNote = noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : "";
     if (vm.isOz && (r.st === "red" || r.st === "amber")) {
       const rt = rateTot[r.art.toLowerCase()] || 0;
@@ -326,37 +409,63 @@ export function fbsStocksTbl(n) {
       const tip = r.empty.length ? "Пусто на обязательных складах: " + r.empty.join(", ") : "Нет обязательного склада среди FBS-складов";
       return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}"><span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто ${r.empty.length || ""}</span>${srcNote}</td>`;
     }
-    if (r.st === "amber") return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Мало (" + lowTxt + "): " + r.low.map((w) => hasWhData ? daysTip(r.art, w, r.wh[w]) : w + " " + r.wh[w]).join("; "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>${srcNote}</td>`;
+    if (r.st === "amber") return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Мало (" + lowTxt + "): " + r.low.map((w) => hasWhData ? daysTip(r.art, w, r.wh[w], r.sz ?? null) : w + " " + r.wh[w]).join("; "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>${srcNote}</td>`;
     return `<td style="text-align:center"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅</span></td>`;
   };
 
   /* Свёрнуто до LIM строк, ниже — кнопка «Все N / Свернуть» (как в «Остатки по складам»). */
   const shown = EXFS[n] ? rows : rows.slice(0, LIM);
-  const body = shown.map((r) => {
-    const over = (!vm.isOz || r.base > 0) && r.fbs > r.base;   /* у Ozon — только если справочник нашёл СГП/сырьё */
-    const cells = whList.map((w) => {
-      const qy = r.wh[w] || 0;
-      if (!r.rule) return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
-      if (noBreakdown) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="Нет разбивки по складам">—</td>`;
-      if (r.rule.rule === "none") {
-        return qy > 0
-          ? `<td style="text-align:center;font-size:11px;${AMB}" data-tip="По правилу здесь должно быть 0">${qy}</td>`
-          : `<td style="text-align:center;font-size:11px;color:var(--ink3)">·</td>`;
-      }
-      const req = whRequired(r.rule.rule, w);
-      if (!req) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(r.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
-      const style = qy === 0 ? RED : isLow(r.art, w, qy) ? AMB : "color:#8B4513";
-      const tip = qy > 0 ? daysTip(r.art, w, qy) : "";
-      return `<td style="text-align:center;font-size:11px;${style}"${tip ? ` data-tip="${esc(tip)}"` : ""}>${qy || "0"}</td>`;
-    }).join("");
-    return `<tr>
-      <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>
-      <td style="text-align:center;font-size:10px;color:var(--ink2);white-space:nowrap">${r.rule ? `<span data-tip="${esc(r.rule.name)}">${esc(ruleText(r.rule.rule))}</span>` : "—"}</td>
+  /* Ячейки складов для «единицы» (артикул без размеров или один размер) */
+  const unitCell = (u, art, sz, w) => {
+    const qy = u.wh[w] || 0;
+    if (!u.rule) return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
+    if (noBreakdown) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="Нет разбивки по складам">—</td>`;
+    if (u.rule.rule === "none") {
+      return qy > 0
+        ? `<td style="text-align:center;font-size:11px;${AMB}" data-tip="По правилу здесь должно быть 0">${qy}</td>`
+        : `<td style="text-align:center;font-size:11px;color:var(--ink3)">·</td>`;
+    }
+    if (!whRequired(u.rule.rule, w)) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(u.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
+    const style = qy === 0 ? RED : isLowU(art, sz, w, qy) ? AMB : "color:#8B4513";
+    const tip = qy > 0 ? daysTip(art, w, qy, sz) : "";
+    return `<td style="text-align:center;font-size:11px;${style}"${tip ? ` data-tip="${esc(tip)}"` : ""}>${qy || "0"}</td>`;
+  };
+
+  /* Строка артикула с размерами: сумма по складу, цвет — худший размер на этом складе */
+  const artCell = (r, w) => {
+    if (r.rule.rule === "none" || !whRequired(r.rule.rule, w)) return unitCell(r, r.art, null, w);
+    const qy = r.wh[w] || 0;
+    const emptySz = r.sizes.filter((x) => !(x.wh[w] > 0)).map((x) => x.sz);
+    const lowSz = r.sizes.filter((x) => isLowU(r.art, x.sz, w, x.wh[w] || 0)).map((x) => x.sz);
+    const style = emptySz.length ? RED : lowSz.length ? AMB : "color:#8B4513";
+    const tip = emptySz.length ? `${w}: нет размеров ${emptySz.join(", ")}` : lowSz.length ? `${w}: мало — ${lowSz.join(", ")}` : "";
+    return `<td style="text-align:center;font-size:11px;${style}"${tip ? ` data-tip="${esc(tip)}"` : ""}>${qy}</td>`;
+  };
+
+  const rowHTML = (r, isSz, open) => {
+    const over = !isSz && (!vm.isOz || r.base > 0) && r.fbs > r.base;   /* у Ozon — только если справочник нашёл СГП/сырьё */
+    const hasSz = !isSz && !!r.sizes && r.sizes.length > 1;
+    const tog = hasSz ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
+    const name = isSz
+      ? `<td style="padding-left:28px;font-weight:600">${esc(r.sz)}</td>`
+      : `<td style="white-space:nowrap">${tog}<span class="art">${esc(r.art)}</span></td>`;
+    const cells = whList.map((w) => (hasSz ? artCell(r, w) : unitCell(r, r.art, isSz ? r.sz : null, w))).join("");
+    const baseRed = !isSz && !(r.base > 0) && r.rule && r.rule.rule !== "none" && r.st !== "ok";
+    return `<tr class="${isSz ? "sz-row" : hasSz ? "ar-row" : ""}"${hasSz ? ` onclick="App.togArtF(${n},'${q(r.art)}')"` : ""}>
+      ${name}
+      <td style="text-align:center;font-size:10px;color:var(--ink2);white-space:nowrap">${isSz ? "" : r.rule ? `<span data-tip="${esc(r.rule.name)}">${esc(ruleText(r.rule.rule))}</span>` : "—"}</td>
       ${statusCell(r)}
-      <td style="text-align:center;${!(r.base > 0) && r.rule && r.rule.rule !== "none" && r.st !== "ok" ? "color:#B3261E;font-weight:700" : ""}">${r.base || "—"}</td>
-      <td class="tc" style="text-align:center;font-weight:700;${over ? "color:#B3261E" : ""}">${r.fbs || "0"}${over ? ` <span style="cursor:help" data-tip="FBS (${r.fbs}) больше, чем Сырьё+СГП (${r.base}) — возможно завышен">❗</span>` : ""}</td>
+      <td style="text-align:center;${isSz ? "font-size:11px;" : ""}${baseRed ? "color:#B3261E;font-weight:700" : ""}">${r.base || "—"}</td>
+      <td class="${isSz ? "" : "tc"}" style="text-align:center;font-weight:700;${isSz ? "font-size:11px;" : ""}${over ? "color:#B3261E" : ""}">${r.fbs || "0"}${over ? ` <span style="cursor:help" data-tip="FBS (${r.fbs}) больше, чем Сырьё+СГП (${r.base}) — возможно завышен">❗</span>` : ""}</td>
       ${cells}
     </tr>`;
+  };
+
+  const body = shown.map((r) => {
+    const open = OAF[n].has(r.art);
+    let h = rowHTML(r, false, open);
+    if (open && r.sizes) for (const z of r.sizes) h += rowHTML({ ...z, art: r.art, rule: r.rule }, true, false);
+    return h;
   }).join("");
 
   const span = whList.length + 5;

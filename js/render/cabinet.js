@@ -6,7 +6,7 @@ import { alertsHTML } from "./alerts.js";
 import { metricsHTML } from "./metrics.js";
 import { chartHTML } from "./chart.js";
 import { ordersHTML } from "./orders.js";
-import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl } from "./stocks.js";
+import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl, sizeBtn, stocksAllOpen, fbsAllOpen } from "./stocks.js";
 import { deficitHTML, defTbl, rawModeTog } from "./deficit.js";
 import { issuesHTML } from "./issues.js";
 import { setRawScope } from "../api/sheets.js";
@@ -53,6 +53,8 @@ export function repaintStocks(n) {
   scopeFor(n);
   const el = document.getElementById("stbl" + n);
   if (el && VM[n]) el.innerHTML = stocksTbl(n);
+  const b = document.getElementById("szs" + n);   /* подпись кнопки «Все размеры» */
+  if (b) b.outerHTML = sizeBtn("szs" + n, stocksAllOpen(n), `App.togAllSizesS(${n})`);
 }
 
 export function repaintDeficit(n) {
@@ -67,4 +69,6 @@ export function repaintFbsStocks(n) {
   scopeFor(n);
   const el = document.getElementById("fbstbl" + n);
   if (el && VM[n]) el.innerHTML = fbsStocksTbl(n);
+  const b = document.getElementById("szf" + n);
+  if (b) b.outerHTML = sizeBtn("szf" + n, fbsAllOpen(n), `App.togAllSizesF(${n})`);
 }

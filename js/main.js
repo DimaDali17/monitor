@@ -1,6 +1,6 @@
 import { VERSION } from "./config.js";
 import {
-  D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAC, SS, DS, FSS, FA, FP,
+  D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
   CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -11,6 +11,8 @@ import { loadOZ } from "./api/ozon.js";
 import { renderCabinet, repaintStocks, repaintDeficit, repaintFbsStocks } from "./render/cabinet.js";
 import { renderConso, logConso } from "./render/conso.js";
 import { multiSizeArts, allSizesOpen } from "./render/deficit.js";
+import { stocksSizeArts, stocksAllOpen, fbsSizeArts, fbsAllOpen } from "./render/stocks.js";
+import { consoSizeArts } from "./render/conso.js";
 import { fpInput, faInput, fgInput } from "./render/filters.js";
 import { esc } from "./utils.js";
 import { exportBlock } from "./export.js";
@@ -228,6 +230,7 @@ const App = {
     repaintFbsStocks(n);
   },
   togExFS(n) { EXFS[n] = !EXFS[n]; repaintFbsStocks(n); },
+  togArtF(n, a) { OAF[n].has(a) ? OAF[n].delete(a) : OAF[n].add(a); repaintFbsStocks(n); },
 
   /* дефицит — точечная перерисовка */
   sortD(n, c) {
@@ -257,6 +260,24 @@ const App = {
       multiSizeArts(n).forEach((a) => OAD[n].add(a));
     }
     renderCabinet(n);
+  },
+
+  /* «Все размеры» в «Остатки FBW + FBS» и «Остатки по FBS» */
+  togAllSizesS(n) {
+    if (stocksAllOpen(n)) OA[n].clear();
+    else { EXS[n] = true; stocksSizeArts(n).forEach((a) => OA[n].add(a)); }
+    repaintStocks(n);
+  },
+  togAllSizesF(n) {
+    if (fbsAllOpen(n)) OAF[n].clear();
+    else { EXFS[n] = true; fbsSizeArts(n).forEach((a) => OAF[n].add(a)); }
+    repaintFbsStocks(n);
+  },
+  togAllSizesC() {
+    const arts = consoSizeArts();
+    if (arts.length && arts.every((a) => OAC.has(a))) OAC.clear();
+    else arts.forEach((a) => OAC.add(a));
+    renderConso();
   },
 
   /* консолидация */

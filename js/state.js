@@ -22,6 +22,7 @@ export const DRW = { 1: true, 2: true, 3: true };
 /* Открытые артикулы (аккордеон по размерам) */
 export const OA = { 1: new Set(), 2: new Set(), 3: new Set() };  /* остатки */
 export const OAD = { 1: new Set(), 2: new Set(), 3: new Set() }; /* дефицит */
+export const OAF = { 1: new Set(), 2: new Set(), 3: new Set() }; /* остатки по FBS (правила по размерам) */
 export const OAC = new Set();                                    /* консолидация */
 
 /* Сортировки */

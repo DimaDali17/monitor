@@ -228,7 +228,12 @@ function ordersFeed() {
   </div>`;
 }
 
+/* Артикулы консолидированного дефицита с несколькими размерами — для «Все размеры» */
+let consoSzArts = [];
+export const consoSizeArts = () => consoSzArts;
+
 function deficitTable(loaded) {
+  const szArts = [];
   const t = totals();
   const cols = loaded;
 
@@ -282,6 +287,7 @@ function deficitTable(loaded) {
 
     const open = OAC.has(art);
     const hasSz = szList.length > 1;
+    if (hasSz) szArts.push(art);
     const tog = hasSz ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
 
     rows += `<tr class="ar-row"${hasSz ? ` onclick="App.togConsoArt('${q(art)}')"` : ""}>
@@ -334,10 +340,14 @@ function deficitTable(loaded) {
     }
   }
 
+  consoSzArts = szArts;
   return `<div class="sec">
     <div class="sh">
       <span class="st">📊 Консолидированный дефицит · ${loaded.map((c) => c.short).join(" + ")}</span>
-      <span class="sm2">${t.arts.length} артикулов</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <span class="sm2">${t.arts.length} артикулов</span>
+        ${szArts.length ? `<button class="b" style="padding:3px 9px;font-size:10px" onclick="App.togAllSizesC()" data-tip="Раскрыть все артикулы до размеров или свернуть обратно">${szArts.every((a) => OAC.has(a)) ? "▲ Свернуть размеры" : "▼ Все размеры"}</button>` : ""}
+      </span>
     </div>
     <div class="sw sw-sticky"><table><thead>${head}</thead>
       <tbody>${rows || '<tr><td class="em" colspan="20">Нет данных</td></tr>'}</tbody></table></div>
