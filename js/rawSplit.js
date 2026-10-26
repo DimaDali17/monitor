@@ -34,9 +34,15 @@ export const RAW_SPLIT_GROUPS = [
   },
   {
     name: "Каш01/04",
-    prop: { "TermSocks.Kash.Assor.01": 70, "TermSocks.Kash.Assor.04": 30 },
+    prop: { "TermSocks.Kash.Assor.01": 80, "TermSocks.Kash.Assor.04": 20 },
   },
   /* Каш02 — сам по себе, свой пул: в группах не нужен */
 ];
+
+/* Артикул шьётся из того же сырья, что другой, но в «Арт производ» у него неверный код.
+   Дашборд игнорирует его собственную привязку и берёт сырьё/пул «старшего» артикула. */
+export const RAW_SAME_AS = {
+  "TermSocks.Kash.Assor.04": "TermSocks.Kash.Assor.01",
+};
 
 export const RAW_SPLIT_TEXT = { pool: "Пул", prop: "Пропорции", inv: "Инвентаризация" };

@@ -1,4 +1,4 @@
-import { RAW_SPLIT_GROUPS, RAW_SPLIT_DEFAULT } from "../rawSplit.js";
+import { RAW_SPLIT_GROUPS, RAW_SPLIT_DEFAULT, RAW_SAME_AS } from "../rawSplit.js";
 import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
@@ -95,13 +95,20 @@ export function rawShare(rk, ka) {
   if (rawMode === "pool") return null;
   const users = sheets.rawUsers[rk];
   if (!users || users.size < 2) return null;
-  const g = groupOfArt[ka] || [...users].map((u) => groupOfArt[u]).find(Boolean);
-  if (!g) return null;
-  const w = lowerKeys(rawMode === "inv" && g.inv ? g.inv.weights : g.prop);
+  /* Вес каждого участника пула — из его группы (доли группы нормированы к 1).
+     Пул делится ОДИН раз на всех участников: если в нём артикулы из разных групп,
+     двойного счёта нет. Участник без группы получает 0. */
+  const wOf = (u) => {
+    const g = groupOfArt[u];
+    if (!g) return 0;
+    const w = lowerKeys(rawMode === "inv" && g.inv ? g.inv.weights : g.prop);
+    const tot = Object.values(w).reduce((a, b) => a + b, 0);
+    return tot > 0 ? (w[u] || 0) / tot : 0;
+  };
   let sum = 0;
-  for (const u of users) sum += w[u] || 0;
+  for (const u of users) sum += wOf(u);
   if (!(sum > 0)) return null;
-  return (w[ka] || 0) / sum;
+  return wOf(ka) / sum;
 }
 /* Как делится пул артикула — для подсказки в ячейке «Сырьё» */
 export function rawSplitInfo(ka) {
@@ -110,9 +117,10 @@ export function rawSplitInfo(ka) {
   const g = groupOfArt[ka];
   if (!g) return null;
   const inv = rawMode === "inv" && g.inv;
-  const w = lowerKeys(inv ? g.inv.weights : g.prop);
-  const sum = Object.values(w).reduce((a, b) => a + b, 0);
-  return { group: g.name, how: inv ? "инвентаризация " + g.inv.date : "пропорции", pct: sum > 0 ? Math.round((w[ka] || 0) / sum * 100) : 0 };
+  /* реальная доля: сколько сырья досталось артикулу от всего его пула */
+  const total = dedupRawTotal([ka]);
+  const mine = getStocksForArt(ka).raw;
+  return { group: g.name, how: inv ? "инвентаризация " + g.inv.date : "пропорции", pct: total > 0 ? Math.round(mine / total * 100) : 0 };
 }
 
 function effPrimary(rk) {
@@ -336,6 +344,17 @@ export function loadExternal() {
           sheets.raw[k2] = (sheets.raw[k2] || 0) + qty;
         }
       });
+
+      /* «То же сырьё, что у …» (js/rawSplit.js): привязку артикула из «Арт производ»
+         заменяем привязкой старшего — по тем же размерам. */
+      for (const [art0, anchor0] of Object.entries(RAW_SAME_AS)) {
+        const art = art0.toLowerCase(), anchor = anchor0.toLowerCase();
+        for (const k of Object.keys(sheets.map)) if (k.split(";")[0] === art) delete sheets.map[k];
+        for (const [k, v] of Object.entries(sheets.map)) {
+          const [a, z] = k.split(";");
+          if (a === anchor) sheets.map[art + ";" + z] = v.map((m) => ({ ...m, col: 2 }));   /* старший остаётся главным в режиме «Пул» */
+        }
+      }
 
       buildIndexes();
       sheets.loaded = true;
