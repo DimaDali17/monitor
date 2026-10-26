@@ -3,7 +3,8 @@
    Блок «Остатки по FBS» подсвечивает обязательные склады, где пусто или мало,
    и показывает, есть ли из чего пополнить (сырьё + СГП).
 
-   rule:  "all"   — на всех складах
+   rule:  "none"  — НЕ держим на FBS (всё на FBO): норма — 0 на всех складах
+          "all"   — на всех складах
           "exMsk" — на всех, кроме Москвы (МСК не обязателен)
           "pyat"  — только Пятигорск
    cab:   в каком кабинете действует правило (1 = Easyform / ИП1, 2 = EZFR / ИП2).
@@ -15,7 +16,10 @@ export const FBS_LOW = 3;   /* «мало» — 3 шт и меньше на об
    exclude: артикулы, которые правило не трогает (сняты с продажи). */
 export const FBS_RULES = [
   /* ── ИП1 · Easyform ── */
-  { cab: 1, name: "Нум1,3",      rule: "exMsk", arts: ["TS21num1", "TS21num3", "TS26num3new"] },
+  /* Порядок важен: срабатывает первое подходящее правило, поэтому «none» — выше общих */
+  { cab: 1, name: "Нум3",        rule: "none",  arts: ["TS21num3"] },
+  { cab: 1, name: "Майки ESS (на FBO)", rule: "none", arts: ["TermoMai.ESS.Black.01", "TermoMai.ESS.Grey.01"] },
+  { cab: 1, name: "Нум1,3",      rule: "exMsk", arts: ["TS21num1", "TS26num3new"] },
   { cab: 1, name: "Нум4",        rule: "exMsk", arts: ["TS21num4"] },
   { cab: 1, name: "rab1, rab4",  rule: "exMsk", arts: ["TermSocks.EF.Rab.01", "TermSocks.EF.Rab.04"] },
   { cab: 1, name: "rab2, rab3",  rule: "all",   arts: ["TermSocks.EF.Rab.02", "TermSocks.EF.Rab.03"] },
@@ -43,7 +47,7 @@ export const RAW_POOLS = [
   ["TS21num1", "TS21num3", "TS26num3new", "TS21num4"],
 ];
 
-const RULE_TEXT = { all: "все склады", exMsk: "кроме МСК", pyat: "только Пятигорск" };
+const RULE_TEXT = { all: "все склады", exMsk: "кроме МСК", pyat: "только Пятигорск", none: "0 на FBS (всё на FBO)" };
 export const ruleText = (r) => RULE_TEXT[r] || r;
 
 export const isMsk = (wh) => /мск|москв/i.test(wh || "");
@@ -65,6 +69,7 @@ export function ruleFor(art, n) {
 
 /* Обязателен ли склад по правилу */
 export function whRequired(rule, wh) {
+  if (rule === "none") return false;
   if (rule === "pyat") return isPyat(wh);
   if (rule === "exMsk") return !isMsk(wh);
   return true;

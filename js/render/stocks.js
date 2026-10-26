@@ -186,13 +186,18 @@ function fbsRows(n) {
     const base = vm.isOz ? 0 : srcForArt(g.art);
     const rule = vm.isOz ? null : ruleFor(g.art, n);
     let empty = [], low = [], st = "none";
-    if (rule) {
+    let extra = [];
+    if (rule && rule.rule === "none") {
+      /* «не держим на FBS»: норма — пусто везде; остаток где-то — жёлтый сигнал */
+      extra = whList.filter((w) => g.wh[w] > 0);
+      st = extra.length ? "amber" : "ok";
+    } else if (rule) {
       const req = whList.filter((w) => whRequired(rule.rule, w));
       empty = req.filter((w) => !(g.wh[w] > 0));
       low = req.filter((w) => g.wh[w] > 0 && g.wh[w] <= FBS_LOW);
       st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
     }
-    return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, st, rank: RANK[st] };
+    return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
   });
   return { rows, whList };
 }
@@ -247,6 +252,11 @@ export function fbsStocksTbl(n) {
   const RED = "background:#F7DDD9;color:#B3261E;font-weight:700", AMB = "background:#FBEBCF;color:#8A5A00;font-weight:700";
   const statusCell = (r) => {
     if (!r.rule) return `<td style="text-align:center;color:var(--ink3)">—</td>`;
+    if (r.rule.rule === "none") {
+      return r.st === "amber"
+        ? `<td style="text-align:center;white-space:nowrap" data-tip="${esc("По правилу на FBS должно быть 0 (всё на FBO), а есть: " + r.extra.map((w) => w + " " + r.wh[w]).join(", "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 есть на FBS</span></td>`
+        : `<td style="text-align:center" data-tip="По правилу на FBS ничего нет — всё на FBO"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅ FBO</span></td>`;
+    }
     const noSrc = (r.st === "red" || r.st === "amber") && !(r.base > 0);
     const srcNote = noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : "";
     if (r.st === "red") {
@@ -264,6 +274,11 @@ export function fbsStocksTbl(n) {
     const cells = whList.map((w) => {
       const qy = r.wh[w] || 0;
       if (!r.rule) return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
+      if (r.rule.rule === "none") {
+        return qy > 0
+          ? `<td style="text-align:center;font-size:11px;${AMB}" data-tip="По правилу здесь должно быть 0">${qy}</td>`
+          : `<td style="text-align:center;font-size:11px;color:var(--ink3)">·</td>`;
+      }
       const req = whRequired(r.rule.rule, w);
       if (!req) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(r.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
       const style = qy === 0 ? RED : qy <= FBS_LOW ? AMB : "color:#8B4513";
@@ -273,7 +288,7 @@ export function fbsStocksTbl(n) {
       <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>
       <td style="text-align:center;font-size:10px;color:var(--ink2);white-space:nowrap">${r.rule ? `<span data-tip="${esc(r.rule.name)}">${esc(ruleText(r.rule.rule))}</span>` : "—"}</td>
       ${statusCell(r)}
-      <td style="text-align:center;${!(r.base > 0) && r.rule && r.st !== "ok" ? "color:#B3261E;font-weight:700" : ""}">${r.base || "—"}</td>
+      <td style="text-align:center;${!(r.base > 0) && r.rule && r.rule.rule !== "none" && r.st !== "ok" ? "color:#B3261E;font-weight:700" : ""}">${r.base || "—"}</td>
       <td class="tc" style="text-align:center;font-weight:700;${over ? "color:#B3261E" : ""}">${r.fbs || "0"}${over ? ` <span style="cursor:help" data-tip="FBS (${r.fbs}) больше, чем Сырьё+СГП (${r.base}) — возможно завышен">❗</span>` : ""}</td>
       ${cells}
     </tr>`;
