@@ -54,6 +54,22 @@ export const RAW_POOLS = [
 const RULE_TEXT = { all: "все склады", exMsk: "кроме МСК", pyat: "только Пятигорск", none: "0 на FBS (всё на FBO)" };
 export const ruleText = (r) => RULE_TEXT[r] || r;
 
+/* Наши FBS-склады — фиксированный список. «Все склады» = эти пять, даже если в кабинете
+   (например, в EZFR) сейчас заведено меньше: недостающий склад считается пустым.
+   Название склада из WB сопоставляется по шаблону. */
+export const FBS_WAREHOUSES = [
+  { name: "Пятигорск",   re: /пятигорск/i },
+  { name: "Урал",        re: /урал|екатеринбург/i },
+  { name: "Казань",      re: /казан/i },
+  { name: "МСК",         re: /мск|москв/i },
+  { name: "Новосибирск", re: /новосиб/i },
+];
+/* Название склада WB → наш склад из списка (или как есть, если не узнали) */
+export const canonWh = (wh) => {
+  const w = FBS_WAREHOUSES.find((x) => x.re.test(wh || ""));
+  return w ? w.name : wh;
+};
+
 export const isMsk = (wh) => /мск|москв/i.test(wh || "");
 export const isPyat = (wh) => /пятигорск/i.test(wh || "");
 

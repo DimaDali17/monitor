@@ -2,7 +2,7 @@ import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+import { FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
@@ -165,12 +165,17 @@ function fbsRows(n) {
   const vm = VM[n];
   const fbsMap = vm.fbs || {};
   const fbsCells = vm.fbsCells || {};
-  const whList = Object.keys(vm.fbsWh || {}).sort((a, b) => (vm.fbsWh[b] || 0) - (vm.fbsWh[a] || 0));
+  /* Колонки: всегда наши 5 FBS-складов (по правилам «все склады» — это они), плюс
+     склады кабинета, которые не удалось сопоставить, — справа. */
+  const fixed = FBS_WAREHOUSES.map((w) => w.name);
+  const extraWh = [...new Set(Object.keys(vm.fbsWh || {}).map(canonWh))].filter((w) => !fixed.includes(w)).sort();
+  const whList = [...fixed, ...extraWh];
+  const whInCab = new Set(Object.keys(vm.fbsWh || {}).map(canonWh));
 
   const byArt = {};
   const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, fbs: 0, wh: {} });
   for (const [k, v] of Object.entries(fbsMap)) { const g = add(k.split(" · ")[0]); g.art = k.split(" · ")[0]; g.fbs += v; }
-  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w, qy] of Object.entries(wm)) g.wh[w] = (g.wh[w] || 0) + qy; }
+  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w0, qy] of Object.entries(wm)) { const w = canonWh(w0); g.wh[w] = (g.wh[w] || 0) + qy; } }
 
   /* Артикулы с правилом, у которых FBS нет совсем, — тоже показываем (это и есть тревога).
      Только те, что есть в кабинете (с учётом фильтров). */
@@ -189,8 +194,8 @@ function fbsRows(n) {
     for (const o of vm.orders7 || []) {
       if (!o.fbsWarehouse) continue;
       hasWhData = true;
-      const k = (o.supplierArticle || "").toLowerCase();
-      (rate[k] ||= {})[o.fbsWarehouse] = ((rate[k] || {})[o.fbsWarehouse] || 0) + (o.quantity || 1) / 7;
+      const k = (o.supplierArticle || "").toLowerCase(), w = canonWh(o.fbsWarehouse);
+      (rate[k] ||= {})[w] = ((rate[k] || {})[w] || 0) + (o.quantity || 1) / 7;
     }
   }
   const daysAt = (art, w, qy) => {
@@ -217,7 +222,7 @@ function fbsRows(n) {
     }
     return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
   });
-  return { rows, whList, isLow, daysAt, rate, hasWhData };
+  return { rows, whList, whInCab, isLow, daysAt, rate, hasWhData };
 }
 
 export function fbsStocksHTML(n) {
@@ -249,7 +254,7 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const { rows, whList, isLow, daysAt, rate, hasWhData } = fbsRows(n);
+  const { rows, whList, whInCab, isLow, daysAt, rate, hasWhData } = fbsRows(n);
   const lowTxt = hasWhData ? `хватит на ≤${FBS_LOW_DAYS} дн.` : `≤${FBS_LOW} шт`;
   const daysTip = (art, w, qy) => {
     const r = (rate[art.toLowerCase()] || {})[w] || 0;
@@ -271,8 +276,8 @@ export function fbsStocksTbl(n) {
   const cls = (k) => (FSS[n].c === k ? " sa" : "");
 
   const whHead = whList.map((w) =>
-    `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513" onclick="App.sortFS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
-    `<span style="font-size:9px">${esc(w)}</span>${arrow(w)}</th>`).join("");
+    `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513${whInCab.has(w) ? "" : ";opacity:.6"}" onclick="App.sortFS(${n},'${q(w)}')" data-tip="${esc(whInCab.has(w) ? "FBS-склад продавца: " + w : "Склада «" + w + "» в этом кабинете нет — по правилу «все склады» он считается пустым")}">` +
+    `<span style="font-size:9px">${esc(w)}${whInCab.has(w) ? "" : " ⚠"}</span>${arrow(w)}</th>`).join("");
 
   const RED = "background:#F7DDD9;color:#B3261E;font-weight:700", AMB = "background:#FBEBCF;color:#8A5A00;font-weight:700";
   const statusCell = (r) => {
