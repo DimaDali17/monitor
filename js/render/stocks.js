@@ -2,7 +2,7 @@ import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+import { ozBase, FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
@@ -168,21 +168,31 @@ function fbsRows(n) {
   /* Колонки: всегда наши 5 FBS-складов (по правилам «все склады» — это они), плюс
      склады кабинета, которые не удалось сопоставить, — справа. */
   const fixed = FBS_WAREHOUSES.map((w) => w.name);
-  const extraWh = [...new Set(Object.keys(vm.fbsWh || {}).map(canonWh))].filter((w) => !fixed.includes(w)).sort();
+  /* «FBS» — условный склад, когда маркетплейс не дал разбивку (Ozon): отдельной колонкой
+     не показываем — это дубль «FBS общий». */
+  const noBreakdown = Object.keys(vm.fbsWh || {}).some((w) => w === "FBS");
+  const extraWh = [...new Set(Object.keys(vm.fbsWh || {}).map(canonWh))].filter((w) => !fixed.includes(w) && w !== "FBS").sort();
   const whList = [...fixed, ...extraWh];
   const whInCab = new Set(Object.keys(vm.fbsWh || {}).map(canonWh));
 
+  /* У Ozon артикул бывает с размером («…_XL») — сводим к базовому, как у WB */
+  const artOf = (k) => { const a = k.split(" · ")[0]; return vm.isOz ? ozBase(a) : a; };
   const byArt = {};
   const add = (art) => (byArt[(art || "").toLowerCase()] ||= { art, fbs: 0, wh: {} });
-  for (const [k, v] of Object.entries(fbsMap)) { const g = add(k.split(" · ")[0]); g.art = k.split(" · ")[0]; g.fbs += v; }
-  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(k.split(" · ")[0]); for (const [w0, qy] of Object.entries(wm)) { const w = canonWh(w0); g.wh[w] = (g.wh[w] || 0) + qy; } }
+  for (const [k, v] of Object.entries(fbsMap)) { const g = add(artOf(k)); g.fbs += v; }
+  for (const [k, wm] of Object.entries(fbsCells)) { const g = add(artOf(k)); for (const [w0, qy] of Object.entries(wm)) { const w = canonWh(w0); g.wh[w] = (g.wh[w] || 0) + qy; } }
 
   /* Артикулы с правилом, у которых FBS нет совсем, — тоже показываем (это и есть тревога).
      Только те, что есть в кабинете (с учётом фильтров). */
-  if (!vm.isOz) {
+  {
     const present = new Set();
-    for (const r of vm.stocks || []) present.add(r.supplierArticle);
-    for (const o of vm.allOrders || []) present.add(o.supplierArticle);
+    if (vm.isOz) {
+      for (const r of vm.stocks || []) present.add(ozBase(r.item_code || r.offer_id));
+      for (const o of vm.allOrders || []) for (const p of o.products || []) present.add(ozBase(p.offer_id));
+    } else {
+      for (const r of vm.stocks || []) present.add(r.supplierArticle);
+      for (const o of vm.allOrders || []) present.add(o.supplierArticle);
+    }
     for (const art of present) if (art && ruleFor(art, n) && !byArt[art.toLowerCase()]) add(art);
   }
 
@@ -190,12 +200,14 @@ function fbsRows(n) {
      склад продавца (сопоставлено по сборочным заданиям). Шт/день. */
   const rate = {};
   let hasWhData = false;
-  if (!vm.isOz) {
-    for (const o of vm.orders7 || []) {
-      if (!o.fbsWarehouse) continue;
-      hasWhData = true;
-      const k = (o.supplierArticle || "").toLowerCase(), w = canonWh(o.fbsWarehouse);
-      (rate[k] ||= {})[w] = ((rate[k] || {})[w] || 0) + (o.quantity || 1) / 7;
+  for (const o of vm.orders7 || []) {
+    if (!o.fbsWarehouse) continue;
+    hasWhData = true;
+    const w = canonWh(o.fbsWarehouse);
+    const lines = vm.isOz ? (o.products || []).map((p) => [ozBase(p.offer_id), p.quantity || 1]) : [[o.supplierArticle, o.quantity || 1]];
+    for (const [a, qn] of lines) {
+      const k = (a || "").toLowerCase();
+      (rate[k] ||= {})[w] = ((rate[k] || {})[w] || 0) + qn / 7;
     }
   }
   const daysAt = (art, w, qy) => {
@@ -204,16 +216,19 @@ function fbsRows(n) {
   };
   const isLow = (art, w, qy) => qy > 0 && (hasWhData ? daysAt(art, w, qy) <= FBS_LOW_DAYS : qy <= FBS_LOW);
 
-  const RANK = { red: 0, amber: 1, ok: 2, none: 3 };
+  const RANK = { red: 0, amber: 1, nobd: 2, ok: 3, none: 4 };
   const rows = Object.values(byArt).map((g) => {
-    const base = vm.isOz ? 0 : srcForArt(g.art);
-    const rule = vm.isOz ? null : ruleFor(g.art, n);
+    const base = srcForArt(g.art);   /* у Ozon g.art уже базовый — те же СГП/сырьё, что у WB */
+    const rule = ruleFor(g.art, n);
     let empty = [], low = [], st = "none";
     let extra = [];
     if (rule && rule.rule === "none") {
       /* «не держим на FBS»: норма — пусто везде; остаток где-то — жёлтый сигнал */
       extra = whList.filter((w) => g.wh[w] > 0);
       st = extra.length ? "amber" : "ok";
+    } else if (rule && noBreakdown) {
+      /* разбивки по складам нет — по складам не судим: 0 всего = пусто, иначе «без разбивки» */
+      st = g.fbs > 0 ? "nobd" : "red";
     } else if (rule) {
       const req = whList.filter((w) => whRequired(rule.rule, w));
       empty = req.filter((w) => !(g.wh[w] > 0));
@@ -222,7 +237,7 @@ function fbsRows(n) {
     }
     return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
   });
-  return { rows, whList, whInCab, isLow, daysAt, rate, hasWhData };
+  return { rows, whList, whInCab, isLow, daysAt, rate, hasWhData, noBreakdown };
 }
 
 export function fbsStocksHTML(n) {
@@ -254,7 +269,7 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const { rows, whList, whInCab, isLow, daysAt, rate, hasWhData } = fbsRows(n);
+  const { rows, whList, whInCab, isLow, daysAt, rate, hasWhData, noBreakdown } = fbsRows(n);
   const lowTxt = hasWhData ? `хватит на ≤${FBS_LOW_DAYS} дн.` : `≤${FBS_LOW} шт`;
   const daysTip = (art, w, qy) => {
     const r = (rate[art.toLowerCase()] || {})[w] || 0;
@@ -276,8 +291,8 @@ export function fbsStocksTbl(n) {
   const cls = (k) => (FSS[n].c === k ? " sa" : "");
 
   const whHead = whList.map((w) =>
-    `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513${whInCab.has(w) ? "" : ";opacity:.6"}" onclick="App.sortFS(${n},'${q(w)}')" data-tip="${esc(whInCab.has(w) ? "FBS-склад продавца: " + w : "Склада «" + w + "» в этом кабинете нет — по правилу «все склады» он считается пустым")}">` +
-    `<span style="font-size:9px">${esc(w)}${whInCab.has(w) ? "" : " ⚠"}</span>${arrow(w)}</th>`).join("");
+    `<th class="${cls(w)}" data-sort style="text-align:center;background:#FBE9E7;color:#8B4513${whInCab.has(w) || noBreakdown ? "" : ";opacity:.6"}" onclick="App.sortFS(${n},'${q(w)}')" data-tip="${esc(whInCab.has(w) ? "FBS-склад продавца: " + w : "Склада «" + w + "» в этом кабинете нет — по правилу «все склады» он считается пустым")}">` +
+    `<span style="font-size:9px">${esc(w)}${whInCab.has(w) || noBreakdown ? "" : " ⚠"}</span>${arrow(w)}</th>`).join("");
 
   const RED = "background:#F7DDD9;color:#B3261E;font-weight:700", AMB = "background:#FBEBCF;color:#8A5A00;font-weight:700";
   const statusCell = (r) => {
@@ -287,6 +302,7 @@ export function fbsStocksTbl(n) {
         ? `<td style="text-align:center;white-space:nowrap" data-tip="${esc("По правилу на FBS должно быть 0 (всё на FBO), а есть: " + r.extra.map((w) => w + " " + r.wh[w]).join(", "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 есть на FBS</span></td>`
         : `<td style="text-align:center" data-tip="По правилу на FBS ничего нет — всё на FBO"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅ FBO</span></td>`;
     }
+    if (r.st === "nobd") return `<td style="text-align:center;white-space:nowrap" data-tip="Маркетплейс не отдал FBS по складам — правило по складам проверить нельзя, всего на FBS ${r.fbs} шт"><span style="background:var(--bg2);color:var(--ink2);font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">без разбивки</span></td>`;
     const noSrc = (r.st === "red" || r.st === "amber") && !(r.base > 0);
     const srcNote = noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : "";
     if (r.st === "red") {
@@ -300,10 +316,11 @@ export function fbsStocksTbl(n) {
   /* Свёрнуто до LIM строк, ниже — кнопка «Все N / Свернуть» (как в «Остатки по складам»). */
   const shown = EXFS[n] ? rows : rows.slice(0, LIM);
   const body = shown.map((r) => {
-    const over = !vm.isOz && r.fbs > r.base;
+    const over = (!vm.isOz || r.base > 0) && r.fbs > r.base;   /* у Ozon — только если справочник нашёл СГП/сырьё */
     const cells = whList.map((w) => {
       const qy = r.wh[w] || 0;
       if (!r.rule) return `<td style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
+      if (noBreakdown) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="Нет разбивки по складам">—</td>`;
       if (r.rule.rule === "none") {
         return qy > 0
           ? `<td style="text-align:center;font-size:11px;${AMB}" data-tip="По правилу здесь должно быть 0">${qy}</td>`

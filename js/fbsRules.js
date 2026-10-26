@@ -74,10 +74,13 @@ export const isMsk = (wh) => /мск|москв/i.test(wh || "");
 export const isPyat = (wh) => /пятигорск/i.test(wh || "");
 
 /* Правило для артикула в кабинете n (или null) */
+/* Ozon (кабинет 3): у Ozon свои артикулы, но товары те же — сравниваем по базовому
+   артикулу (без хвоста размера «_XL») и берём правила обоих ИП. */
+export const ozBase = (x) => { const s = String(x || ""); const i = s.lastIndexOf("_"); return i > 0 ? s.slice(0, i) : s; };
 export function ruleFor(art, n) {
-  const a = String(art || "").trim().toLowerCase();
+  const a = String(n === 3 ? ozBase(art) : art || "").trim().toLowerCase();
   for (const r of FBS_RULES) {
-    if (r.cab && r.cab !== n) continue;
+    if (r.cab && n !== 3 && r.cab !== n) continue;
     if ((r.exclude || []).some((x) => x.toLowerCase() === a)) continue;
     if (r.arts.some((x) => {
       const p = x.toLowerCase();
