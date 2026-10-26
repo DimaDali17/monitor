@@ -209,54 +209,10 @@ async function fetchOzon(force) {
     }
   }
 
-  /* FBS-остатки по складам продавца — /v2/product/info/stocks-by-warehouse/fbs
-     (v1 Ozon объявил устаревшим). На вход — SKU (до 1000), выдача постранично по cursor.
-     Не получилось — откатываемся на общий FBS без разбивки (одна колонка «FBS») и
-     говорим об этом в плашке. */
-  const fbsSkus = [...new Set(fbsItems.flatMap((it) => (it.stocks || [])
-    .filter((s) => String(s.type || "").toLowerCase() === "fbs" && s.sku).map((s) => String(s.sku))))];
-  const offerBySku0 = {};
-  for (const it of fbsItems) for (const s of (it.stocks || [])) if (s.sku && it.offer_id) offerBySku0[String(s.sku)] = it.offer_id;
-  let whErr = null;
-  const whRows = await cached("oz:fbs_wh2", force, async () => {
-    whErr = null;
-    const out = [];
-    if (!fbsSkus.length) return out;
-    try {
-      for (let i = 0; i < fbsSkus.length; i += 1000) {
-        const sku = fbsSkus.slice(i, i + 1000);
-        let cursor = "";
-        for (let p = 0; p < 50; p++) {
-          const d = await ozPost(`${OZ_BASE}/v2/product/info/stocks-by-warehouse/fbs`, { sku, limit: 1000, ...(cursor ? { cursor } : {}) });
-          const arr = d.stocks || d.items || d.result?.stocks || d.result?.items || (Array.isArray(d.result) ? d.result : []);
-          out.push(...arr);
-          const next = d.cursor ?? d.result?.cursor ?? "";
-          const more = d.has_next ?? d.result?.has_next ?? false;
-          if (!more || !next || next === cursor || !arr.length) break;
-          cursor = next;
-        }
-      }
-    } catch (e) {
-      console.warn("Ozon FBS по складам недоступно:", e.message);
-      whErr = e.message;
-    }
-    return out;
-  }, (rows) => !whErr && rows.length > 0);
-
+  /* FBS-остатки Ozon — одной общей цифрой на товар (без разбивки по складам — так решили). */
   const fbs = {}, fbsCells = {}, fbsWh = {};
   const FBS_WH = "FBS";
-  if (whRows.length) {
-    for (const r of whRows) {
-      const qy = Number(r.present ?? r.amount ?? 0) || 0;
-      if (!qy) continue;
-      const art = r.offer_id || offerBySku0[String(r.sku)] || String(r.sku || "—");
-      const wh = r.warehouse_name || r.warehouse?.name || ("Склад " + (r.warehouse_id ?? "?"));
-      const key = art + " · —";
-      fbs[key] = (fbs[key] || 0) + qy;
-      fbsWh[wh] = (fbsWh[wh] || 0) + qy;
-      (fbsCells[key] ||= {})[wh] = (fbsCells[key][wh] || 0) + qy;
-    }
-  } else for (const it of fbsItems) {
+  for (const it of fbsItems) {
     const art = it.offer_id || it.item_code || "—";
     const st = (it.stocks || []).find((s) => String(s.type || "").toLowerCase() === "fbs");
     const qy = st ? (st.present ?? st.amount ?? 0) : 0;
@@ -266,17 +222,8 @@ async function fetchOzon(force) {
     fbsWh[FBS_WH] = (fbsWh[FBS_WH] || 0) + qy;
     (fbsCells[key] ||= {})[FBS_WH] = (fbsCells[key][FBS_WH] || 0) + qy;
   }
-  if (!whRows.length && Object.keys(fbs).length) {
-    issues.push({ what: "FBS Ozon по складам", why: whErr || "метод вернул пусто",
-      effect: "FBS-остаток показан одной цифрой, без разбивки по складам — правила по складам не проверить" });
-  }
-  console.log(`Ozon FBS: позиций ${Object.keys(fbs).length}, складов ${Object.keys(fbsWh).length}${whRows.length ? "" : " (без разбивки)"}`);
+  console.log(`Ozon FBS: позиций ${Object.keys(fbs).length}, всего ${fbsWh[FBS_WH] || 0} шт`);
 
-  /* Склад продавца у FBS-отправления — для темпа «на сколько дней хватит» по складу */
-  for (const o of postingsFbs) {
-    const w = o.delivery_method?.warehouse || o.delivery_method?.warehouse_name || o.analytics_data?.warehouse_name;
-    if (w) o.fbsWarehouse = w;
-  }
 
   const dayOf = (o) => (o.created_at || o.in_process_at || "").slice(0, 10);
 

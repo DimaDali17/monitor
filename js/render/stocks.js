@@ -172,7 +172,8 @@ function fbsRows(n) {
      не показываем — это дубль «FBS общий». */
   const noBreakdown = Object.keys(vm.fbsWh || {}).some((w) => w === "FBS");
   const extraWh = [...new Set(Object.keys(vm.fbsWh || {}).map(canonWh))].filter((w) => !fixed.includes(w) && w !== "FBS").sort();
-  const whList = [...fixed, ...extraWh];
+  /* Ozon: FBS одной общей цифрой — колонок складов нет, правила проверяем по общему остатку */
+  const whList = vm.isOz ? [] : [...fixed, ...extraWh];
   const whInCab = new Set(Object.keys(vm.fbsWh || {}).map(canonWh));
 
   /* У Ozon артикул бывает с размером («…_XL») — сводим к базовому, как у WB */
@@ -200,6 +201,11 @@ function fbsRows(n) {
      склад продавца (сопоставлено по сборочным заданиям). Шт/день. */
   const rate = {};
   let hasWhData = false;
+  const rateTot = {};   /* Ozon: FBS-заказов в день по товару (все склады вместе) */
+  if (vm.isOz) for (const o of vm.orders7 || []) {
+    if (!o._fbs) continue;
+    for (const p of o.products || []) { const k = ozBase(p.offer_id).toLowerCase(); rateTot[k] = (rateTot[k] || 0) + (p.quantity || 1) / 7; }
+  }
   for (const o of vm.orders7 || []) {
     if (!o.fbsWarehouse) continue;
     hasWhData = true;
@@ -224,8 +230,13 @@ function fbsRows(n) {
     let extra = [];
     if (rule && rule.rule === "none") {
       /* «не держим на FBS»: норма — пусто везде; остаток где-то — жёлтый сигнал */
-      extra = whList.filter((w) => g.wh[w] > 0);
+      extra = vm.isOz ? (g.fbs > 0 ? ["всего"] : []) : whList.filter((w) => g.wh[w] > 0);
       st = extra.length ? "amber" : "ok";
+    } else if (rule && vm.isOz) {
+      /* Ozon — по общему FBS: 0 → пусто; хватит на ≤2 дн. по FBS-заказам → мало */
+      const r = rateTot[g.art.toLowerCase()] || 0;
+      st = !(g.fbs > 0) ? "red" : (r > 0 && g.fbs / r <= FBS_LOW_DAYS) ? "amber" : "ok";
+      if (st === "amber") low = ["всего"];
     } else if (rule && noBreakdown) {
       /* разбивки по складам нет — по складам не судим: 0 всего = пусто, иначе «без разбивки» */
       st = g.fbs > 0 ? "nobd" : "red";
@@ -237,7 +248,7 @@ function fbsRows(n) {
     }
     return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
   });
-  return { rows, whList, whInCab, isLow, daysAt, rate, hasWhData, noBreakdown };
+  return { rows, whList, whInCab, isLow, daysAt, rate, rateTot, hasWhData, noBreakdown };
 }
 
 export function fbsStocksHTML(n) {
@@ -269,7 +280,7 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const { rows, whList, whInCab, isLow, daysAt, rate, hasWhData, noBreakdown } = fbsRows(n);
+  const { rows, whList, whInCab, isLow, daysAt, rate, rateTot, hasWhData, noBreakdown } = fbsRows(n);
   const lowTxt = hasWhData ? `хватит на ≤${FBS_LOW_DAYS} дн.` : `≤${FBS_LOW} шт`;
   const daysTip = (art, w, qy) => {
     const r = (rate[art.toLowerCase()] || {})[w] || 0;
@@ -299,12 +310,18 @@ export function fbsStocksTbl(n) {
     if (!r.rule) return `<td style="text-align:center;color:var(--ink3)">—</td>`;
     if (r.rule.rule === "none") {
       return r.st === "amber"
-        ? `<td style="text-align:center;white-space:nowrap" data-tip="${esc("По правилу на FBS должно быть 0 (всё на FBO), а есть: " + r.extra.map((w) => w + " " + r.wh[w]).join(", "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 есть на FBS</span></td>`
+        ? `<td style="text-align:center;white-space:nowrap" data-tip="${esc("По правилу на FBS должно быть 0 (всё на FBO), а есть: " + (vm.isOz ? r.fbs + " шт" : r.extra.map((w) => w + " " + r.wh[w]).join(", ")))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 есть на FBS</span></td>`
         : `<td style="text-align:center" data-tip="По правилу на FBS ничего нет — всё на FBO"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅ FBO</span></td>`;
     }
     if (r.st === "nobd") return `<td style="text-align:center;white-space:nowrap" data-tip="Маркетплейс не отдал FBS по складам — правило по складам проверить нельзя, всего на FBS ${r.fbs} шт"><span style="background:var(--bg2);color:var(--ink2);font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">без разбивки</span></td>`;
     const noSrc = (r.st === "red" || r.st === "amber") && !(r.base > 0);
     const srcNote = noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : "";
+    if (vm.isOz && (r.st === "red" || r.st === "amber")) {
+      const rt = rateTot[r.art.toLowerCase()] || 0;
+      const tip = r.st === "red" ? "На FBS Ozon 0 шт" : `На FBS ${r.fbs} шт, FBS-заказов ~${(Math.round(rt * 10) / 10).toLocaleString("ru")}/день → хватит на ~${Math.round(r.fbs / rt * 10) / 10} дн.`;
+      const chip = r.st === "red" ? `<span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто</span>` : `<span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>`;
+      return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}">${chip}${noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : ""}</td>`;
+    }
     if (r.st === "red") {
       const tip = r.empty.length ? "Пусто на обязательных складах: " + r.empty.join(", ") : "Нет обязательного склада среди FBS-складов";
       return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}"><span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто ${r.empty.length || ""}</span>${srcNote}</td>`;
