@@ -2,7 +2,7 @@ import { VM, SS, FSS, FS, FSZ, OA, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { FBS_LOW, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+import { FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
@@ -181,6 +181,24 @@ function fbsRows(n) {
     for (const art of present) if (art && ruleFor(art, n) && !byArt[art.toLowerCase()]) add(art);
   }
 
+  /* Темп FBS-заказов по складу: заказы 7 дней (с учётом фильтров), у которых известен
+     склад продавца (сопоставлено по сборочным заданиям). Шт/день. */
+  const rate = {};
+  let hasWhData = false;
+  if (!vm.isOz) {
+    for (const o of vm.orders7 || []) {
+      if (!o.fbsWarehouse) continue;
+      hasWhData = true;
+      const k = (o.supplierArticle || "").toLowerCase();
+      (rate[k] ||= {})[o.fbsWarehouse] = ((rate[k] || {})[o.fbsWarehouse] || 0) + (o.quantity || 1) / 7;
+    }
+  }
+  const daysAt = (art, w, qy) => {
+    const r = (rate[art.toLowerCase()] || {})[w] || 0;
+    return r > 0 ? qy / r : Infinity;
+  };
+  const isLow = (art, w, qy) => qy > 0 && (hasWhData ? daysAt(art, w, qy) <= FBS_LOW_DAYS : qy <= FBS_LOW);
+
   const RANK = { red: 0, amber: 1, ok: 2, none: 3 };
   const rows = Object.values(byArt).map((g) => {
     const base = vm.isOz ? 0 : srcForArt(g.art);
@@ -194,24 +212,24 @@ function fbsRows(n) {
     } else if (rule) {
       const req = whList.filter((w) => whRequired(rule.rule, w));
       empty = req.filter((w) => !(g.wh[w] > 0));
-      low = req.filter((w) => g.wh[w] > 0 && g.wh[w] <= FBS_LOW);
+      low = req.filter((w) => isLow(g.art, w, g.wh[w] || 0));
       st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
     }
     return { art: g.art, base, fbs: g.fbs, wh: g.wh, rule, empty, low, extra, st, rank: RANK[st] };
   });
-  return { rows, whList };
+  return { rows, whList, isLow, daysAt, rate, hasWhData };
 }
 
 export function fbsStocksHTML(n) {
   const vm = VM[n];
   if (!vm) return "";
-  const { rows, whList } = fbsRows(n);
+  const { rows, whList, hasWhData } = fbsRows(n);
   if (!rows.length) return "";          /* нет FBS-данных и правил — блок не показываем */
 
   const red = rows.filter((r) => r.st === "red").length, amber = rows.filter((r) => r.st === "amber").length;
   const okN = rows.filter((r) => r.st === "ok").length;
   const summary = (red || amber || okN)
-    ? `<span class="sm2" data-tip="По правилам наличия на FBS-складах (js/fbsRules.js): пусто или мало (≤${FBS_LOW} шт) на обязательном складе">Правила:
+    ? `<span class="sm2" data-tip="По правилам наличия на FBS-складах (js/fbsRules.js): пусто или мало (${hasWhData ? "хватит на ≤" + FBS_LOW_DAYS + " дн. по FBS-заказам этого склада за 7 дней" : "≤" + FBS_LOW + " шт — нет данных о складах заказов"}) на обязательном складе">Правила:
          ${red ? `<b style="color:#B3261E">🔴 ${red}</b>` : ""} ${amber ? `<b style="color:#8A5A00">🟠 ${amber}</b>` : ""} ${okN ? `<span style="color:#2F7D55">✅ ${okN}</span>` : ""}</span>`
     : "";
 
@@ -231,7 +249,14 @@ export function fbsStocksHTML(n) {
 export function fbsStocksTbl(n) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
-  const { rows, whList } = fbsRows(n);
+  const { rows, whList, isLow, daysAt, rate, hasWhData } = fbsRows(n);
+  const lowTxt = hasWhData ? `хватит на ≤${FBS_LOW_DAYS} дн.` : `≤${FBS_LOW} шт`;
+  const daysTip = (art, w, qy) => {
+    const r = (rate[art.toLowerCase()] || {})[w] || 0;
+    if (!hasWhData) return "";
+    return r > 0 ? `${w}: ${qy} шт, FBS-заказов ~${(Math.round(r * 10) / 10).toLocaleString("ru")}/день → хватит на ~${Math.round(qy / r * 10) / 10} дн.`
+                 : `${w}: ${qy} шт, FBS-заказов с этого склада за 7 дней не было`;
+  };
 
   /* Сортировка: статус (сначала проблемы), артикул, Сырьё+СГП, FBS общий, любой склад. */
   const { c, d: dir } = FSS[n];
@@ -263,7 +288,7 @@ export function fbsStocksTbl(n) {
       const tip = r.empty.length ? "Пусто на обязательных складах: " + r.empty.join(", ") : "Нет обязательного склада среди FBS-складов";
       return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}"><span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто ${r.empty.length || ""}</span>${srcNote}</td>`;
     }
-    if (r.st === "amber") return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Мало (≤" + FBS_LOW + " шт): " + r.low.map((w) => w + " " + r.wh[w]).join(", "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>${srcNote}</td>`;
+    if (r.st === "amber") return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Мало (" + lowTxt + "): " + r.low.map((w) => hasWhData ? daysTip(r.art, w, r.wh[w]) : w + " " + r.wh[w]).join("; "))}"><span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>${srcNote}</td>`;
     return `<td style="text-align:center"><span style="background:#E1EFE4;color:#2F7D55;font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px">✅</span></td>`;
   };
 
@@ -281,8 +306,9 @@ export function fbsStocksTbl(n) {
       }
       const req = whRequired(r.rule.rule, w);
       if (!req) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(r.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
-      const style = qy === 0 ? RED : qy <= FBS_LOW ? AMB : "color:#8B4513";
-      return `<td style="text-align:center;font-size:11px;${style}">${qy || "0"}</td>`;
+      const style = qy === 0 ? RED : isLow(r.art, w, qy) ? AMB : "color:#8B4513";
+      const tip = qy > 0 ? daysTip(r.art, w, qy) : "";
+      return `<td style="text-align:center;font-size:11px;${style}"${tip ? ` data-tip="${esc(tip)}"` : ""}>${qy || "0"}</td>`;
     }).join("");
     return `<tr>
       <td style="white-space:nowrap"><span class="art">${esc(r.art)}</span></td>
@@ -303,7 +329,7 @@ export function fbsStocksTbl(n) {
     <thead><tr>
       <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortFS(${n},'art')">Артикул${arrow('art')}</th>
       <th style="text-align:center" data-tip="Где товар должен быть на FBS. Правила — в js/fbsRules.js">Правило</th>
-      <th class="${cls('st')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'st')" data-tip="🔴 пусто на обязательном складе · 🟠 мало (≤${FBS_LOW} шт) · ✅ правило выполняется. Клик — сортировка, проблемы сверху">Статус${arrow('st')}</th>
+      <th class="${cls('st')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'st')" data-tip="🔴 пусто на обязательном складе · 🟠 мало (${lowTxt}) · ✅ правило выполняется. Клик — сортировка, проблемы сверху">Статус${arrow('st')}</th>
       <th class="${cls('base')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'base')" data-tip="Из чего пополнить: СГП + сырьё (в наборах, всего пула)">Сырьё+СГП${arrow('base')}</th>
       <th class="${cls('fbs')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'fbs')" data-tip="Остаток FBS по всем вашим складам">FBS общий${arrow('fbs')}</th>
       ${whHead}
