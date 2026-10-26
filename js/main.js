@@ -5,7 +5,7 @@ import {
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
-import { loadExternal } from "./api/sheets.js";
+import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadWB } from "./api/wb.js";
 import { loadOZ } from "./api/ozon.js";
 import { renderCabinet, repaintStocks, repaintDeficit, repaintFbsStocks } from "./render/cabinet.js";
@@ -243,6 +243,12 @@ const App = {
   },
   togExD(n) { EXD[n] = !EXD[n]; repaintDeficit(n); },
   /* «С сырьём / Без сырья» в «Запас дней» */
+  /* Как делить общий пул сырья — для всех таблиц и кабинетов */
+  setRawSplit(m) {
+    if (rawSplitMode() === m) return;
+    setRawSplitMode(m);
+    if (curTab === 4) renderConso(); else renderCabinet(curTab);
+  },
   setRawD(n, on) {
     if (DRW[n] === on) return;
     DRW[n] = on;

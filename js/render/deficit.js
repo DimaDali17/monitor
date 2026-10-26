@@ -3,10 +3,17 @@ import { LIM } from "../config.js";
 import { esc, q, szCmp, fmtDays, pct, normSz } from "../utils.js";
 import { poolMates } from "../fbsRules.js";
 import { rawPoolForSz } from "../api/sheets.js";
-import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason } from "../api/sheets.js";
+import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason, rawSplitMode, rawSplitInfo } from "../api/sheets.js";
+import { RAW_SPLIT_TEXT } from "../rawSplit.js";
 
 /* Бейдж на ГЛАВНОМ артикуле пула: сырьё показано здесь целиком. */
 function rawPoolBadge(art, sibs) {
+  /* пул поделён по пропорциям/инвентаризации — показываем долю артикула */
+  const sp = rawSplitInfo(art);
+  if (sp) {
+    const tip = `Доля общего пула «${sp.group}» по: ${sp.how} — ${sp.pct}%. Переключить — «Сырьё: Пул / Пропорции / Инвентаризация» в шапке дефицита.`;
+    return `<span style="font-size:9px;color:var(--raw);border:1px dashed var(--raw);border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${esc(tip)}">${sp.pct}%</span>`;
+  }
   const members = [art, ...sibs.map(artDisp)].join(", ");
   const tip = "Весь остаток общего пула сырья показан здесь. Пул делят артикулы: " + esc(members) + ".";
   return `<span style="font-size:9px;color:var(--raw);border:1px solid var(--raw);border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
@@ -94,7 +101,11 @@ export function deficitHTML(n) {
 /* Тумблер «С сырьём / Без сырья» для колонок «Общий×» и «ВБ сезон» */
 export function rawModeTog(n) {
   const on = DRW[n];
-  return `<span class="ctog" data-tip="Запас дней «Общий×» и «ВБ сезон»: с сырьём (FBW+СГП+Сырьё) или без сырья — только готовое (FBW+СГП)">
+  const sm = rawSplitMode();
+  const split = `<span class="ctog" style="margin-left:6px" data-tip="Как делить общий пул сырья между артикулами: Пул — весь на первом артикуле; Пропорции — по долям наборов; Инвентаризация — по последнему факту (настройки в js/rawSplit.js). Действует на все таблицы">
+    ${Object.entries(RAW_SPLIT_TEXT).map(([k, t]) => `<button class="${sm === k ? "on" : ""}" onclick="App.setRawSplit('${k}')">${k === "pool" ? "Сырьё: " : ""}${t}</button>`).join("")}
+  </span>`;
+  return split + `<span class="ctog" data-tip="Запас дней «Общий×» и «ВБ сезон»: с сырьём (FBW+СГП+Сырьё) или без сырья — только готовое (FBW+СГП)">
     <button class="${on ? "on" : ""}" onclick="App.setRawD(${n},true)">С сырьём</button>
     <button class="${on ? "" : "on"}" onclick="App.setRawD(${n},false)">Без сырья</button>
   </span>`;

@@ -1,3 +1,4 @@
+import { RAW_SPLIT_GROUPS, RAW_SPLIT_DEFAULT } from "../rawSplit.js";
 import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
@@ -72,6 +73,48 @@ export function setRawScope(arts) {
   rawScope = arts ? new Set([...arts].map((a) => String(a || "").toLowerCase()).filter(Boolean)) : null;
   effCache.clear();
 }
+/* ── Как делим общий пул сырья: pool | prop | inv (js/rawSplit.js) ──
+   Выбор пользователя запоминается в браузере. */
+let rawMode = (() => { try { return localStorage.getItem("ef_raw_split") || RAW_SPLIT_DEFAULT; } catch { return RAW_SPLIT_DEFAULT; } })();
+export const rawSplitMode = () => rawMode;
+export function setRawSplitMode(m) {
+  rawMode = m;
+  try { localStorage.setItem("ef_raw_split", m); } catch { /* приватный режим */ }
+}
+const groupOfArt = (() => {
+  const m = {};
+  for (const g of RAW_SPLIT_GROUPS) {
+    for (const a of Object.keys(g.prop || {})) m[a.toLowerCase()] = g;
+    for (const a of Object.keys((g.inv && g.inv.weights) || {})) m[a.toLowerCase()] = g;
+  }
+  return m;
+})();
+const lowerKeys = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k.toLowerCase(), v]));
+/* Доля пула rk, которая достаётся артикулу ka (0…1), или null — делить «по-старому» (на главного) */
+export function rawShare(rk, ka) {
+  if (rawMode === "pool") return null;
+  const users = sheets.rawUsers[rk];
+  if (!users || users.size < 2) return null;
+  const g = groupOfArt[ka] || [...users].map((u) => groupOfArt[u]).find(Boolean);
+  if (!g) return null;
+  const w = lowerKeys(rawMode === "inv" && g.inv ? g.inv.weights : g.prop);
+  let sum = 0;
+  for (const u of users) sum += w[u] || 0;
+  if (!(sum > 0)) return null;
+  return (w[ka] || 0) / sum;
+}
+/* Как делится пул артикула — для подсказки в ячейке «Сырьё» */
+export function rawSplitInfo(ka) {
+  ka = (ka || "").toLowerCase();
+  if (rawMode === "pool") return null;
+  const g = groupOfArt[ka];
+  if (!g) return null;
+  const inv = rawMode === "inv" && g.inv;
+  const w = lowerKeys(inv ? g.inv.weights : g.prop);
+  const sum = Object.values(w).reduce((a, b) => a + b, 0);
+  return { group: g.name, how: inv ? "инвентаризация " + g.inv.date : "пропорции", pct: sum > 0 ? Math.round((w[ka] || 0) / sum * 100) : 0 };
+}
+
 function effPrimary(rk) {
   const base = sheets.rawPrimary[rk];
   if (!rawScope || !base || rawScope.has(base)) return base;
@@ -417,19 +460,25 @@ export function getStocksForSz(wbArt, wbSz) {
   let raw = 0;
   for (const { artPr, szPr } of sheets.map[ka + ";" + kzRaw] || []) {
     const rk = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+    const sh = rawShare(rk, ka);
+    if (sh != null) { raw += rawSets(rk) * sh; continue; }   /* пул делится по пропорциям/инвентаризации */
     const pr = effPrimary(rk);
     if (pr && pr !== ka) continue; /* пул — у главного (в пределах кабинета) */
     raw += rawSets(rk); /* в наборах */
   }
-  return { sgp, raw };
+  return { sgp, raw: Math.round(raw) };
 }
 
 export function getStocksForArt(wbArt) {
   const ka = (wbArt || "").toLowerCase();
-  if (!rawScope) return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
+  if (!rawScope && rawMode === "pool") return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
   let raw = 0;
-  for (const rk of sheets.rawKeysByArt[ka] || []) if (effPrimary(rk) === ka) raw += rawSets(rk);
-  return { sgp: sheets.sgpByArt[ka] || 0, raw };
+  for (const rk of sheets.rawKeysByArt[ka] || []) {
+    const sh = rawShare(rk, ka);
+    if (sh != null) raw += rawSets(rk) * sh;
+    else if (effPrimary(rk) === ka) raw += rawSets(rk);
+  }
+  return { sgp: sheets.sgpByArt[ka] || 0, raw: Math.round(raw) };
 }
 
 /* Диагностика: из чего складывается «Сырьё» артикула. В консоли браузера:
@@ -497,6 +546,7 @@ export function rawPrimaryFor(wbArt) {
   const ka = (wbArt || "").toLowerCase();
   for (const rk of sheets.rawKeysByArt[ka] || []) {
     const users = sheets.rawUsers[rk];
+    if (rawShare(rk, ka) != null) continue;   /* пул поделён — у артикула своя доля, «спутника» нет */
     const pr = effPrimary(rk);
     if (users && users.size > 1 && pr && pr !== ka) return pr;
   }

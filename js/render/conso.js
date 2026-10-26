@@ -3,6 +3,7 @@ import { MSK_RE } from "../config.js";
 import { fmt, esc, q, szCmp, fmtDays, sitePrice, wbPrice, pct } from "../utils.js";
 import { issuesHTML } from "./issues.js";
 import { setRawScope } from "../api/sheets.js";
+import { rawSplitInfo } from "../api/sheets.js";
 import { getBuyrate, getStocksForArt, getStocksForSz, parseOzonArt, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
 
 const CABS = [
@@ -108,6 +109,8 @@ function loaderPanel() {
 
 /* Общий пул сырья: сырьё на первом артикуле (бейдж «пул»), остальным «—». */
 function rawPoolBadge(art, sibs) {
+  const sp = rawSplitInfo(art);   /* пул поделён — показываем долю */
+  if (sp) return `<span style="font-size:9px;color:#8B4513;border:1px dashed #8B4513;border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${esc("Доля пула «" + sp.group + "» по: " + sp.how + " — " + sp.pct + "%")}">${sp.pct}%</span>`;
   const members = [art, ...sibs.map(artDisp)].join(", ");
   const tip = "Весь остаток общего пула сырья показан здесь. Пул делят артикулы: " + esc(members) + ".";
   return `<span style="font-size:9px;color:#8B4513;border:1px solid #8B4513;border-radius:3px;padding:0 3px;margin-left:4px;vertical-align:middle;cursor:help" data-tip="${tip}">пул</span>`;
