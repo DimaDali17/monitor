@@ -1,4 +1,4 @@
-import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON, DEFAULT_BUYRATE } from "../config.js";
+import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, DEFAULT_BUYRATE } from "../config.js";
 import { normSz } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
@@ -89,6 +89,7 @@ function effPrimary(rk) {
 export const sheets = {
   loaded: false,
   error: null,      /* текст ошибки, если справочники не загрузились */
+  warn: null,       /* не критично: номенклатура ИП2 не загрузилась (группы EZFR пустые) */
   buyrate: {},      /* artLower → 0..1 */
   sgp: {},          /* "wbArt;wbSz(norm)" → шт */
   raw: {},          /* "artPr;szPr(norm)" → шт */
@@ -148,6 +149,15 @@ export function loadExternal() {
 
   inflight = (async () => {
     try {
+      /* Номенклатура ИП2 (EZFR) — необязательная: если не загрузится, остальное работает,
+         а пользователь увидит плашку «группы EZFR пустые». */
+      const rN2p = fetch(CSV_NOMEN_2).then(async (r) => {
+        if (!r.ok) throw new Error(`Номенклатура ИП2: HTTP ${r.status}`);
+        const txt = await r.text();
+        if (/^\s*<(!doctype|html)/i.test(txt)) throw new Error("Номенклатура ИП2: Google вернул страницу вместо CSV (таблица не опубликована?)");
+        return txt;
+      }).catch((e) => { console.warn(e.message); return { err: e.message }; });
+
       const [rB, rR, rM, rN, rS] = await Promise.all(
         [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON].map((u, i) => fetch(u).then(async (r) => {
           const nm = ["Выкупаемость", "Остатки сводная (СГП+сырьё)", "Арт производ", "Номенклатура", "Сезон"][i];
@@ -170,18 +180,42 @@ export function loadExternal() {
 
       /* Номенклатура: артикул поставщика → Предмет + Кратко (структура спроса).
          По артикулу несколько строк (размеры) — берём первую, пустые поля дозаполняем. */
-      parseCSV(rN).forEach((row) => {
-        const art = (row["Артикул поставщика"] || "").trim().toLowerCase();
-        if (!art) return;
-        const predmet = (row["Предмет"] || "").trim();
-        const kratko = (row["Кратко"] || "").trim();
-        const sRaw = (row["Сезон"] || "").trim().toLowerCase();
-        const season = sRaw.startsWith("зим") ? "winter" : sRaw.startsWith("лет") ? "summer" : null;
-        const color = colorHex(row["Цвет"]);
-        const ex = sheets.nomen[art];
-        if (!ex) sheets.nomen[art] = { predmet, kratko, season, color };
-        else { if (!ex.predmet && predmet) ex.predmet = predmet; if (!ex.kratko && kratko) ex.kratko = kratko; if (!ex.season && season) ex.season = season; if (!ex.color && color) ex.color = color; }
-      });
+      /* Две таблицы: ИП1 (Easyform) и ИП2 (EZFR). Колонки ищем по имени без учёта
+         регистра и лишних пробелов — в копиях таблицы заголовки бывают чуть иначе. */
+      const col = (row, ...names) => {
+        for (const n of names) if (row[n] != null && String(row[n]).trim() !== "") return String(row[n]).trim();
+        const keys = Object.keys(row);
+        for (const n of names) {
+          const k = keys.find((x) => x.trim().toLowerCase() === n.toLowerCase());
+          if (k && String(row[k]).trim() !== "") return String(row[k]).trim();
+        }
+        return "";
+      };
+      const parseNomen = (txt) => {
+        let n = 0;
+        parseCSV(txt).forEach((row) => {
+          const art = col(row, "Артикул поставщика", "Артикул продавца", "Артикул").toLowerCase();
+          if (!art) return;
+          const predmet = col(row, "Предмет");
+          const kratko = col(row, "Кратко", "Группа");
+          const sRaw = col(row, "Сезон").toLowerCase();
+          const season = sRaw.startsWith("зим") ? "winter" : sRaw.startsWith("лет") ? "summer" : null;
+          const color = colorHex(col(row, "Цвет"));
+          const ex = sheets.nomen[art];
+          if (!ex) { sheets.nomen[art] = { predmet, kratko, season, color }; n++; }
+          else { if (!ex.predmet && predmet) ex.predmet = predmet; if (!ex.kratko && kratko) ex.kratko = kratko; if (!ex.season && season) ex.season = season; if (!ex.color && color) ex.color = color; }
+        });
+        return n;
+      };
+      parseNomen(rN);
+      const rN2 = await rN2p;
+      sheets.warn = null;
+      if (typeof rN2 === "string") {
+        const added = parseNomen(rN2);
+        console.log(`Номенклатура ИП2: добавлено артикулов ${added}`);
+      } else {
+        sheets.warn = rN2.err;
+      }
 
       /* Недельные кривые сезонности (вкладка «Сезон»): № недели ISO → Зима/Лето */
       parseCSV(rS).forEach((row) => {

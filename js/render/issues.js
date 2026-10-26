@@ -10,6 +10,11 @@ export function issuesOf(n) {
     why: sheets.error,
     effect: "СГП/сырьё/сезон пустые, выкупаемость ~70%",
   });
+  if (sheets.warn && n === 2) list.push({
+    what: "Номенклатура ИП2 (EZFR)",
+    why: sheets.warn,
+    effect: "группы («Кратко»), предметы и сезон у артикулов EZFR могут быть пустыми",
+  });
   return list;
 }
 

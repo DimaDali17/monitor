@@ -17,6 +17,8 @@ export const CSV_SGP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8a
 export const CSV_RAW = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1104329590&single=true&output=csv";
 export const CSV_MAP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdfWL8acRSVEEy__OKcizuFMBn1QCZqvMlbsE0Zz8IZfSMr-sDj_8_MaYQiz8KIvQ3ag8T2qU2cTK0/pub?gid=1004508899&single=true&output=csv";
 export const CSV_NOMEN = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRv2VuvAbmweu5Q_5cj-zoss2s3RoFMwKfK2z6tp22oG7FFfNGvoR8LYAyv56tvnvdJc6wouLBaYpph/pub?gid=612792464&single=true&output=csv"; /* Предмет + Кратко по артикулу поставщика */
+/* Номенклатура ИП2 (EZFR) — отдельная таблица той же структуры. Объединяется с CSV_NOMEN. */
+export const CSV_NOMEN_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS4upRNoJpKgaEClkUgzfEBePMDEIYNBNHGO-iV5wqa0lzZPh1wLKuRw-fC2XDyc-kixxFbq4nPbKh9/pub?gid=612792464&single=true&output=csv";
 export const CSV_SEASON = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRv2VuvAbmweu5Q_5cj-zoss2s3RoFMwKfK2z6tp22oG7FFfNGvoR8LYAyv56tvnvdJc6wouLBaYpph/pub?gid=1493619127&single=true&output=csv"; /* вкладка «Сезон»: № недели ISO, Зима, Лето */
 
 /* ══════════════════════════════════════════════════════════
