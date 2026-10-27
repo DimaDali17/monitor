@@ -4,16 +4,22 @@ name: Бот — оповещения в Telegram
 
 on:
   schedule:
-    - cron: "0 7 * * *"    # 10:00 МСК — «срочно на ВБ» + правила FBS
-    - cron: "0 12 * * *"   # 15:00 МСК — падение заказов к этому часу
-  workflow_dispatch:       # ручной запуск: Actions → этот workflow → Run workflow
+    - cron: "0 7 * * *"          # 10:00 МСК — «срочно на ВБ» + «закончилось на FBS»
+    - cron: "0 6,8-18 * * *"     # 9:00, 11:00–21:00 МСК каждый час — «закончилось на FBS»
+    - cron: "0 12 * * *"         # 15:00 МСК — падение заказов к этому часу
+  workflow_dispatch:             # ручной запуск: Actions → этот workflow → Run workflow
     inputs:
       mode:
-        description: "morning — дефицит и FBS, drop — падение заказов"
+        description: "morning — дефицит + FBS, fbs — только FBS, drop — падение заказов"
         required: true
         default: morning
         type: choice
-        options: [morning, drop]
+        options: [morning, fbs, drop]
+
+# запуски по очереди — чтобы не перезаписывать память остатков друг другу
+concurrency:
+  group: bot
+  cancel-in-progress: false
 
 jobs:
   bot:
@@ -24,6 +30,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Память остатков FBS (с прошлой проверки)
+        uses: actions/cache/restore@v4
+        with:
+          path: .bot-state
+          key: bot-state-${{ github.run_id }}
+          restore-keys: bot-state-
       - name: Запуск бота
         env:
           DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
@@ -32,6 +44,16 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           if [ -z "$MODE" ]; then
-            if [ "${{ github.event.schedule }}" = "0 12 * * *" ]; then MODE=drop; else MODE=morning; fi
+            case "${{ github.event.schedule }}" in
+              "0 12 * * *") MODE=drop ;;
+              "0 7 * * *") MODE=morning ;;
+              *) MODE=fbs ;;
+            esac
           fi
           node scripts/bot.mjs "$MODE"
+      - name: Сохранить память остатков
+        if: always() && hashFiles('.bot-state/fbs.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .bot-state
+          key: bot-state-${{ github.run_id }}-${{ github.run_attempt }}

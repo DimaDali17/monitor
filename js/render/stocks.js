@@ -2,7 +2,7 @@ import { VM, SS, FSS, FS, FSZ, OA, OAF, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, normSz } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { ozBase, FBS_WAREHOUSES, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+import { ozBase, cabWarehouses, whUsed, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
@@ -188,7 +188,7 @@ export function fbsRows(n) {
   const fbsCells = vm.fbsCells || {};
   /* Колонки: всегда наши 5 FBS-складов (по правилам «все склады» — это они), плюс
      склады кабинета, которые не удалось сопоставить, — справа. */
-  const fixed = FBS_WAREHOUSES.map((w) => w.name);
+  const fixed = cabWarehouses(n).map((w) => w.name);
   /* «FBS» — условный склад, когда маркетплейс не дал разбивку (Ozon): отдельной колонкой
      не показываем — это дубль «FBS общий». */
   const noBreakdown = Object.keys(vm.fbsWh || {}).some((w) => w === "FBS");
@@ -273,7 +273,7 @@ export function fbsRows(n) {
     } else if (rule && noBreakdown) {
       st = fbsQty > 0 ? "nobd" : "red";
     } else if (rule) {
-      const req = whList.filter((w) => whRequired(rule.rule, w));
+      const req = whList.filter((w) => whRequired(rule.rule, w, n));
       empty = req.filter((w) => !(wh[w] > 0));
       low = req.filter((w) => isLowU(art, sz, w, wh[w] || 0));
       st = !req.length || empty.length ? "red" : low.length ? "amber" : "ok";
@@ -448,7 +448,7 @@ export function fbsStocksTbl(n) {
         ? `<td style="text-align:center;font-size:11px;${AMB}" data-tip="По правилу здесь должно быть 0">${qy}</td>`
         : `<td style="text-align:center;font-size:11px;color:var(--ink3)">·</td>`;
     }
-    if (!whRequired(u.rule.rule, w)) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="По правилу «${esc(ruleText(u.rule.rule))}» этот склад не обязателен">${qy || "·"}</td>`;
+    if (!whRequired(u.rule.rule, w, n)) return `<td style="text-align:center;font-size:11px;color:var(--ink3)" data-tip="${whUsed(n, w) ? `По правилу «${esc(ruleText(u.rule.rule))}» этот склад не обязателен` : "Кабинет на этом складе не работает"}">${qy || "·"}</td>`;
     if (u.st === "nodem") return `<td style="text-align:center;font-size:11px;color:var(--ink3)">${qy || "·"}</td>`;
     const style = qy === 0 ? (sz != null ? AMB : RED) : isLowU(art, sz, w, qy) ? AMB : "color:#8B4513";
     const tip = qy > 0 ? daysTip(art, w, qy, sz) : "";
@@ -457,7 +457,7 @@ export function fbsStocksTbl(n) {
 
   /* Строка артикула с размерами: сумма по складу, цвет — худший размер на этом складе */
   const artCell = (r, w) => {
-    if (r.rule.rule === "none" || !whRequired(r.rule.rule, w)) return unitCell(r, r.art, null, w);
+    if (r.rule.rule === "none" || !whRequired(r.rule.rule, w, n)) return unitCell(r, r.art, null, w);
     const qy = r.wh[w] || 0;
     const act = r.sizes.filter((x) => x.st !== "nodem");   /* размеры со спросом */
     const emptySz = act.filter((x) => !(x.wh[w] > 0)).map((x) => x.sz);

@@ -64,6 +64,14 @@ export const FBS_WAREHOUSES = [
   { name: "МСК",         re: /мск|москв/i },
   { name: "Новосибирск", re: /новосиб/i },
 ];
+/* На каких складах кабинет сейчас работает (если не указано — на всех пяти).
+   Остальные склады для правил не обязательны: пусто там — не тревога. */
+export const CAB_WAREHOUSES = {
+  2: ["Урал", "Казань", "МСК"],   /* EZFR (ИП2): Екатеринбург, Казань, Москва */
+};
+export const cabWarehouses = (n) => (CAB_WAREHOUSES[n] ? FBS_WAREHOUSES.filter((w) => CAB_WAREHOUSES[n].includes(w.name)) : FBS_WAREHOUSES);
+export const whUsed = (n, wh) => !CAB_WAREHOUSES[n] || CAB_WAREHOUSES[n].includes(wh);
+
 /* Название склада WB → наш склад из списка (или как есть, если не узнали) */
 export const canonWh = (wh) => {
   const w = FBS_WAREHOUSES.find((x) => x.re.test(wh || ""));
@@ -91,8 +99,9 @@ export function ruleFor(art, n) {
 }
 
 /* Обязателен ли склад по правилу */
-export function whRequired(rule, wh) {
+export function whRequired(rule, wh, n) {
   if (rule === "none") return false;
+  if (n && !whUsed(n, wh)) return false;   /* кабинет на этом складе не работает */
   if (rule === "pyat") return isPyat(wh);
   if (rule === "exMsk") return !isMsk(wh);
   return true;

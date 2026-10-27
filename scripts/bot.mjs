@@ -2,8 +2,13 @@
    Бот-оповещения в Telegram на тех же расчётах, что монитор.
    Запускается по расписанию в GitHub Actions (.github/workflows/bot.yml).
 
-   node scripts/bot.mjs morning  — «срочно на ВБ» (дефицит) + нарушения правил FBS
+   node scripts/bot.mjs morning  — «срочно на ВБ» (дефицит) + «закончилось на FBS»
+   node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час днём)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
+
+   «Закончилось на FBS»: бот помнит остатки прошлой проверки (файл BOT_STATE,
+   между запусками его хранит кэш GitHub) и пишет, только если на обязательном
+   складе было > 0, а стало 0. Первая проверка — молча запоминает остатки.
 
    Секреты (GitHub → Settings → Secrets and variables → Actions):
      DASH_PASSWORD  пароль от монитора (бот входит через воркер, как человек)
@@ -37,6 +42,9 @@ const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
 const { defTbl, statusKey } = await import("../js/render/deficit.js");
 const { fbsRows } = await import("../js/render/stocks.js");
+const { whRequired } = await import("../js/fbsRules.js");
+const fs = await import("node:fs");
+const STATE = process.env.BOT_STATE || ".bot-state/fbs.json";
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const MAX_LINES = 15;   /* в одном блоке; остальное — «и ещё N» */
@@ -79,7 +87,7 @@ if (process.env.BOT_FAKE) {
   for (const n of [1, 2]) {
     try { await loadWB(n, {}); } catch (e) { problems.push(`⚠️ ${cabName(n)}: не загрузился — ${esc(e.message)}`); }
   }
-  if (MODE === "morning") {
+  if (MODE !== "drop") {
     try { await loadOZ({}); } catch (e) { problems.push(`⚠️ Ozon: не загрузился — ${esc(e.message)}`); }
   }
 }
@@ -92,40 +100,59 @@ if (MODE === "morning") {
   for (const n of [1, 2]) {
     if (!prepare(n)) continue;
     const rows = defTbl(n, { rowsOnly: true })
-      .filter((r) => r.o7 > 0 && statusKey(r.dStock) === "urgent")
+      .filter((r) => r.o7 > 0 && Math.round(r.dr) >= 1 && statusKey(r.dStock) === "urgent")
       .sort((a, b) => (a.dStock ?? 0) - (b.dStock ?? 0));
     if (!rows.length) continue;
     const lines = rows.map((r) => {
-      const src = r.sgp + r.raw;
-      return `• <code>${esc(r.art)}</code> — FBW ${r.stk}${r.fbsArt ? ` + FBS ${r.fbsArt}` : ""}, хватит ~${r.dStock} дн. (${Math.round(r.dr)} зак/день)` +
-        (src > 0 ? ` · есть из чего: ${r.sgp ? "СГП " + r.sgp : ""}${r.sgp && r.raw ? ", " : ""}${r.raw ? "сырьё " + r.raw : ""}` : " · ❗ нечем пополнить");
+      const src = [r.sgp ? "СГП " + r.sgp : "", r.raw ? "сырьё " + r.raw : ""].filter(Boolean).join(", ");
+      return `• <code>${esc(r.art)}</code> — ~${r.dStock} дн. · ${src || "❗ нечем пополнить"}`;
     });
-    urgent.push(`<b>${cabName(n)} (${rows.length})</b>\n` + cap(lines).join("\n"));
+    urgent.push(`<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
-  if (urgent.length) parts.push(`🔥 <b>Срочно на ВБ — запаса меньше 14 дней</b>\n\n` + urgent.join("\n\n"));
+  if (urgent.length) parts.push(`🔥 <b>Срочно на ВБ</b> (запаса < 14 дн.)\n` + urgent.join("\n"));
+}
 
-  /* ── 3. Правила FBS: пусто / мало на обязательных складах (как в «Остатки по FBS») ── */
-  const fbs = [];
+if (MODE === "morning" || MODE === "fbs") {
+  /* ── 3. Закончилось на FBS: на обязательном складе было > 0 — стало 0 ── */
+  let prev = null;
+  try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { /* первый запуск */ }
+  const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) } };
+  const gone = [];
   for (const n of [1, 2, 3]) {
-    if (!prepare(n)) continue;
-    const { rows } = fbsRows(n);
-    const bad = rows.filter((r) => r.rule && (r.st === "red" || r.st === "amber")).sort((a, b) => a.rank - b.rank);
-    if (!bad.length) continue;
-    const lines = bad.map((r) => {
-      const mark = r.st === "red" ? "🔴" : "🟠";
-      if (r.rule.rule === "none") return `${mark} <code>${esc(r.art)}</code> — должно быть 0 на FBS, а есть ${r.fbs} шт`;
-      if (r.sizes) {
-        const sz = r.sizes.filter((x) => x.st === "red" || x.st === "amber")
-          .map((x) => `${esc(x.sz)} (${[x.empty.length ? "нет: " + x.empty.join(", ") : "", x.low.length ? "мало: " + x.low.join(", ") : ""].filter(Boolean).join("; ")})`);
-        return `${mark} <code>${esc(r.art)}</code> — размеры: ${sz.join("; ")}`;
-      }
-      if (n === 3) return `${mark} <code>${esc(r.art)}</code> — ${r.st === "red" ? "на FBS 0" : `на FBS ${r.fbs} шт, хватит ≤2 дн.`}`;
-      const what = [r.empty.length ? "пусто: " + r.empty.join(", ") : "", r.low.length ? "мало: " + r.low.join(", ") : ""].filter(Boolean).join("; ");
-      return `${mark} <code>${esc(r.art)}</code> — ${what}${!(r.base > 0) ? " · ❗ нечем пополнить" : ""}`;
+    if (!D[n] || !prepare(n)) continue;           /* кабинет не загрузился — помним прошлое */
+    const { rows, whList } = fbsRows(n);
+    const snap = {};
+    for (const r of rows) {
+      if (!r.rule || r.rule.rule === "none") continue;
+      if (n === 3) { snap[`${r.art}||всего`] = r.fbs || 0; continue; }
+      const units = r.sizes ? r.sizes.filter((x) => x.st !== "nodem") : [{ sz: "", wh: r.wh }];
+      for (const u of units) for (const w of whList) if (whRequired(r.rule.rule, w, n)) snap[`${r.art}|${u.sz}|${w}`] = u.wh[w] || 0;
+    }
+    const old = prev?.cabs?.[n];
+    const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+    if (old && sum(old) > 0 && sum(snap) === 0) {   /* всё разом в ноль — скорее сбой загрузки FBS */
+      problems.push(`⚠️ ${cabName(n)}: остатки FBS не загрузились — проверка пропущена`);
+      continue;
+    }
+    next.cabs[n] = snap;
+    if (!old) continue;
+    /* арт → склад → размеры, которые закончились */
+    const byArt = {};
+    for (const [k, q] of Object.entries(snap)) {
+      if (q > 0 || !(old[k] > 0)) continue;
+      const [art, sz, w] = k.split("|");
+      ((byArt[art] ||= {})[w] ||= []).push(sz);
+    }
+    const lines = Object.entries(byArt).map(([art, ws]) => {
+      if (n === 3) return `• <code>${esc(art)}</code> — FBS 0`;
+      const where = Object.entries(ws).map(([w, szs]) => szs.filter(Boolean).length ? `${w} (${szs.map(esc).join(", ")})` : w).join(", ");
+      return `• <code>${esc(art)}</code> — ${where}`;
     });
-    fbs.push(`<b>${cabName(n)} (${bad.length})</b>\n` + cap(lines).join("\n"));
+    if (lines.length) gone.push(`<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
-  if (fbs.length) parts.push(`🏬 <b>FBS: не по правилам</b>\n\n` + fbs.join("\n\n"));
+  fs.mkdirSync(STATE.replace(/\/[^/]*$/, ""), { recursive: true });
+  fs.writeFileSync(STATE, JSON.stringify(next));
+  if (gone.length) parts.push(`🔴 <b>Закончилось на FBS</b>\n` + gone.join("\n"));
 }
 
 if (MODE === "drop") {
