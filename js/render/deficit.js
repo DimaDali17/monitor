@@ -221,7 +221,7 @@ function seasonTip(i) {
     `Продаж сейчас по модели ~${f(nowDay)}/день (выкуп ${Math.round(i.buyrate * 100)}%). Остаток ${i.stk} шт.`;
 }
 
-function statusKey(days) {
+export function statusKey(days) {
   if (days == null) return "none";
   if (days < 14) return "urgent";
   if (days < 21) return "soon";
@@ -239,7 +239,8 @@ function statusLegend(key, tip) {
   return `<span data-tip="${tip}" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${s.bg};color:${s.fg}">${s.icon ? s.icon + " " : ""}${s.label}</span>`;
 }
 
-export function defTbl(n) {
+/* opts.rowsOnly — вернуть только посчитанные строки (для бота: scripts/bot.mjs) */
+export function defTbl(n, opts) {
   const vm = VM[n];
   if (!vm) return '<div class="em">Нет данных</div>';
 
@@ -360,6 +361,7 @@ export function defTbl(n) {
     /* Прячем полностью пустые строки: общий сток < 1 И мес. потребность < 1 И FBS < 1
        (строку с любым остатком или спросом оставляем). */
     .filter((r) => !(r.total < 1 && r.need < 1 && r.fbsArt < 1));
+  if (opts && opts.rowsOnly) return rows;
 
   const { c, d: dir } = DS[n];
   rows.sort((a, b) => {

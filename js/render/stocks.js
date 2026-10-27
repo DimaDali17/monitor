@@ -182,7 +182,7 @@ export function stocksTbl(n) {
    Артикул · Сырьё+СГП · FBS общий · FBS по складам (колонки).
    Каркас + тело: сортировка перерисовывает только #fbstbl, как и в остальных таблицах. */
 /* ── «Остатки по FBS» + правила наличия на складах (js/fbsRules.js) ── */
-function fbsRows(n) {
+export function fbsRows(n) {
   const vm = VM[n];
   const fbsMap = vm.fbs || {};
   const fbsCells = vm.fbsCells || {};
