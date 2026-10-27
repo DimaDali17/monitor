@@ -2,6 +2,7 @@ import { D, OAC, CONSO, cabShort } from "../state.js";
 import { MSK_RE } from "../config.js";
 import { fmt, esc, q, szCmp, fmtDays, sitePrice, wbPrice, pct } from "../utils.js";
 import { issuesHTML } from "./issues.js";
+import { returnsHTML } from "./returns.js";
 import { setRawScope } from "../api/sheets.js";
 import { rawSplitInfo } from "../api/sheets.js";
 import { getBuyrate, getStocksForArt, getStocksForSz, parseOzonArt, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp } from "../api/sheets.js";
@@ -80,7 +81,7 @@ export function renderConso() {
 
   const loaded = CABS.filter((c) => D[c.n]);
   el.innerHTML = loaded.length
-    ? loaded.map((c) => issuesHTML(c.n, true)).join("") + loaderPanel() + summaryCards(loaded) + ordersFeed() + deficitTable(loaded) + warehouseSummary()
+    ? loaded.map((c) => issuesHTML(c.n, true)).join("") + [1, 2].map((n) => (D[n] ? returnsHTML(n, true) : "")).join("") + loaderPanel() + summaryCards(loaded) + ordersFeed() + deficitTable(loaded) + warehouseSummary()
     : `<div style="max-width:520px;margin:40px auto">
          <div class="sh"><span class="st">📊 Консолидация — загрузка данных</span></div>
          ${loaderPanel()}

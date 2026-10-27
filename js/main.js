@@ -7,6 +7,8 @@ import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadWB } from "./api/wb.js";
+import { loadReturns, RETURNS } from "./api/returns.js";
+import { repaintReturns } from "./render/returns.js";
 import { loadOZ } from "./api/ozon.js";
 import { renderCabinet, repaintStocks, repaintDeficit, repaintFbsStocks } from "./render/cabinet.js";
 import { renderConso, logConso } from "./render/conso.js";
@@ -50,6 +52,9 @@ async function reload(n, force = false) {
 
     if (curTab === 4) renderConso();
     else renderCabinet(n);
+
+    /* Возвраты к выдаче — отдельным лёгким запросом, не задерживая кабинет */
+    if (n !== 3) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else repaintReturns(n); });
   } catch (e) {
     view.innerHTML = `<div class="sb"><span class="sde"></span>
       <div><b>«${cabName(n)}» не загрузился</b><br>${esc(e.message)}</div></div>
@@ -334,6 +339,11 @@ function init() {
 
   document.getElementById("verBtn").textContent = VERSION;
   checkVersion();
+
+  /* Возвраты к выдаче — обновляем каждые 15 минут, пока страница открыта */
+  setInterval(() => {
+    for (const n of [1, 2]) if (D[n]) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else if (curTab === n) repaintReturns(n); });
+  }, 15 * 60 * 1000);
 
   /* Пропуск ещё действует — пускаем сразу, иначе показываем окно входа */
   if (loadPass()) {
