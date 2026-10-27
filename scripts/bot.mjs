@@ -49,7 +49,7 @@ async function send(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000), parse_mode: "HTML", disable_web_page_preview: true }),
     });
-    if (!r.ok) console.error("Telegram:", r.status, await r.text());
+    if (!r.ok) { console.error("Telegram не принял сообщение:", r.status, await r.text()); process.exitCode = 1; }
   }
 }
 
