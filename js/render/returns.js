@@ -3,8 +3,8 @@ import { cabName, D } from "../state.js";
 import { esc } from "../utils.js";
 
 /* Плашка «Возвраты к выдаче» вверху кабинета WB.
-   Красная — если у какого-то возврата срок хранения кончается в ближайшие 2 дня,
-   жёлтая — есть что забрать, нет плашки — забирать нечего. Клик — список. */
+   Жёлтая — есть что забрать, нет плашки — забирать нечего. Клик — список.
+   «Хранится до» WB в отчёте не заполняет — не показываем; видно, с какого числа лежит на ПВЗ. */
 
 const DAY = 864e5;
 const fmtD = (s) => {
@@ -24,11 +24,11 @@ export function returnsHTML(n, compact) {
   }
 
   const now = Date.now();
-  const left = (r) => (r.expiredDt ? (new Date(r.expiredDt) - now) / DAY : Infinity);
-  ready.sort((a, b) => left(a) - left(b));
-  const soonest = ready[0];
-  const urgent = ready.filter((r) => left(r) <= 2).length;
-  const bg = urgent ? "#FDECEA" : "#FFF6E0", bd = urgent ? "#E8A39B" : "#E9C77B", acc = urgent ? "#B3261E" : "#8A5A00";
+  const since = (r) => (r.readyToReturnDt ? new Date(r.readyToReturnDt).getTime() : Infinity);
+  ready.sort((a, b) => since(a) - since(b));   /* дольше всех ждут — сверху */
+  const oldest = ready[0];
+  const waitDays = isFinite(since(oldest)) ? Math.floor((now - since(oldest)) / DAY) : null;
+  const bg = "#FFF6E0", bd = "#E9C77B", acc = "#8A5A00";
   const addrs = [...new Set(ready.map((r) => r.dstOfficeAddress).filter(Boolean))];
 
   /* В отчёте нет артикула продавца — берём по nmId из заказов кабинета */
@@ -36,23 +36,20 @@ export function returnsHTML(n, compact) {
   for (const o of (D[n] && D[n].allOrders) || []) if (o.nmId && o.supplierArticle) artByNm[o.nmId] = o.supplierArticle;
 
   const rows = ready.map((r) => {
-    const l = left(r);
-    const exp = r.expiredDt ? `${fmtD(r.expiredDt)}${isFinite(l) ? ` <span style="color:${l <= 2 ? "#B3261E" : "var(--ink3)"};font-weight:${l <= 2 ? 700 : 400}">(${l < 0 ? "срок вышел" : "ост. " + Math.max(0, Math.floor(l)) + " дн."})</span>` : ""}` : "—";
+    const w = isFinite(since(r)) ? Math.floor((now - since(r)) / DAY) : null;
     return `<tr>
       <td style="white-space:nowrap"><span class="art">${esc(artByNm[r.nmId] || "")}</span> <span style="color:var(--ink3)">${esc(String(r.nmId || ""))}</span></td>
       <td>${esc(r.techSize || "—")}</td>
       <td>${esc(r.subjectName || "")}</td>
       <td>${esc(r.returnType || "")}</td>
-      <td style="white-space:nowrap">${fmtD(r.readyToReturnDt)}</td>
-      <td style="white-space:nowrap">${exp}</td>
+      <td style="white-space:nowrap">${fmtD(r.readyToReturnDt)}${w != null ? ` <span style="color:var(--ink3)">(${w} дн.)</span>` : ""}</td>
       <td>${esc(r.dstOfficeAddress || "")}</td>
     </tr>`;
   }).join("");
 
   const title = `📦 ${compact ? esc(cabName(n)) + ": " : ""}Возвратов к выдаче: <b>${ready.length}</b>`;
   const sub = [
-    soonest.expiredDt ? `ближайший срок хранения — до ${fmtD(soonest.expiredDt)}` : "",
-    urgent ? `<b style="color:#B3261E">${urgent} истекает в ближайшие 2 дня — начнёт капать штраф</b>` : "",
+    waitDays != null ? `дольше всех лежит ${waitDays} дн. (с ${fmtD(oldest.readyToReturnDt)})` : "",
     onWay.length ? `ещё ${onWay.length} в пути на ПВЗ` : "",
     addrs.length === 1 ? `ПВЗ: ${esc(addrs[0])}` : addrs.length > 1 ? `ПВЗ: ${addrs.length}` : "",
   ].filter(Boolean).join(" · ");
@@ -66,7 +63,7 @@ export function returnsHTML(n, compact) {
       </summary>
       <div class="sw" style="margin-top:8px">
         <table>
-          <thead><tr><th>Артикул WB</th><th>Размер</th><th>Предмет</th><th>Тип</th><th>Готов к выдаче</th><th>Хранится до</th><th>ПВЗ</th></tr></thead>
+          <thead><tr><th>Артикул WB</th><th>Размер</th><th>Предмет</th><th>Тип</th><th>На ПВЗ с</th><th>ПВЗ</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
