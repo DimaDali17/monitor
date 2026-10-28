@@ -3,10 +3,9 @@
 name: Бот — оповещения в Telegram
 
 on:
-  schedule:
-    - cron: "0 7 * * *"          # 10:00 МСК — «срочно на ВБ» + «закончилось на FBS»
-    - cron: "0 6,8-18 * * *"     # 9:00, 11:00–21:00 МСК каждый час — «закончилось на FBS»
-    - cron: "0 12 * * *"         # 15:00 МСК — падение заказов к этому часу
+  # Расписание держит воркер Cloudflare (cron «0 6-18 * * *», v5.3): GitHub по своему
+  # расписанию запускает ненадёжно. Воркер присылает mode: 10:00 morning, 15:00 drop + fbs,
+  # остальные часы 9–21 — fbs.
   workflow_dispatch:             # ручной запуск: Actions → этот workflow → Run workflow
     inputs:
       mode:
@@ -44,11 +43,7 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           if [ -z "$MODE" ]; then
-            case "${{ github.event.schedule }}" in
-              "0 12 * * *") MODE=drop ;;
-              "0 7 * * *") MODE=morning ;;
-              *) MODE=fbs ;;
-            esac
+            MODE=fbs
           fi
           node scripts/bot.mjs "$MODE"
       - name: Сохранить память остатков
