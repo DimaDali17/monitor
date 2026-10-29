@@ -51,13 +51,21 @@ const MAX_LINES = 15;   /* в одном блоке; остальное — «и
 const cap = (arr) => arr.length > MAX_LINES ? [...arr.slice(0, MAX_LINES), `…и ещё ${arr.length - MAX_LINES}`] : arr;
 
 async function send(text) {
+  const post = (chat, body) => fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chat, disable_web_page_preview: true, ...body }),
+  });
   for (const chat of TG_CHAT_ID.split(",").map((s) => s.trim()).filter(Boolean)) {
-    const r = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000), parse_mode: "HTML", disable_web_page_preview: true }),
-    });
-    if (!r.ok) { console.error("Telegram не принял сообщение:", r.status, await r.text()); process.exitCode = 1; }
+    let r = await post(chat, { text: text.slice(0, 4000), parse_mode: "HTML" });
+    if (!r.ok) {
+      const err = await r.text();
+      console.error("Telegram не принял HTML:", r.status, err);
+      /* запасной путь: тот же текст без разметки — лучше некрасиво, чем ничего */
+      const plain = text.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      r = await post(chat, { text: plain.slice(0, 4000) });
+      if (!r.ok) { console.error("Telegram не принял и простой текст:", r.status, await r.text()); process.exitCode = 1; }
+    }
   }
 }
 
@@ -109,7 +117,7 @@ if (MODE === "morning") {
     });
     urgent.push(`<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
-  if (urgent.length) parts.push(`🔥 <b>Срочно на ВБ</b> (запаса < 14 дн.)\n` + urgent.join("\n"));
+  if (urgent.length) parts.push(`🔥 <b>Срочно на ВБ</b> (запаса меньше 14 дн.)\n` + urgent.join("\n"));
 }
 
 if (MODE === "morning" || MODE === "fbs") {
