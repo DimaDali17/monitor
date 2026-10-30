@@ -3,9 +3,9 @@
 name: Бот — оповещения в Telegram
 
 on:
-  # Расписание держит воркер Cloudflare (cron «0 6-18 * * *», v5.3): GitHub по своему
+  # Расписание держит воркер Cloudflare (cron «0 1-21 * * *», v5.4): GitHub по своему
   # расписанию запускает ненадёжно. Воркер присылает mode: 10:00 morning, 15:00 drop + fbs,
-  # остальные часы 9–21 — fbs.
+  # остальные часы 4:00–0:00 — fbs.
   workflow_dispatch:             # ручной запуск: Actions → этот workflow → Run workflow
     inputs:
       mode:

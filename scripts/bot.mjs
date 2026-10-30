@@ -3,7 +3,7 @@
    Запускается по расписанию в GitHub Actions (.github/workflows/bot.yml).
 
    node scripts/bot.mjs morning  — «срочно на ВБ» (дефицит) + «закончилось на FBS»
-   node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час днём)
+   node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час 4:00–0:00 МСК)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
 
    «Закончилось на FBS»: бот помнит остатки прошлой проверки (файл BOT_STATE,
