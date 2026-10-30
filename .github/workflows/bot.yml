@@ -9,7 +9,7 @@ on:
   workflow_dispatch:             # ручной запуск: Actions → этот workflow → Run workflow
     inputs:
       mode:
-        description: "morning — дефицит + FBS, fbs — только FBS, drop — падение заказов"
+        description: "morning — сводка за вчера + дефицит + FBS, fbs — только FBS, drop — падение заказов"
         required: true
         default: morning
         type: choice
@@ -40,6 +40,7 @@ jobs:
           DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TZ: Europe/Moscow   # «вчера» и «сегодня» — по Москве, как в мониторе
         run: |
           MODE="${{ github.event.inputs.mode }}"
           if [ -z "$MODE" ]; then

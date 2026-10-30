@@ -2,7 +2,7 @@
    Бот-оповещения в Telegram на тех же расчётах, что монитор.
    Запускается по расписанию в GitHub Actions (.github/workflows/bot.yml).
 
-   node scripts/bot.mjs morning  — «срочно на ВБ» (дефицит) + «закончилось на FBS»
+   node scripts/bot.mjs morning  — сводка за вчера + «срочно на ВБ» (дефицит) + «закончилось на FBS»
    node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час 4:00–0:00 МСК)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
 
@@ -42,7 +42,8 @@ const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
 const { defTbl, statusKey } = await import("../js/render/deficit.js");
 const { fbsRows } = await import("../js/render/stocks.js");
-const { whRequired } = await import("../js/fbsRules.js");
+const { whRequired, ozBase } = await import("../js/fbsRules.js");
+const { wbPrice, ozRev } = await import("../js/utils.js");
 const fs = await import("node:fs");
 const STATE = process.env.BOT_STATE || ".bot-state/fbs.json";
 
@@ -103,6 +104,35 @@ if (process.env.BOT_FAKE) {
 const parts = [];
 
 if (MODE === "morning") {
+  /* ── Сводка за вчера: заказы и сумма по кабинетам (как «Вчера» в мониторе),
+     сравнение со средним за 7 полных дней, три лидера по штукам ── */
+  const rub = (x) => Math.round(x).toLocaleString("ru-RU").replace(/\u00a0/g, " ") + " ₽";
+  const pct = (a, b) => (b > 0 ? Math.round((a / b - 1) * 100) : null);
+  const sign = (p) => (p == null ? "" : ` (${p > 0 ? "+" : p < 0 ? "−" : "±"}${Math.abs(p)}% к среднему)`);
+  const lines = [], top = {};
+  let totC = 0, totR = 0;
+  for (const n of [1, 2, 3]) {
+    const d = D[n];
+    if (!d) continue;
+    const price = d.isOz ? ozRev : wbPrice;
+    const y = d.yestO || [], w7 = d.orders7 || [];
+    const yC = y.length, yR = y.reduce((a, o) => a + price(o), 0);
+    const aC = w7.length / 7, aR = w7.reduce((a, o) => a + price(o), 0) / 7;
+    totC += yC; totR += yR;
+    lines.push(`${cabName(n)} — ${yC} зак · ${rub(yR)}${sign(pct(yR, aR))}`);
+    for (const o of y) {
+      if (d.isOz) for (const p of o.products || []) { const a = ozBase(p.offer_id); top[a] = (top[a] || 0) + (p.quantity || 1); }
+      else top[o.supplierArticle] = (top[o.supplierArticle] || 0) + (o.quantity || 1);
+    }
+  }
+  if (lines.length) {
+    const yDate = new Date(Date.now() + 3 * 3600e3 - 864e5).toISOString().slice(5, 10).split("-").reverse().join(".");
+    const lead = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a, q]) => `${esc(a)} — ${q}`).join(", ");
+    parts.push(`📊 <b>Вчера, ${yDate}</b>\n` + lines.map(esc).join("\n") +
+      (lines.length > 1 ? `\n<b>Итого — ${totC} зак · ${rub(totR)}</b>` : "") +
+      (lead ? `\nЛидеры: ${lead}` : ""));
+  }
+
   /* ── 2. Срочно на ВБ: запаса FBW+FBS меньше 14 дней (тот же статус, что в дефиците) ── */
   const urgent = [];
   for (const n of [1, 2]) {
