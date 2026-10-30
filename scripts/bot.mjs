@@ -101,25 +101,22 @@ if (process.env.BOT_FAKE) {
   }
 }
 
-const parts = [];
+const msgs = [];   /* каждое — отдельным сообщением в Telegram */
 
 if (MODE === "morning") {
   /* ── Сводка за вчера: заказы и сумма по кабинетам (как «Вчера» в мониторе),
      сравнение со средним за 7 полных дней, три лидера по штукам ── */
   const rub = (x) => Math.round(x).toLocaleString("ru-RU").replace(/\u00a0/g, " ") + " ₽";
-  const pct = (a, b) => (b > 0 ? Math.round((a / b - 1) * 100) : null);
-  const sign = (p) => (p == null ? "" : ` (${p > 0 ? "+" : p < 0 ? "−" : "±"}${Math.abs(p)}% к среднему)`);
   const lines = [], top = {};
   let totC = 0, totR = 0;
   for (const n of [1, 2, 3]) {
     const d = D[n];
     if (!d) continue;
     const price = d.isOz ? ozRev : wbPrice;
-    const y = d.yestO || [], w7 = d.orders7 || [];
+    const y = d.yestO || [];
     const yC = y.length, yR = y.reduce((a, o) => a + price(o), 0);
-    const aC = w7.length / 7, aR = w7.reduce((a, o) => a + price(o), 0) / 7;
     totC += yC; totR += yR;
-    lines.push(`${cabName(n)} — ${yC} зак · ${rub(yR)}${sign(pct(yR, aR))}`);
+    lines.push(`${esc(cabName(n))}: ${yC} зак. · ${rub(yR)}`);
     for (const o of y) {
       if (d.isOz) for (const p of o.products || []) { const a = ozBase(p.offer_id); top[a] = (top[a] || 0) + (p.quantity || 1); }
       else top[o.supplierArticle] = (top[o.supplierArticle] || 0) + (o.quantity || 1);
@@ -127,10 +124,10 @@ if (MODE === "morning") {
   }
   if (lines.length) {
     const yDate = new Date(Date.now() + 3 * 3600e3 - 864e5).toISOString().slice(5, 10).split("-").reverse().join(".");
-    const lead = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a, q]) => `${esc(a)} — ${q}`).join(", ");
-    parts.push(`📊 <b>Вчера, ${yDate}</b>\n` + lines.map(esc).join("\n") +
-      (lines.length > 1 ? `\n<b>Итого — ${totC} зак · ${rub(totR)}</b>` : "") +
-      (lead ? `\nЛидеры: ${lead}` : ""));
+    const lead = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a, q]) => `${esc(a)} — ${q}`);
+    msgs.push({ link: false, text: `📊 <b>Заказы за ${yDate}</b>\n\n` + lines.join("\n") +
+      `\n<b>Всего: ${totC} зак. · ${rub(totR)}</b>` +
+      (lead.length ? `\n\nТоп: ` + lead.join(", ") : "") });
   }
 
   /* ── 2. Срочно на ВБ: запаса FBW+FBS меньше 14 дней (тот же статус, что в дефиците) ── */
@@ -145,9 +142,9 @@ if (MODE === "morning") {
       const src = [r.sgp ? "СГП " + r.sgp : "", r.raw ? "сырьё " + r.raw : ""].filter(Boolean).join(", ");
       return `• <code>${esc(r.art)}</code> — ~${r.dStock} дн. · ${src || "❗ нечем пополнить"}`;
     });
-    urgent.push(`<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
+    urgent.push(`\n<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
-  if (urgent.length) parts.push(`🔥 <b>Срочно на ВБ</b> (запаса меньше 14 дн.)\n` + urgent.join("\n"));
+  if (urgent.length) msgs.push(`🔥 <b>Срочно на ВБ</b> (запаса меньше 14 дн.)\n` + urgent.join("\n"));
 }
 
 if (MODE === "morning" || MODE === "fbs") {
@@ -186,11 +183,11 @@ if (MODE === "morning" || MODE === "fbs") {
       const where = Object.entries(ws).map(([w, szs]) => szs.filter(Boolean).length ? `${w} (${szs.map(esc).join(", ")})` : w).join(", ");
       return `• <code>${esc(art)}</code> — ${where}`;
     });
-    if (lines.length) gone.push(`<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
+    if (lines.length) gone.push(`\n<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
   fs.mkdirSync(STATE.replace(/\/[^/]*$/, ""), { recursive: true });
   fs.writeFileSync(STATE, JSON.stringify(next));
-  if (gone.length) parts.push(`🔴 <b>Закончилось на FBS</b>\n` + gone.join("\n"));
+  if (gone.length) msgs.push(`🔴 <b>Закончилось на FBS</b>\n` + gone.join("\n"));
 }
 
 if (MODE === "drop") {
@@ -230,15 +227,18 @@ if (MODE === "drop") {
       (cabDrop ? ` — всего ${totToday} заказов против обычных ~${Math.round(avgTot)} (${Math.round((totToday / avgTot - 1) * 100)}%)` : "") +
       (lines.length ? "\n" + cap(lines.map((x) => `• <code>${esc(x.art)}</code> — ${x.now} вместо обычных ~${Math.round(x.expected)}`)).join("\n") : ""));
   }
-  if (drops.length) parts.push(`📉 <b>Заказы упали — сегодня к ${hhmm}</b>\nСравнение со средним за 7 дней к тому же часу. Проверьте карточку, цену, остатки по размерам.\n\n` + drops.join("\n\n"));
+  if (drops.length) msgs.push(`📉 <b>Заказы упали — сегодня к ${hhmm}</b>\nСравнение со средним за 7 дней к тому же часу. Проверьте карточку, цену, остатки по размерам.\n\n` + drops.join("\n\n"));
 }
 
-if (problems.length) parts.push(problems.join("\n"));
+if (problems.length) msgs.push(problems.join("\n"));
 
-if (!parts.length) {
+if (!msgs.length) {
   console.log("Нечего сообщать — молчим");
 } else {
-  const text = parts.join("\n\n") + `\n\n<a href="https://dimadali17.github.io/monitor/">Открыть монитор</a>`;
-  console.log(text);
-  await send(text);
+  for (const m of msgs) {
+    const { text, link = true } = typeof m === "string" ? { text: m } : m;
+    const full = text + (link ? `\n\n<a href="https://dimadali17.github.io/monitor/">Открыть монитор</a>` : "");
+    console.log(full + "\n---");
+    await send(full);
+  }
 }
