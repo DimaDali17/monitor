@@ -6,6 +6,8 @@ import {
 import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
+import { loadPlan } from "./api/plan.js";
+import { repaintPlan } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
 import { repaintReturns } from "./render/returns.js";
@@ -54,6 +56,8 @@ async function reload(n, force = false) {
     else renderCabinet(n);
 
     /* Возвраты к выдаче — отдельным лёгким запросом, не задерживая кабинет */
+    /* План / факт — большая таблица, грузим фоном и дорисовываем блок */
+    if (n === 1 || n === 2) loadPlan().then(() => { if (curTab === 1) repaintPlan(1); });
     if (n !== 3) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else repaintReturns(n); });
   } catch (e) {
     view.innerHTML = `<div class="sb"><span class="sde"></span>

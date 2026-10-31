@@ -10,6 +10,7 @@ import { stocksHTML, stocksTbl, fbsStocksHTML, fbsStocksTbl, sizeBtn, stocksAllO
 import { deficitHTML, defTbl, rawModeTog } from "./deficit.js";
 import { issuesHTML } from "./issues.js";
 import { returnsHTML } from "./returns.js";
+import { planHTML } from "./plan.js";
 import { setRawScope } from "../api/sheets.js";
 
 /* Артикулы кабинета (без фильтров) — чтобы общий пул сырья показывался
@@ -40,6 +41,7 @@ export function renderCabinet(n) {
     `<div class="top3" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
        <div class="top3c" style="flex:0 1 245px;min-width:225px">${filterHTML(n)}</div>
        <div class="top3c" style="flex:1 1 280px;min-width:260px">${alertsHTML(n)}</div>
+       ${n === 1 ? `<div class="top3c" style="flex:1 1 280px;min-width:260px">${planHTML(n)}</div>` : ""}
        <div class="top3c" style="flex:1.6 1 360px;min-width:300px">${structureHTML(n)}</div>
      </div>` +
     metricsHTML(n, vm, type) +

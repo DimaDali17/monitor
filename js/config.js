@@ -52,3 +52,11 @@ export const DEFAULT_BUYRATE = 0.7;
 
 /* Московские склады WB (справочная колонка МСК) */
 export const MSK_RE = /коледино|электросталь|тула|подольск|рязань/i;
+
+/* План / факт (блок вверху кабинета Easyform).
+   План: «План зима 26-27», вкладка «План 2026-2027» — штук по артикулу и размеру на месяц (сен–янв).
+   Факт: исторический отчёт WB по дням — «Заказано, шт.» (report — EF, report2 — EZFR).
+   Дни, которых в отчёте ещё нет (вчера/сегодня), монитор добирает из живых заказов. */
+export const CSV_PLAN = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFg-5T74ZxxPalXrw1GTZg5ekvP7So_HZmzLGVLIqC_h5FBOQPhtvdKWCNVngUXXhXoRBlKVWG7iaF/pub?gid=594715177&single=true&output=csv";
+export const CSV_FACT_1 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHmDOfUKYgGrjZl6iocQ-gkkXET4_Ts7fw7dYIBB9_nGk-_KCU8pjnFoawiqbjZEZBHTgtJubJm3lT/pub?gid=1646776592&single=true&output=csv";
+export const CSV_FACT_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHmDOfUKYgGrjZl6iocQ-gkkXET4_Ts7fw7dYIBB9_nGk-_KCU8pjnFoawiqbjZEZBHTgtJubJm3lT/pub?gid=2136621481&single=true&output=csv";
