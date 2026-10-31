@@ -1,4 +1,5 @@
-import { D } from "../state.js";
+import { D, FA, FP, FG } from "../state.js";
+import { artGroup } from "../api/sheets.js";
 import { esc } from "../utils.js";
 import { PLAN } from "../api/plan.js";
 
@@ -35,35 +36,59 @@ const nfR = (x) => {
   return Math.round(x).toLocaleString("ru-RU");
 };
 
-/* Факт по группе: { "YYYY-MM-DD": {q, r} } — отчёт + живые заказы после последнего дня отчёта */
-function factByGroup() {
+/* Факт по артикулу: { арт → { "YYYY-MM-DD": {q, r} } } — отчёт + живые заказы после последнего дня отчёта.
+   price[группа] — средняя цена штуки группы за сезон (по отчёту, без фильтров) — для плана в ₽ и живых заказов. */
+function factByArt() {
   const out = {};
-  const add = (g, day, q, r) => { const f = (out[g] ||= {}); const c = (f[day] ||= { q: 0, r: 0, live: 0 }); c.q += q; c.r += r; };
+  const add = (a, day, q, r) => { const f = (out[a] ||= {}); const c = (f[day] ||= { q: 0, r: 0 }); c.q += q; c.r += r; };
+  const gq = {}, gr = {};
   for (const cab of [1, 2]) {
     for (const [a, days] of Object.entries(PLAN.fact[cab] || {})) {
       const g = PLAN.group[a];
-      if (g) for (const [d, c] of Object.entries(days)) add(g, d, c.q, c.r);
+      if (!g) continue;
+      for (const [d, c] of Object.entries(days)) { add(a, d, c.q, c.r); gq[g] = (gq[g] || 0) + c.q; gr[g] = (gr[g] || 0) + c.r; }
     }
   }
-  /* средняя цена штуки группы за сезон (по отчёту) — для плана в ₽ и живых заказов */
   const price = {};
-  for (const [g, days] of Object.entries(out)) {
-    let q = 0, r = 0;
-    for (const c of Object.values(days)) { q += c.q; r += c.r; }
-    price[g] = q > 0 ? r / q : 0;
-  }
+  for (const g of Object.keys(gq)) price[g] = gq[g] > 0 ? gr[g] / gq[g] : 0;
   for (const cab of [1, 2]) {
     const after = PLAN.factMax[cab] || "";
     for (const o of (D[cab] && D[cab].allOrders) || []) {
       const day = (o.date || "").slice(0, 10);
       if (!day || day <= after || day < PLAN.seasonStart) continue;
-      const g = PLAN.group[(o.supplierArticle || "").toLowerCase()];
+      const a = (o.supplierArticle || "").toLowerCase();
+      const g = PLAN.group[a];
       if (!g) continue;
       const q = o.quantity || 1;
-      add(g, day, q, q * (price[g] || 0));
+      add(a, day, q, q * (price[g] || 0));
     }
   }
   return { fact: out, price };
+}
+
+/* Фильтры кабинета Easyform (артикул / предмет / группа) — те же, что для остальных блоков.
+   Предмет артикула — как у WB в заказах/остатках (любой кабинет), иначе из номенклатуры. */
+function planFilter() {
+  const arts = FA[1].map((x) => String(x).trim().toLowerCase());
+  const subs = FP[1].map((x) => String(x).trim().toLowerCase());
+  const grps = FG[1].map((x) => String(x).trim().toLowerCase());
+  if (!arts.length && !subs.length && !grps.length) return null;
+  const subj = {};
+  for (const cab of [1, 2]) {
+    const d = D[cab];
+    if (!d) continue;
+    for (const o of [...(d.allOrders || []), ...(d.stocks || [])]) {
+      const a = (o.supplierArticle || "").toLowerCase();
+      if (a && !subj[a] && (o.subject || o.category)) subj[a] = String(o.subject || o.category).trim().toLowerCase();
+    }
+  }
+  return (a) => {
+    const nm = artGroup(a);
+    if (arts.length && !arts.includes(a)) return false;
+    if (subs.length && !subs.includes(subj[a] || String((nm && nm.predmet) || "").trim().toLowerCase())) return false;
+    if (grps.length && !grps.includes(String((nm && nm.kratko) || "").trim().toLowerCase())) return false;
+    return true;
+  };
 }
 
 export function planHTML(n) {
@@ -86,30 +111,29 @@ export function planHTML(n) {
   const inSeason = PLAN.months.includes(m);
   const seasonMonths = PLAN.months.slice(0, PLAN.months.indexOf(m) + 1);   /* сен…текущий */
 
-  const { fact, price } = factByGroup();
+  const { fact, price } = factByArt();
+  const ok = planFilter();
+  const filtered = !!ok;
 
-  /* План по группам: { месяц → шт } */
-  const planG = {};
-  for (const [a, pm] of Object.entries(PLAN.plan)) {
-    const g = (planG[PLAN.group[a]] ||= {});
-    for (const [mm, q] of Object.entries(pm)) g[mm] = (g[mm] || 0) + q;
-  }
-  const val = (g, q, r) => (R ? r : q);
+  const val = (q, r) => (R ? r : q);
   const planVal = (g, qty) => (R ? qty * (price[g] || 0) : qty);
 
   const groups = {};
   let pM = 0, fM = 0, pS = 0, fS = 0, pAll = 0;
-  for (const g of new Set([...Object.keys(planG), ...Object.keys(fact)])) {
-    const pm = planG[g] || {};
+  for (const a of Object.keys(PLAN.group)) {
+    if (ok && !ok(a)) continue;
+    const g = PLAN.group[a];
+    const pm = PLAN.plan[a] || {};
     let factM = 0, factS = 0;
-    for (const [d, c] of Object.entries(fact[g] || {})) {
+    for (const [d, c] of Object.entries(fact[a] || {})) {
       if (d > today) continue;
-      const v = val(g, c.q, c.r);
+      const v = val(c.q, c.r);
       if (d.startsWith(ym)) factM += v;
       factS += v;
     }
     const planM = planVal(g, pm[m] || 0);
-    groups[g] = { p: planM, f: factM };
+    const G = (groups[g] ||= { p: 0, f: 0 });
+    G.p += planM; G.f += factM;
     pM += planM; fM += factM; fS += factS;
     for (const mm of PLAN.months) pAll += planVal(g, pm[mm] || 0);
     if (inSeason) for (const mm of seasonMonths) pS += planVal(g, (pm[mm] || 0) * (mm === m ? elapsed / dim : 1));   /* план к сегодня */
@@ -121,7 +145,7 @@ export function planHTML(n) {
   const tip = `Заказы по группам плана, оба кабинета WB. Факт — отчёт WB по дням + живые заказы монитора за дни, которых в отчёте ещё нет. ` +
     `₽ — «сумма заказов минус комиссия WB»; план в ₽ = план в шт × средняя цена штуки группы за сезон. Прогноз = темп с начала месяца × дней в месяце.`;
   const head = (title) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <span class="st">${title}</span>
+      <span class="st">${title}${filtered ? ` <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink3)">· по фильтру</span>` : ""}</span>
       <span style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--ink3);cursor:help" data-tip="${esc(tip)}">ⓘ</span>${unitTog}</span>
     </div>`;
 
@@ -170,10 +194,10 @@ export function planHTML(n) {
     .map(([name, g]) => {
       const gf = elapsed > 0.5 ? (g.f / elapsed) * dim : null;
       const gp = g.p > 0 && gf != null ? pc(gf, g.p) : null;
-      return `<div style="display:flex;gap:8px;font-size:11px;padding:2px 0;border-bottom:1px solid var(--border)">
+      return `<div style="display:flex;gap:6px;font-size:11px;padding:2px 0;border-bottom:1px solid var(--border);min-width:0">
         <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name.replace(/^ТН_/, ""))}</span>
         <span style="color:var(--ink2);white-space:nowrap">${nf(g.f)} / ${g.p ? nf(g.p) : "—"}</span>
-        <span style="width:44px;text-align:right;font-weight:700;color:${tone(gp)}">${gp != null ? gp + "%" : "—"}</span>
+        <span style="width:36px;text-align:right;font-weight:700;color:${tone(gp)}">${gp != null ? gp + "%" : "—"}</span>
       </div>`;
     }).join("");
 
@@ -186,8 +210,8 @@ export function planHTML(n) {
     </div>
     ${bar(doneP, paceP, col, 8)}
     ${seasonBlock}
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
-    <div style="max-height:118px;overflow:auto">${gRows}</div>`, col);
+    ${gRows ? `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));column-gap:14px">${gRows}</div>` : `<div style="font-size:11px;color:var(--ink3)">${filtered ? "По этому фильтру товаров из плана нет" : ""}</div>`}`, col);
 }
 
 export function repaintPlan(n) {
