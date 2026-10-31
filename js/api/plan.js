@@ -1,11 +1,12 @@
 import { CSV_PLAN, CSV_FACT_1, CSV_FACT_2 } from "../config.js";
 import { parseCSV } from "./sheets.js";
+import { PLAN_EXTRA } from "../planMap.js";
 
 /* ══════════════════════════════════════════════════════════
    План / факт по сезону (сен–янв).
    PLAN.plan[арт][месяц 1..12] — штук по плану (размеры сложены)
-   PLAN.group[арт]             — «Кратко» из плана
-   PLAN.fact[cab][арт][YYYY-MM-DD] — «Заказано, шт.» из отчёта
+   PLAN.group[арт]             — группа плана («Кратко»): артикулы плана + PLAN_EXTRA
+   PLAN.fact[cab][арт][YYYY-MM-DD] — { q: «Заказано, шт.», r: «Сумма заказов минус комиссия WB, руб.» }
    PLAN.factMax[cab]           — последний день в отчёте (дальше берём живые заказы)
    Артикулы — в нижнем регистре.
    ══════════════════════════════════════════════════════════ */
@@ -42,7 +43,10 @@ export function loadPlan() {
         for (const [h, m] of mCols) p[m] = (p[m] || 0) + num(r[h]);
       }
 
-      /* Факт: только этот сезон и только артикулы из плана — остальное не нужно */
+      /* Доп. артикулы групп (тот же товар под другим артикулом / в другом кабинете) */
+      for (const [g, arts] of Object.entries(PLAN_EXTRA)) for (const a of arts) PLAN.group[a.toLowerCase()] ||= g;
+
+      /* Факт: только этот сезон и только артикулы групп плана — остальное не нужно */
       const from = PLAN.seasonStart;
       for (const [cab, txt] of [[1, t1], [2, t2]]) {
         for (const r of parseCSV(txt)) {
@@ -52,11 +56,13 @@ export function loadPlan() {
           if (day > PLAN.factMax[cab]) PLAN.factMax[cab] = day;
           if (day < from) continue;
           const a = (r["Артикул поставщика"] || "").trim().toLowerCase();
-          if (!PLAN.plan[a]) continue;
+          if (!PLAN.group[a]) continue;
           const q = num(r["Заказано, шт."]);
           if (!q) continue;
           const f = (PLAN.fact[cab][a] ||= {});
-          f[day] = (f[day] || 0) + q;
+          const c = (f[day] ||= { q: 0, r: 0 });
+          c.q += q;
+          c.r += num(r["Сумма заказов минус комиссия WB, руб."]);
         }
       }
       PLAN.ready = true;

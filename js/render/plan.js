@@ -3,35 +3,67 @@ import { esc } from "../utils.js";
 import { PLAN } from "../api/plan.js";
 
 /* ══════════════════════════════════════════════════════════
-   Блок «План / факт» вверху кабинета Easyform.
-   Факт = «Заказано, шт.» по артикулам из плана (оба кабинета WB):
-   из отчёта по дням + живые заказы монитора за дни, которых в отчёте ещё нет.
+   Блок «План / факт» вверху кабинета Easyform. План общий на оба кабинета WB.
+   Считаем по группам плана («Кратко»): артикулы плана + доп. артикулы (planMap.js).
+   Факт = отчёт WB по дням (оба кабинета) + живые заказы монитора за дни,
+   которых в отчёте ещё нет.
+   Штуки — «Заказано, шт.». Рубли — «Сумма заказов минус комиссия WB»; план в рублях =
+   план в штуках × средняя цена штуки группы за сезон (по тому же отчёту); живые
+   заказы — по той же средней цене, чтобы не смешивать цены до и после комиссии.
    Прогноз месяца = факт / прошедшие дни × дней в месяце (сегодня — частью дня).
    ══════════════════════════════════════════════════════════ */
 
 const MONTH = ["", "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 const MSHORT = ["", "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-const nf = (x) => Math.round(x).toLocaleString("ru-RU");
 const pc = (a, b) => (b > 0 ? Math.round((a / b) * 100) : null);
-/* цвет по прогнозу к плану */
+/* цвет по проценту к плану (с учётом темпа) */
 const tone = (p) => (p == null ? "var(--ink3)" : p >= 95 ? "var(--green)" : p >= 80 ? "#B7791F" : "var(--red)");
 
-/* Факт по артикулу: { "YYYY-MM-DD": шт } — отчёт + живые заказы после последнего дня отчёта */
-function factByArt() {
+/* Единицы: шт или ₽ — переключатель в шапке блока */
+let UNIT = "q";
+try { UNIT = localStorage.getItem("planUnit") === "r" ? "r" : "q"; } catch { /* нет хранилища — по умолчанию шт */ }
+export function setPlanUnit(u) {
+  UNIT = u === "r" ? "r" : "q";
+  try { localStorage.setItem("planUnit", UNIT); } catch { /* не страшно */ }
+}
+
+const nfQ = (x) => Math.round(x).toLocaleString("ru-RU");
+const nfR = (x) => {
+  const a = Math.abs(x);
+  if (a >= 1e6) return (x / 1e6).toLocaleString("ru-RU", { maximumFractionDigits: a >= 1e7 ? 1 : 2 }) + " млн";
+  if (a >= 1e3) return Math.round(x / 1e3).toLocaleString("ru-RU") + " тыс";
+  return Math.round(x).toLocaleString("ru-RU");
+};
+
+/* Факт по группе: { "YYYY-MM-DD": {q, r} } — отчёт + живые заказы после последнего дня отчёта */
+function factByGroup() {
   const out = {};
-  const add = (a, day, q) => { const f = (out[a] ||= {}); f[day] = (f[day] || 0) + q; };
+  const add = (g, day, q, r) => { const f = (out[g] ||= {}); const c = (f[day] ||= { q: 0, r: 0, live: 0 }); c.q += q; c.r += r; };
   for (const cab of [1, 2]) {
-    for (const [a, days] of Object.entries(PLAN.fact[cab] || {})) for (const [d, q] of Object.entries(days)) add(a, d, q);
+    for (const [a, days] of Object.entries(PLAN.fact[cab] || {})) {
+      const g = PLAN.group[a];
+      if (g) for (const [d, c] of Object.entries(days)) add(g, d, c.q, c.r);
+    }
+  }
+  /* средняя цена штуки группы за сезон (по отчёту) — для плана в ₽ и живых заказов */
+  const price = {};
+  for (const [g, days] of Object.entries(out)) {
+    let q = 0, r = 0;
+    for (const c of Object.values(days)) { q += c.q; r += c.r; }
+    price[g] = q > 0 ? r / q : 0;
+  }
+  for (const cab of [1, 2]) {
     const after = PLAN.factMax[cab] || "";
     for (const o of (D[cab] && D[cab].allOrders) || []) {
       const day = (o.date || "").slice(0, 10);
       if (!day || day <= after || day < PLAN.seasonStart) continue;
-      const a = (o.supplierArticle || "").toLowerCase();
-      if (!PLAN.plan[a]) continue;
-      add(a, day, o.quantity || 1);
+      const g = PLAN.group[(o.supplierArticle || "").toLowerCase()];
+      if (!g) continue;
+      const q = o.quantity || 1;
+      add(g, day, q, q * (price[g] || 0));
     }
   }
-  return out;
+  return { fact: out, price };
 }
 
 export function planHTML(n) {
@@ -41,6 +73,10 @@ export function planHTML(n) {
   if (PLAN.error) return wrap(`<span class="st">🎯 План / факт</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">План не загрузился: ${esc(PLAN.error)}</div>`);
   if (!PLAN.ready) return wrap(`<span class="st">🎯 План / факт</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем план…</div>`);
 
+  const R = UNIT === "r";
+  const nf = R ? nfR : nfQ;
+  const unitWord = R ? "₽" : "шт";
+
   const now = new Date(Date.now() + 3 * 3600e3);              /* московское время */
   const today = now.toISOString().slice(0, 10);
   const y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
@@ -48,29 +84,50 @@ export function planHTML(n) {
   const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const elapsed = now.getUTCDate() - 1 + (now.getUTCHours() * 60 + now.getUTCMinutes()) / 1440;
   const inSeason = PLAN.months.includes(m);
-
-  const fact = factByArt();
-  const groups = {};
-  let pM = 0, fM = 0, pS = 0, fS = 0;
   const seasonMonths = PLAN.months.slice(0, PLAN.months.indexOf(m) + 1);   /* сен…текущий */
+
+  const { fact, price } = factByGroup();
+
+  /* План по группам: { месяц → шт } */
+  const planG = {};
   for (const [a, pm] of Object.entries(PLAN.plan)) {
-    const g = (groups[PLAN.group[a]] ||= { p: 0, f: 0 });
-    const planM = pm[m] || 0;
-    let factM = 0, factS = 0;
-    for (const [d, q] of Object.entries(fact[a] || {})) {
-      if (d > today) continue;
-      if (d.startsWith(ym)) factM += q;
-      factS += q;
-    }
-    g.p += planM; g.f += factM;
-    pM += planM; fM += factM; fS += factS;
-    if (inSeason) for (const mm of seasonMonths) pS += (pm[mm] || 0) * (mm === m ? elapsed / dim : 1);   /* план к сегодня */
+    const g = (planG[PLAN.group[a]] ||= {});
+    for (const [mm, q] of Object.entries(pm)) g[mm] = (g[mm] || 0) + q;
   }
-  const pSeasonAll = Object.values(PLAN.plan).reduce((s, pm) => s + PLAN.months.reduce((t, mm) => t + (pm[mm] || 0), 0), 0);
+  const val = (g, q, r) => (R ? r : q);
+  const planVal = (g, qty) => (R ? qty * (price[g] || 0) : qty);
+
+  const groups = {};
+  let pM = 0, fM = 0, pS = 0, fS = 0, pAll = 0;
+  for (const g of new Set([...Object.keys(planG), ...Object.keys(fact)])) {
+    const pm = planG[g] || {};
+    let factM = 0, factS = 0;
+    for (const [d, c] of Object.entries(fact[g] || {})) {
+      if (d > today) continue;
+      const v = val(g, c.q, c.r);
+      if (d.startsWith(ym)) factM += v;
+      factS += v;
+    }
+    const planM = planVal(g, pm[m] || 0);
+    groups[g] = { p: planM, f: factM };
+    pM += planM; fM += factM; fS += factS;
+    for (const mm of PLAN.months) pAll += planVal(g, pm[mm] || 0);
+    if (inSeason) for (const mm of seasonMonths) pS += planVal(g, (pm[mm] || 0) * (mm === m ? elapsed / dim : 1));   /* план к сегодня */
+  }
+
+  const unitTog = `<span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:10px">
+      ${["q", "r"].map((u) => `<span onclick="App.setPlanUnit('${u}')" style="padding:1px 7px;cursor:pointer;${UNIT === u ? "background:var(--ink);color:var(--bg3)" : "color:var(--ink2)"}">${u === "q" ? "шт" : "₽"}</span>`).join("")}
+    </span>`;
+  const tip = `Заказы по группам плана, оба кабинета WB. Факт — отчёт WB по дням + живые заказы монитора за дни, которых в отчёте ещё нет. ` +
+    `₽ — «сумма заказов минус комиссия WB»; план в ₽ = план в шт × средняя цена штуки группы за сезон. Прогноз = темп с начала месяца × дней в месяце.`;
+  const head = (title) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span class="st">${title}</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--ink3);cursor:help" data-tip="${esc(tip)}">ⓘ</span>${unitTog}</span>
+    </div>`;
 
   if (!inSeason) {
-    return wrap(`<span class="st">🎯 План / факт</span>
-      <div style="font-size:12px;margin-top:6px">Сезон ${MSHORT[PLAN.months[0]]}–${MSHORT[PLAN.months[PLAN.months.length - 1]]}: план ${nf(pSeasonAll)} шт · сейчас вне сезона</div>`);
+    return wrap(head("🎯 План / факт") +
+      `<div style="font-size:12px;margin-top:6px">Сезон ${MSHORT[PLAN.months[0]]}–${MSHORT[PLAN.months[PLAN.months.length - 1]]}: план ${nf(pAll)} ${unitWord} · сейчас вне сезона</div>`);
   }
 
   const fc = elapsed > 0.5 ? (fM / elapsed) * dim : null;      /* прогноз месяца */
@@ -79,35 +136,32 @@ export function planHTML(n) {
   const paceP = Math.min(100, (elapsed / dim) * 100);           /* где «должны быть» сегодня */
   const col = tone(fcP);
 
-  const bar = `<div style="position:relative;height:8px;background:var(--bg2);border-radius:4px;margin:7px 0 6px;overflow:hidden">
-      <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, doneP || 0)}%;background:${col};border-radius:4px"></div>
-      <div title="где должны быть сегодня по плану" style="position:absolute;top:-2px;bottom:-2px;left:${paceP}%;width:2px;background:var(--ink)"></div>
+  const bar = (fillP, markP, color, h) => `<div style="position:relative;height:${h}px;background:var(--bg2);border-radius:${h / 2}px;margin:6px 0 5px;overflow:hidden">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, fillP || 0)}%;background:${color};border-radius:${h / 2}px"></div>
+      <div title="где должны быть сегодня по плану" style="position:absolute;top:-2px;bottom:-2px;left:${markP}%;width:2px;background:var(--ink)"></div>
     </div>`;
 
-  /* Сезон сен–янв: YTD против плана к сегодня, весь план, сколько осталось и сколько нужно в день */
+  /* Сезон: YTD против плана к сегодня, весь план, сколько осталось и сколько нужно в день */
   const last = PLAN.months[PLAN.months.length - 1];
   const sY = PLAN.months[0] <= m ? y : y - 1;                       /* год начала сезона */
   const endY = last < PLAN.months[0] ? sY + 1 : sY;
   const end = new Date(Date.UTC(endY, last, 0));                     /* последний день сезона */
-  const daysLeft = Math.max(0, Math.ceil((end - Date.UTC(y, m - 1, now.getUTCDate())) / 864e5) + 1 - (elapsed - Math.floor(elapsed)));
-  const left = Math.max(0, pSeasonAll - fS);
-  const ytdP = pc(fS, pS), allP = pc(fS, pSeasonAll);
+  const daysLeft = Math.max(0, (end - Date.UTC(y, m - 1, now.getUTCDate())) / 864e5 + 1 - (elapsed - Math.floor(elapsed)));
+  const left = Math.max(0, pAll - fS);
+  const ytdP = pc(fS, pS), allP = pc(fS, pAll);
   const sCol = tone(ytdP);
-  const sPace = pSeasonAll > 0 ? Math.min(100, (pS / pSeasonAll) * 100) : 0;
+  const sPace = pAll > 0 ? Math.min(100, (pS / pAll) * 100) : 0;
   const seasonBlock = `<div style="border-top:1px dashed var(--border);margin:2px 0 6px;padding-top:6px">
       <div style="display:flex;align-items:baseline;justify-content:space-between">
         <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">Сезон ${MSHORT[PLAN.months[0]]} ${String(sY).slice(2)} – ${MSHORT[last]} ${String(endY).slice(2)}</span>
-        <span style="font-size:11px;color:var(--ink2)">весь план <b>${nf(pSeasonAll)}</b></span>
+        <span style="font-size:11px;color:var(--ink2)">весь план <b>${nf(pAll)}</b> ${unitWord}</span>
       </div>
-      <div style="position:relative;height:6px;background:var(--bg2);border-radius:3px;margin:6px 0 5px;overflow:hidden">
-        <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, allP || 0)}%;background:${sCol};border-radius:3px"></div>
-        <div title="где должны быть сегодня по плану сезона" style="position:absolute;top:-2px;bottom:-2px;left:${sPace}%;width:2px;background:var(--ink)"></div>
-      </div>
+      ${bar(allP, sPace, sCol, 6)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:11px">
         <span>YTD: <b>${nf(fS)}</b> · ${allP ?? "—"}% плана</span>
         <span style="text-align:right" data-tip="План с 1 сентября по сегодня (текущий месяц — пропорционально прошедшим дням)">к сегодня ${nf(pS)} · <b style="color:${sCol}">${ytdP ?? "—"}%</b></span>
         <span>Осталось: <b>${nf(left)}</b></span>
-        <span style="text-align:right">${daysLeft >= 1 ? `≈ ${nf(left / daysLeft)} в день до ${String(last === 1 ? 31 : end.getUTCDate()).padStart(2, "0")}.${String(last).padStart(2, "0")}` : ""}</span>
+        <span style="text-align:right">${daysLeft >= 1 ? `≈ ${nf(left / daysLeft)} в день до ${String(end.getUTCDate()).padStart(2, "0")}.${String(last).padStart(2, "0")}` : ""}</span>
       </div>
     </div>`;
 
@@ -124,16 +178,13 @@ export function planHTML(n) {
     }).join("");
 
   return wrap(`
-    <div style="display:flex;align-items:baseline;justify-content:space-between">
-      <span class="st">🎯 План / факт · ${MONTH[m]}</span>
-      <span style="font-size:10px;color:var(--ink3)" data-tip="Заказано штук по артикулам из плана (оба кабинета WB). Факт — отчёт по дням + живые заказы монитора за дни, которых в отчёте ещё нет. Прогноз = темп с начала месяца × дней в месяце.">заказы, шт ⓘ</span>
-    </div>
+    ${head(`🎯 План / факт · ${MONTH[m]}`)}
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px;flex-wrap:wrap">
-      <span style="font-size:20px;font-weight:700">${nf(fM)}</span>
+      <span style="font-size:20px;font-weight:700">${nf(fM)}${R ? " ₽" : ""}</span>
       <span style="font-size:12px;color:var(--ink2)">из ${nf(pM)} · ${doneP ?? "—"}%</span>
       ${fc != null ? `<span style="margin-left:auto;font-size:12px">прогноз <b style="color:${col}">${nf(fc)} · ${fcP}%</b></span>` : ""}
     </div>
-    ${bar}
+    ${bar(doneP, paceP, col, 8)}
     ${seasonBlock}
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
     <div style="max-height:118px;overflow:auto">${gRows}</div>`, col);

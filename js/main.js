@@ -7,7 +7,7 @@ import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
-import { repaintPlan } from "./render/plan.js";
+import { repaintPlan, setPlanUnit } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
 import { repaintReturns } from "./render/returns.js";
@@ -157,6 +157,7 @@ const App = {
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
   setChartVal(n, v) { CV[n] = v; renderCabinet(n); },
   togChartPrice(n) { CP[n] = !CP[n]; renderCabinet(n); },
+  setPlanUnit(u) { setPlanUnit(u); repaintPlan(1); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {
