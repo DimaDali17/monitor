@@ -64,7 +64,7 @@ export function planHTML(n) {
     }
     g.p += planM; g.f += factM;
     pM += planM; fM += factM; fS += factS;
-    if (inSeason) for (const mm of seasonMonths) pS += pm[mm] || 0;
+    if (inSeason) for (const mm of seasonMonths) pS += (pm[mm] || 0) * (mm === m ? elapsed / dim : 1);   /* план к сегодня */
   }
   const pSeasonAll = Object.values(PLAN.plan).reduce((s, pm) => s + PLAN.months.reduce((t, mm) => t + (pm[mm] || 0), 0), 0);
 
@@ -82,6 +82,33 @@ export function planHTML(n) {
   const bar = `<div style="position:relative;height:8px;background:var(--bg2);border-radius:4px;margin:7px 0 6px;overflow:hidden">
       <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, doneP || 0)}%;background:${col};border-radius:4px"></div>
       <div title="где должны быть сегодня по плану" style="position:absolute;top:-2px;bottom:-2px;left:${paceP}%;width:2px;background:var(--ink)"></div>
+    </div>`;
+
+  /* Сезон сен–янв: YTD против плана к сегодня, весь план, сколько осталось и сколько нужно в день */
+  const last = PLAN.months[PLAN.months.length - 1];
+  const sY = PLAN.months[0] <= m ? y : y - 1;                       /* год начала сезона */
+  const endY = last < PLAN.months[0] ? sY + 1 : sY;
+  const end = new Date(Date.UTC(endY, last, 0));                     /* последний день сезона */
+  const daysLeft = Math.max(0, Math.ceil((end - Date.UTC(y, m - 1, now.getUTCDate())) / 864e5) + 1 - (elapsed - Math.floor(elapsed)));
+  const left = Math.max(0, pSeasonAll - fS);
+  const ytdP = pc(fS, pS), allP = pc(fS, pSeasonAll);
+  const sCol = tone(ytdP);
+  const sPace = pSeasonAll > 0 ? Math.min(100, (pS / pSeasonAll) * 100) : 0;
+  const seasonBlock = `<div style="border-top:1px dashed var(--border);margin:2px 0 6px;padding-top:6px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">Сезон ${MSHORT[PLAN.months[0]]} ${String(sY).slice(2)} – ${MSHORT[last]} ${String(endY).slice(2)}</span>
+        <span style="font-size:11px;color:var(--ink2)">весь план <b>${nf(pSeasonAll)}</b></span>
+      </div>
+      <div style="position:relative;height:6px;background:var(--bg2);border-radius:3px;margin:6px 0 5px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, allP || 0)}%;background:${sCol};border-radius:3px"></div>
+        <div title="где должны быть сегодня по плану сезона" style="position:absolute;top:-2px;bottom:-2px;left:${sPace}%;width:2px;background:var(--ink)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:11px">
+        <span>YTD: <b>${nf(fS)}</b> · ${allP ?? "—"}% плана</span>
+        <span style="text-align:right" data-tip="План с 1 сентября по сегодня (текущий месяц — пропорционально прошедшим дням)">к сегодня ${nf(pS)} · <b style="color:${sCol}">${ytdP ?? "—"}%</b></span>
+        <span>Осталось: <b>${nf(left)}</b></span>
+        <span style="text-align:right">${daysLeft >= 1 ? `≈ ${nf(left / daysLeft)} в день до ${String(last === 1 ? 31 : end.getUTCDate()).padStart(2, "0")}.${String(last).padStart(2, "0")}` : ""}</span>
+      </div>
     </div>`;
 
   const gRows = Object.entries(groups).filter(([, g]) => g.p > 0 || g.f > 0)
@@ -107,7 +134,8 @@ export function planHTML(n) {
       ${fc != null ? `<span style="margin-left:auto;font-size:12px">прогноз <b style="color:${col}">${nf(fc)} · ${fcP}%</b></span>` : ""}
     </div>
     ${bar}
-    <div style="font-size:11px;color:var(--ink2);margin-bottom:6px">Сезон с 1 ${MSHORT[PLAN.months[0]]}: <b>${nf(fS)}</b> из ${nf(pS)} (${pc(fS, pS) ?? "—"}%) · весь план ${nf(pSeasonAll)}</div>
+    ${seasonBlock}
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
     <div style="max-height:118px;overflow:auto">${gRows}</div>`, col);
 }
 
