@@ -127,7 +127,7 @@ export function planHTML(n) {
   const val = (q, r) => (R ? r : q);
   const planVal = (g, qty) => (R ? qty * (price[g] || 0) : qty);
 
-  const groups = {};
+  const groups = {}, byArt = {};
   let pM = 0, fM = 0, pS = 0, fS = 0, pAll = 0;
   for (const a of Object.keys(PLAN.group)) {
     if (ok && !ok(a)) continue;
@@ -143,6 +143,7 @@ export function planHTML(n) {
     const planM = planVal(g, pm[m] || 0);
     const G = (groups[g] ||= { p: 0, f: 0 });
     G.p += planM; G.f += factM;
+    if (planM > 0 || factM > 0) byArt[a] = { p: planM, f: factM };
     pM += planM; fM += factM; fS += factS;
     for (const mm of PLAN.months) pAll += planVal(g, pm[mm] || 0);
     if (inSeason) for (const mm of seasonMonths) pS += planVal(g, (pm[mm] || 0) * (mm === m ? elapsed / dim : 1));   /* план к сегодня */
@@ -198,7 +199,11 @@ export function planHTML(n) {
       </div>
     </div>`;
 
-  const gRows = Object.entries(groups).filter(([, g]) => g.p > 0 || g.f > 0)
+  /* Строки: по группам; если после фильтра осталась одна группа — по артикулам */
+  const liveGroups = Object.entries(groups).filter(([, g]) => g.p > 0 || g.f > 0);
+  const perArt = liveGroups.length === 1;
+  const rowsSrc = perArt ? Object.entries(byArt).map(([a, v]) => [PLAN.disp[a] || a, v]) : liveGroups;
+  const gRows = rowsSrc
     .sort((a, b) => b[1].p - a[1].p)
     .map(([name, g]) => {
       const gf = elapsed > 0.5 ? (g.f / elapsed) * dim : null;
@@ -219,8 +224,8 @@ export function planHTML(n) {
     </div>
     ${bar(doneP, paceP, col, 8)}
     ${seasonBlock}
-    ${gRows ? `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));column-gap:14px">${gRows}</div>` : `<div style="font-size:11px;color:var(--ink3)">${filtered ? "По этому фильтру товаров из плана нет" : ""}</div>`}`, col);
+    ${gRows ? `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>${perArt ? `${esc(liveGroups[0][0].replace(/^ТН_/, ""))} по артикулам` : "группы"} · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
+    <div style="display:grid;grid-template-columns:${perArt ? "1fr" : "repeat(auto-fit,minmax(195px,1fr))"};column-gap:14px">${gRows}</div>` : `<div style="font-size:11px;color:var(--ink3)">${filtered ? "По этому фильтру товаров из плана нет" : ""}</div>`}`, col);
 }
 
 export function repaintPlan(n) {

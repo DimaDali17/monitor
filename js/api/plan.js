@@ -10,7 +10,7 @@ import { PLAN_EXTRA } from "../planMap.js";
    PLAN.factMax[cab]           — последний день в отчёте (дальше берём живые заказы)
    Артикулы — в нижнем регистре.
    ══════════════════════════════════════════════════════════ */
-export const PLAN = { ready: false, error: null, plan: {}, group: {}, months: [], fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, seasonStart: "" };
+export const PLAN = { disp: {}, ready: false, error: null, plan: {}, group: {}, months: [], fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, seasonStart: "" };
 
 let inflight = null;
 const num = (s) => parseFloat(String(s || "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -39,12 +39,13 @@ export function loadPlan() {
         const a = (r["Артикул поставщика"] || "").trim().toLowerCase();
         if (!a) continue;
         PLAN.group[a] ||= (r["Кратко"] || "").trim() || a;
+        PLAN.disp[a] ||= (r["Артикул поставщика"] || "").trim();
         const p = (PLAN.plan[a] ||= {});
         for (const [h, m] of mCols) p[m] = (p[m] || 0) + num(r[h]);
       }
 
       /* Доп. артикулы групп (тот же товар под другим артикулом / в другом кабинете) */
-      for (const [g, arts] of Object.entries(PLAN_EXTRA)) for (const a of arts) PLAN.group[a.toLowerCase()] ||= g;
+      for (const [g, arts] of Object.entries(PLAN_EXTRA)) for (const a of arts) { PLAN.group[a.toLowerCase()] ||= g; PLAN.disp[a.toLowerCase()] ||= a; }
 
       /* Факт: только этот сезон и только артикулы групп плана — остальное не нужно */
       const from = PLAN.seasonStart;
@@ -57,6 +58,7 @@ export function loadPlan() {
           if (day < from) continue;
           const a = (r["Артикул поставщика"] || "").trim().toLowerCase();
           if (!PLAN.group[a]) continue;
+          PLAN.disp[a] = (r["Артикул поставщика"] || "").trim();   /* как пишет WB (регистр) */
           const q = num(r["Заказано, шт."]);
           if (!q) continue;
           const f = (PLAN.fact[cab][a] ||= {});
