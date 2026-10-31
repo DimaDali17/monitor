@@ -40,9 +40,9 @@ export function renderCabinet(n) {
     (vm.isOz ? "" : returnsHTML(n)) +
     `<div class="top3" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
        <div class="top3c" style="flex:0 1 245px;min-width:225px">${filterHTML(n)}</div>
-       <div class="top3c" style="flex:1 1 280px;min-width:260px">${alertsHTML(n)}</div>
-       ${n === 1 ? `<div class="top3c" style="flex:1 1 280px;min-width:260px">${planHTML(n)}</div>` : ""}
-       <div class="top3c" style="flex:1.6 1 360px;min-width:300px">${structureHTML(n)}</div>
+       <div class="top3c" style="${n === 1 ? "flex:0 1 250px;min-width:220px" : "flex:1 1 280px;min-width:260px"}">${alertsHTML(n)}</div>
+       ${n === 1 ? `<div class="top3c" style="flex:1.4 1 430px;min-width:380px">${planHTML(n)}</div>` : ""}
+       <div class="top3c" style="flex:${n === 1 ? "1 1 340px" : "1.6 1 360px"};min-width:300px">${structureHTML(n)}</div>
      </div>` +
     metricsHTML(n, vm, type) +
     chartHTML(n, vm, type) +

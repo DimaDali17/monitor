@@ -36,6 +36,14 @@ const nfR = (x) => {
   return Math.round(x).toLocaleString("ru-RU");
 };
 
+/* Коротко для строк групп: 1,06 м · 747 т */
+const nfRs = (x) => {
+  const a = Math.abs(x);
+  if (a >= 1e6) return (x / 1e6).toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " м";
+  if (a >= 1e3) return Math.round(x / 1e3).toLocaleString("ru-RU") + " т";
+  return Math.round(x).toLocaleString("ru-RU");
+};
+
 /* Факт по артикулу: { арт → { "YYYY-MM-DD": {q, r} } } — отчёт + живые заказы после последнего дня отчёта.
    price[группа] — средняя цена штуки группы за сезон (по отчёту, без фильтров) — для плана в ₽ и живых заказов. */
 function factByArt() {
@@ -100,6 +108,7 @@ export function planHTML(n) {
 
   const R = UNIT === "r";
   const nf = R ? nfR : nfQ;
+  const nfG = R ? nfRs : nfQ;   /* в строках групп — короче */
   const unitWord = R ? "₽" : "шт";
 
   const now = new Date(Date.now() + 3 * 3600e3);              /* московское время */
@@ -195,8 +204,8 @@ export function planHTML(n) {
       const gf = elapsed > 0.5 ? (g.f / elapsed) * dim : null;
       const gp = g.p > 0 && gf != null ? pc(gf, g.p) : null;
       return `<div style="display:flex;gap:6px;font-size:11px;padding:2px 0;border-bottom:1px solid var(--border);min-width:0">
-        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name.replace(/^ТН_/, ""))}</span>
-        <span style="color:var(--ink2);white-space:nowrap">${nf(g.f)} / ${g.p ? nf(g.p) : "—"}</span>
+        <span style="flex:1;min-width:58px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(name)}">${esc(name.replace(/^ТН_/, ""))}</span>
+        <span style="color:var(--ink2);white-space:nowrap">${nfG(g.f)} / ${g.p ? nfG(g.p) : "—"}</span>
         <span style="width:36px;text-align:right;font-weight:700;color:${tone(gp)}">${gp != null ? gp + "%" : "—"}</span>
       </div>`;
     }).join("");
@@ -211,7 +220,7 @@ export function planHTML(n) {
     ${bar(doneP, paceP, col, 8)}
     ${seasonBlock}
     ${gRows ? `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:2px"><span>группы · ${MONTH[m]}</span><span>факт / план · прогноз</span></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));column-gap:14px">${gRows}</div>` : `<div style="font-size:11px;color:var(--ink3)">${filtered ? "По этому фильтру товаров из плана нет" : ""}</div>`}`, col);
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));column-gap:14px">${gRows}</div>` : `<div style="font-size:11px;color:var(--ink3)">${filtered ? "По этому фильтру товаров из плана нет" : ""}</div>`}`, col);
 }
 
 export function repaintPlan(n) {
