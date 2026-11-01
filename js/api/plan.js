@@ -8,9 +8,11 @@ import { PLAN_EXTRA } from "../planMap.js";
    PLAN.group[арт]             — группа плана («Кратко»): артикулы плана + PLAN_EXTRA
    PLAN.fact[cab][арт][YYYY-MM-DD] — { q: «Заказано, шт.», r: «Сумма заказов минус комиссия WB, руб.» }
    PLAN.factMax[cab]           — последний день в отчёте (дальше берём живые заказы)
+   PLAN.all[арт][YYYY-MM-DD]   — { q, r } по ВСЕМ артикулам обоих кабинетов с 1 сентября
+                                 прошлого сезона — для сравнения с прошлым годом
    Артикулы — в нижнем регистре.
    ══════════════════════════════════════════════════════════ */
-export const PLAN = { disp: {}, ready: false, error: null, plan: {}, group: {}, months: [], fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, seasonStart: "" };
+export const PLAN = { disp: {}, ready: false, error: null, plan: {}, group: {}, months: [], all: {}, lyStart: "", fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, seasonStart: "" };
 
 let inflight = null;
 const num = (s) => parseFloat(String(s || "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -49,14 +51,26 @@ export function loadPlan() {
 
       /* Факт: только этот сезон и только артикулы групп плана — остальное не нужно */
       const from = PLAN.seasonStart;
+      PLAN.lyStart = `${+from.slice(0, 4) - 1}${from.slice(4)}`;
       for (const [cab, txt] of [[1, t1], [2, t2]]) {
         for (const r of parseCSV(txt)) {
           const m = /(\d{2})\.(\d{2})\.(\d{4})/.exec(r["День"] || "");
           if (!m) continue;
           const day = `${m[3]}-${m[2]}-${m[1]}`;
           if (day > PLAN.factMax[cab]) PLAN.factMax[cab] = day;
-          if (day < from) continue;
+          if (day < PLAN.lyStart) continue;
           const a = (r["Артикул поставщика"] || "").trim().toLowerCase();
+          if (!a) continue;
+          {
+            const q = num(r["Заказано, шт."]);
+            if (q) {
+              const c = ((PLAN.all[a] ||= {})[day] ||= { q: 0, r: 0 });
+              c.q += q;
+              c.r += num(r["Сумма заказов минус комиссия WB, руб."]);
+              PLAN.disp[a] ||= (r["Артикул поставщика"] || "").trim();
+            }
+          }
+          if (day < from) continue;
           if (!PLAN.group[a]) continue;
           PLAN.disp[a] = (r["Артикул поставщика"] || "").trim();   /* как пишет WB (регистр) */
           const q = num(r["Заказано, шт."]);
