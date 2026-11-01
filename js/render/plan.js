@@ -473,7 +473,7 @@ export function seasonHTML(n) {
     const name = `<td style="white-space:nowrap">${MONTH[mm]}${going ? ` <span style="color:var(--ink3);font-size:10px">к ${+C.today.slice(8, 10)}-му</span>` : ""}</td>`;
     if (future) {
       const g = "color:var(--ink3)";
-      return `<tr>${name}${td("—", g)}${td(nfQ(x.bqAll), g)}${td("", g)}${td("—", g + ";" + sep)}${td(nfR(x.brAll), g)}${td("", g)}${td("—", g + ";" + sep)}${isPlan ? "" : td(nfQ(price1(x.brAll, x.bqAll)), g) + td("", g)}</tr>`;
+      return `<tr>${name}${td("—", g)}${td(nfQ(x.bqAll), g)}${td("", g)}${td("—", g + ";" + sep)}${td(nfR(x.brAll), g)}${td("", g)}${td("—", g + ";" + sep)}${td(x.bqAll ? nfQ(price1(x.brAll, x.bqAll)) : "", g)}${td("", g)}</tr>`;
     }
     const bq = going ? x.bqTo : x.bqAll, br = going ? x.brTo : x.brAll;
     S.aq += x.aq; S.ar += x.ar; S.bq += bq; S.br += br;
@@ -482,30 +482,30 @@ export function seasonHTML(n) {
     return `<tr>${name}
       ${td(nfQ(x.aq), "font-weight:700")}${td(nfQ(bq), "color:var(--ink2)")}${td(relTxt(pq), `font-weight:700;color:${relCol(pq)}`)}
       ${td(nfR(x.ar), "font-weight:700;" + sep)}${td(nfR(br), "color:var(--ink2)")}${td(relTxt(pr), `font-weight:700;color:${relCol(pr)}`)}
-      ${td(pa ? nfQ(pa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(pb ? nfQ(pb) : "—", "color:var(--ink2)") + td(dTxt(pp), `font-weight:700;color:${dTone(pp)}`)}</tr>`;
+      ${td(pa ? nfQ(pa) : "—", "font-weight:700;" + sep)}${td(pb ? nfQ(pb) : "—", "color:var(--ink2)")}${td(pa && pb ? dTxt(pp) : "—", `font-weight:700;color:${dTone(pa && pb ? pp : null)}`)}</tr>`;
   }).join("");
   const Wq = Object.values(months).reduce((t, x) => t + x.bqAll, 0), Wr = Object.values(months).reduce((t, x) => t + x.brAll, 0);
   const sq = rel(S.aq, S.bq), sr = rel(S.ar, S.br), spa = price1(S.ar, S.aq), spb = price1(S.br, S.bq), spp = dp(spa, spb);
   const bName = isPlan ? "план" : sYs(C.sY - 1), aName = isPlan ? "факт" : sYs(C.sY);
   const th = (t, st = "") => `<th style="text-align:right;white-space:nowrap;${st}">${t}</th>`;
-  const table = `<div class="sw" style="margin-top:8px;max-width:${isPlan ? 820 : 980}px"><table style="font-size:12px">
+  const table = `<div class="sw" style="margin-top:8px;max-width:980px"><table style="font-size:12px">
     <thead>
-      <tr><th></th><th colspan="3" style="text-align:center">Штуки</th><th colspan="3" style="text-align:center;${sep}">Рубли</th><th colspan="${isPlan ? 1 : 3}" style="text-align:center;${sep}">Цена, ₽/шт</th></tr>
-      <tr><th>Месяц</th>${th(aName)}${th(bName)}${th(isPlan ? "%" : "Δ")}${th(aName, sep)}${th(bName)}${th(isPlan ? "%" : "Δ")}${isPlan ? th("факт", sep) : th(aName, sep) + th(bName) + th("Δ")}</tr>
+      <tr><th></th><th colspan="3" style="text-align:center">Штуки</th><th colspan="3" style="text-align:center;${sep}">Рубли</th><th colspan="3" style="text-align:center;${sep}">Цена, ₽/шт</th></tr>
+      <tr><th>Месяц</th>${th(aName)}${th(bName)}${th(isPlan ? "%" : "Δ")}${th(aName, sep)}${th(bName)}${th(isPlan ? "%" : "Δ")}${th(aName, sep)}${th(bName)}${th("Δ")}</tr>
     </thead>
     <tbody>${mRows}
       <tr style="border-top:2px solid var(--border2)"><td><b>Сезон к дате</b></td>
         ${td(nfQ(S.aq), "font-weight:700")}${td(nfQ(S.bq), "color:var(--ink2)")}${td(relTxt(sq), `font-weight:700;color:${relCol(sq)}`)}
         ${td(nfR(S.ar), "font-weight:700;" + sep)}${td(nfR(S.br), "color:var(--ink2)")}${td(relTxt(sr), `font-weight:700;color:${relCol(sr)}`)}
-        ${td(spa ? nfQ(spa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(spb ? nfQ(spb) : "—", "color:var(--ink2)") + td(dTxt(spp), `font-weight:700;color:${dTone(spp)}`)}</tr>
+        ${td(spa ? nfQ(spa) : "—", "font-weight:700;" + sep)}${td(spb ? nfQ(spb) : "—", "color:var(--ink2)")}${td(spa && spb ? dTxt(spp) : "—", `font-weight:700;color:${dTone(spa && spb ? spp : null)}`)}</tr>
       <tr><td style="color:var(--ink2)" data-tip="${isPlan ? "План на весь сезон и сколько от него уже сделано" : "Прошлый сезон целиком (сен–янв) и сколько от него уже набрано в этом"}">Весь сезон</td>
         ${td(nfQ(S.aq), "color:var(--ink2)")}${td(nfQ(Wq), "font-weight:700")}${td(Wq > 0 ? Math.round((S.aq / Wq) * 100) + "%" : "—", "color:var(--ink2)")}
         ${td(nfR(S.ar), "color:var(--ink2);" + sep)}${td(nfR(Wr), "font-weight:700")}${td(Wr > 0 ? Math.round((S.ar / Wr) * 100) + "%" : "—", "color:var(--ink2)")}
-        ${td("", sep)}${isPlan ? "" : td(Wq > 0 ? nfQ(Wr / Wq) : "—", "color:var(--ink2)") + td("")}</tr>
+        ${td("", sep)}${td(Wq > 0 ? nfQ(Wr / Wq) : "—", "color:var(--ink2)")}${td("")}</tr>
     </tbody>
   </table></div>
   <div style="font-size:10px;color:var(--ink3);margin-top:4px">${isPlan
-    ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. «Весь сезон» — план на сезон целиком и какая доля его выполнена. План в ₽ = план в шт × средняя цена штуки группы за сезон, поэтому «цена плана» не показывается — она равна фактической по построению."
+    ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. «Весь сезон» — план на сезон целиком и какая доля его выполнена. Цена плана = план в ₽ / план в шт (план в ₽ считается по средней цене штуки группы за сезон), Δ цены — факт к плану."
     : "Идущий месяц — к той же дате год назад. Будущие месяцы — прошлый год целиком, серым. «Сезон к дате» — сравнение на сегодняшнюю дату; «Весь сезон» — прошлый сезон целиком и какая доля его уже набрана. Цена — ₽ «минус комиссия WB» на штуку."}</div>`;
 
   /* Откуда факт: отчёт по такой-то день, дальше — заказы по API (окно ORDERS_DAYS дней) */
