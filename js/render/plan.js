@@ -363,44 +363,51 @@ export function seasonHTML(n) {
     rowsHTML = `<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--ink3);margin:12px 0 3px">${rowsTog}<span>сейчас / год назад · Δ</span></div>` + rowsHTML;
   }
 
-  /* ── 2. График по неделям сезона ── */
-  const nDays = dayIdx(C.sEnd, C.sStart) + 1, W = Math.ceil(nDays / 7);
-  const todayIdx = dayIdx(C.today, C.sStart), curW = Math.floor(todayIdx / 7);
+  /* ── 2. График по неделям сезона: календарные недели пн–вс; прошлый год — те же дни недели (−364 дня) ── */
+  const base0 = addDays(C.sStart, -((new Date(C.sStart + "T00:00:00Z").getUTCDay() + 6) % 7));   /* пн недели 1 сентября */
+  const W = Math.ceil((dayIdx(C.sEnd, base0) + 1) / 7);
+  const wOf = (d) => Math.floor(dayIdx(d, base0) / 7);
+  const curW = wOf(C.today);
   const A = Array(W).fill(0), B = Array(W).fill(0);         /* A — факт этого сезона, B — план или прошлый сезон */
-  const months = {};                                        /* "MM" → { a, bTo, bAll } */
-  const M = (k) => (months[k] ||= { a: 0, bTo: 0, bAll: 0 });
+  /* По месяцам — все единицы сразу: a* — этот сезон, b* — план / прошлый; To — к дате, All — весь месяц */
+  const months = {};
+  const M = (k) => (months[k] ||= { aq: 0, ar: 0, bqTo: 0, brTo: 0, bqAll: 0, brAll: 0 });
+  const lyToday = minusYear(C.today);
   if (isPlan) {
     for (const a of Object.keys(PLAN.group)) {
       if (ok && !ok(a)) continue;
       const g = PLAN.group[a];
       for (const [d, c] of Object.entries(pfact[a] || {})) {
         if (d < C.sStart || d > C.today || d > C.sEnd) continue;
-        const x = R ? c.r : c.q;
-        A[Math.floor(dayIdx(d, C.sStart) / 7)] += x; M(d.slice(5, 7)).a += x;
+        A[wOf(d)] += R ? c.r : c.q;
+        const mm = M(d.slice(5, 7)); mm.aq += c.q; mm.ar += c.r;
       }
       if (!PLAN.plan[a]) continue;
-      for (let i = 0; i < nDays; i++) {
-        const d = addDays(C.sStart, i);
-        const x = dayPlan(a, d, C) * (R ? price[g] || 0 : 1);
-        if (!x) continue;
-        B[Math.floor(i / 7)] += x;
+      for (let d = C.sStart; d <= C.sEnd; d = addDays(d, 1)) {
+        const q = dayPlan(a, d, C);
+        if (!q) continue;
+        const r = q * (price[g] || 0);
+        B[wOf(d)] += R ? r : q;
         const mm = M(d.slice(5, 7));
-        mm.bAll += x;
-        if (i < todayIdx) mm.bTo += x; else if (i === todayIdx) mm.bTo += x * C.frac;
+        mm.bqAll += q; mm.brAll += r;
+        const k = d < C.today ? 1 : d === C.today ? C.frac : 0;
+        mm.bqTo += q * k; mm.brTo += r * k;
       }
     }
   } else {
     for (const [a, days] of Object.entries(data)) {
       if (ok && !ok(a)) continue;
       for (const [d, c] of Object.entries(days)) {
-        const x = R ? c.r : c.q;
-        if (d >= C.sStart && d <= C.today && d <= C.sEnd) { A[Math.floor(dayIdx(d, C.sStart) / 7)] += x; M(d.slice(5, 7)).a += x; }
-        else if (d >= C.lStart && d <= C.lEnd) {
-          const i = dayIdx(d, C.lStart);
-          B[Math.floor(i / 7)] += x;
+        if (d >= C.sStart && d <= C.today && d <= C.sEnd) {
+          A[wOf(d)] += R ? c.r : c.q;
+          const mm = M(d.slice(5, 7)); mm.aq += c.q; mm.ar += c.r;
+        } else if (d >= C.lStart && d <= C.lEnd) {
+          const w = wOf(addDays(d, 364));
+          if (w >= 0 && w < W) B[w] += R ? c.r : c.q;
           const mm = M(d.slice(5, 7));
-          mm.bAll += x;
-          if (i < todayIdx) mm.bTo += x; else if (i === todayIdx) mm.bTo += x * C.frac;
+          mm.bqAll += c.q; mm.brAll += c.r;
+          const k = d < lyToday ? 1 : d === lyToday ? C.frac : 0;      /* тот же день год назад */
+          mm.bqTo += c.q * k; mm.brTo += c.r * k;
         }
       }
     }
@@ -422,7 +429,7 @@ export function seasonHTML(n) {
   let mlines = "";
   PLAN.months.forEach((mm, k) => {
     const yy = mm < 9 ? C.sY + 1 : C.sY;
-    const xi = pl + (dayIdx(`${yy}-${String(mm).padStart(2, "0")}-01`, C.sStart) / 7) * wd;
+    const xi = pl + (dayIdx(`${yy}-${String(mm).padStart(2, "0")}-01`, base0) / 7) * wd;
     mlines += `${k ? `<line x1="${xi}" x2="${xi}" y1="${pt}" y2="${VH - pb}" stroke="var(--border)" stroke-dasharray="3 3"/>` : ""}<text x="${xi + 4}" y="${VH - 10}" font-size="11" fill="var(--ink2)">${MONTH[mm]}</text>`;
   });
   const path = (arr, upto) => arr.slice(0, upto).map((y, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)},${ys(y).toFixed(1)}`).join("");
@@ -435,11 +442,11 @@ export function seasonHTML(n) {
   const lblA = shown ? endLbl(xs(shown - 1), ys(TA[shown - 1]), isPlan ? "факт" : sYs(C.sY), C_TY) : "";
   const lblB = endLbl(xs(W - 1), ys(TB[W - 1]), isPlan ? "план" : sYs(C.sY - 1), cB);
   const hits = Array.from({ length: W }, (_, i) => {
-    const d0 = addDays(C.sStart, i * 7);
+    const d0 = addDays(base0, i * 7);
     const a = i < shown ? TA[i] : null, b = TB[i];
     const rel = a != null ? (isPlan ? pc(a, b) : dp(a, b)) : null;
-    const tip = `Неделя ${i + 1}: ${dShort(d0)} – ${dShort(addDays(d0, 6))}${i === curW ? " (идёт)" : ""} · ${nameA}: ${a != null ? nf(a) : "—"} · ` +
-      `${nameB}${isPlan ? "" : ` (${dShort(addDays(C.lStart, i * 7))})`}: ${nf(b)}${rel != null ? ` · ${isPlan ? rel + "% плана" : dTxt(rel)}` : ""}`;
+    const tip = `${dShort(d0)} – ${dShort(addDays(d0, 6))}${i === curW ? " (идёт)" : ""} · ${nameA}: ${a != null ? nf(a) : "—"} · ` +
+      `${nameB}${isPlan ? "" : ` (${dShort(addDays(d0, -364))} – ${dShort(addDays(d0, -358))})`}: ${nf(b)}${rel != null ? ` · ${isPlan ? rel + "% плана" : dTxt(rel)}` : ""}`;
     return `<rect x="${pl + i * wd}" y="${pt}" width="${wd}" height="${VH - pt - pb}" fill="transparent" data-tip="${esc(tip)}"/>`;
   }).join("");
   const svg = `<svg viewBox="0 0 ${VW} ${VH}" style="width:100%;height:auto;display:block;margin-top:8px" role="img" aria-label="По неделям сезона: ${nameA} и ${nameB}">
@@ -449,32 +456,53 @@ export function seasonHTML(n) {
       <span><span style="display:inline-block;width:14px;height:0;border-top:2px ${isPlan ? "dashed" : "solid"} ${cB};vertical-align:middle;margin-right:4px"></span>${nameB}</span>
     </span>`;
 
-  /* ── 3. Таблица по месяцам ── */
+  /* ── 3. Таблица по месяцам: штуки, рубли и цена сразу ──
+     Прошедший месяц — целиком; идущий — к сегодняшней дате (у плана/прошлого года — та же доля);
+     будущий — только план / прошлый год за весь месяц, серым. */
   const curM = C.today.slice(5, 7);
-  let sA = 0, sBto = 0, sBall = 0;
+  const rel = (a, b) => (isPlan ? pc(a, b) : dp(a, b));
+  const relTxt = (p) => (p == null ? "—" : isPlan ? p + "%" : dTxt(p));
+  const relCol = (p) => (isPlan ? tone(p) : dTone(p));
+  const price1 = (r, q) => (q > 0 ? r / q : 0);
+  const S = { aq: 0, ar: 0, bq: 0, br: 0 };
+  const td = (v, st = "") => `<td style="text-align:right;white-space:nowrap;${st}">${v}</td>`;
+  const sep = "border-left:1px solid var(--border);padding-left:14px";
   const mRows = PLAN.months.map((mm) => {
-    const k = String(mm).padStart(2, "0"), x = months[k] || { a: 0, bTo: 0, bAll: 0 };
+    const k = String(mm).padStart(2, "0"), x = months[k] || { aq: 0, ar: 0, bqTo: 0, brTo: 0, bqAll: 0, brAll: 0 };
     const yy = mm < 9 ? C.sY + 1 : C.sY;
     const future = `${yy}-${k}-01` > C.today, going = k === curM && !future;
-    const bCmp = going ? x.bTo : x.bAll;
-    sA += x.a; sBto += future ? 0 : bCmp; sBall += x.bAll;
-    const p = future ? null : isPlan ? pc(x.a, bCmp) : dp(x.a, bCmp);
-    return `<tr><td>${MONTH[mm]}${going ? ` <span style="color:var(--ink3);font-size:10px">идёт</span>` : ""}</td>
-      <td style="text-align:right;font-weight:700">${future ? "—" : nf(x.a)}</td>
-      <td style="text-align:right;color:var(--ink2)">${future ? "" : nf(bCmp)}</td>
-      <td style="text-align:right;color:var(--ink2)">${nf(x.bAll)}</td>
-      <td style="text-align:right;font-weight:700;color:${isPlan ? tone(p) : dTone(p)}">${p == null ? "—" : isPlan ? p + "%" : dTxt(p)}</td></tr>`;
+    const name = `<td style="white-space:nowrap">${MONTH[mm]}${going ? ` <span style="color:var(--ink3);font-size:10px">к ${+C.today.slice(8, 10)}-му</span>` : ""}</td>`;
+    if (future) {
+      const g = "color:var(--ink3)";
+      return `<tr>${name}${td("—", g)}${td(nfQ(x.bqAll), g)}${td("", g)}${td("—", g + ";" + sep)}${td(nfR(x.brAll), g)}${td("", g)}${td("—", g + ";" + sep)}${isPlan ? "" : td(nfQ(price1(x.brAll, x.bqAll)), g) + td("", g)}</tr>`;
+    }
+    const bq = going ? x.bqTo : x.bqAll, br = going ? x.brTo : x.brAll;
+    S.aq += x.aq; S.ar += x.ar; S.bq += bq; S.br += br;
+    const pq = rel(x.aq, bq), pr = rel(x.ar, br);
+    const pa = price1(x.ar, x.aq), pb = price1(br, bq), pp = dp(pa, pb);
+    return `<tr>${name}
+      ${td(nfQ(x.aq), "font-weight:700")}${td(nfQ(bq), "color:var(--ink2)")}${td(relTxt(pq), `font-weight:700;color:${relCol(pq)}`)}
+      ${td(nfR(x.ar), "font-weight:700;" + sep)}${td(nfR(br), "color:var(--ink2)")}${td(relTxt(pr), `font-weight:700;color:${relCol(pr)}`)}
+      ${td(pa ? nfQ(pa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(pb ? nfQ(pb) : "—", "color:var(--ink2)") + td(dTxt(pp), `font-weight:700;color:${dTone(pp)}`)}</tr>`;
   }).join("");
-  const pS = isPlan ? pc(sA, sBto) : dp(sA, sBto);
-  const hB = isPlan ? "План" : sYs(C.sY - 1);
-  const table = `<div class="sw" style="margin-top:10px"><table style="font-size:12px">
-    <thead><tr><th>Месяц</th><th style="text-align:right">Факт ${sYs(C.sY)}</th>
-      <th style="text-align:right" data-tip="Идущий месяц — по сегодняшнюю дату (сегодня — долей дня)">${hB} к дате</th>
-      <th style="text-align:right">${hB} весь месяц</th><th style="text-align:right">${isPlan ? "% плана" : "Δ"}</th></tr></thead>
-    <tbody>${mRows}<tr style="border-top:2px solid var(--border2)"><td><b>Сезон</b></td><td style="text-align:right;font-weight:700">${nf(sA)}</td>
-      <td style="text-align:right;color:var(--ink2)">${nf(sBto)}</td><td style="text-align:right;color:var(--ink2)">${nf(sBall)}</td>
-      <td style="text-align:right;font-weight:700;color:${isPlan ? tone(pS) : dTone(pS)}">${pS == null ? "—" : isPlan ? pS + "%" : dTxt(pS)}</td></tr></tbody>
-  </table></div>`;
+  const sq = rel(S.aq, S.bq), sr = rel(S.ar, S.br), spa = price1(S.ar, S.aq), spb = price1(S.br, S.bq), spp = dp(spa, spb);
+  const bName = isPlan ? "план" : sYs(C.sY - 1), aName = isPlan ? "факт" : sYs(C.sY);
+  const th = (t, st = "") => `<th style="text-align:right;white-space:nowrap;${st}">${t}</th>`;
+  const table = `<div class="sw" style="margin-top:8px;max-width:${isPlan ? 820 : 980}px"><table style="font-size:12px">
+    <thead>
+      <tr><th></th><th colspan="3" style="text-align:center">Штуки</th><th colspan="3" style="text-align:center;${sep}">Рубли</th><th colspan="${isPlan ? 1 : 3}" style="text-align:center;${sep}">Цена, ₽/шт</th></tr>
+      <tr><th>Месяц</th>${th(aName)}${th(bName)}${th(isPlan ? "%" : "Δ")}${th(aName, sep)}${th(bName)}${th(isPlan ? "%" : "Δ")}${isPlan ? th("факт", sep) : th(aName, sep) + th(bName) + th("Δ")}</tr>
+    </thead>
+    <tbody>${mRows}
+      <tr style="border-top:2px solid var(--border2)"><td><b>Сезон к дате</b></td>
+        ${td(nfQ(S.aq), "font-weight:700")}${td(nfQ(S.bq), "color:var(--ink2)")}${td(relTxt(sq), `font-weight:700;color:${relCol(sq)}`)}
+        ${td(nfR(S.ar), "font-weight:700;" + sep)}${td(nfR(S.br), "color:var(--ink2)")}${td(relTxt(sr), `font-weight:700;color:${relCol(sr)}`)}
+        ${td(spa ? nfQ(spa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(spb ? nfQ(spb) : "—", "color:var(--ink2)") + td(dTxt(spp), `font-weight:700;color:${dTone(spp)}`)}</tr>
+    </tbody>
+  </table></div>
+  <div style="font-size:10px;color:var(--ink3);margin-top:4px">${isPlan
+    ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. План в ₽ = план в шт × средняя цена штуки группы за сезон, поэтому «цена плана» не показывается — она равна фактической по построению."
+    : "Идущий месяц — к той же дате год назад. Будущие месяцы — прошлый год целиком, серым. Цена — ₽ «минус комиссия WB» на штуку."}</div>`;
 
   const sub = (t) => `<div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;margin-top:16px">${t}</div>`;
   return box(`
@@ -493,9 +521,9 @@ export function seasonHTML(n) {
     ${summary}
     ${rowsHTML}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">${sub("По неделям сезона")}<span style="display:flex;gap:10px;align-items:center;margin-top:14px">${legend}${pill([["w", "По неделям"], ["c", "Накопительно"]], SMODE, "setSeasMode")}</span></div>
-    <div style="font-size:11px;color:var(--ink3);margin-top:2px">Неделя 1 — с 1 сентября. Текущая неделя неполная — пустая точка. Наведите на неделю — цифры.</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:2px">Каждая точка — календарная неделя пн–вс${isPlan ? "; план недели — план месяца поровну по дням" : "; прошлый год — те же дни недели год назад"}. Текущая неделя неполная — пустая точка. Наведите на неделю — даты и цифры.</div>
     ${svg}
-    ${sub("По месяцам")}
+    ${sub("По месяцам — штуки, рубли и цена")}
     ${table}`);
 }
 
