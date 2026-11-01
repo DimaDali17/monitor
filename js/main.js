@@ -7,7 +7,7 @@ import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
-import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode } from "./render/plan.js";
+import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
 import { repaintReturns } from "./render/returns.js";
@@ -161,6 +161,7 @@ const App = {
   setPlanBase(b) { setPlanBase(b); repaintPlan(1); },
   setPlanPer(p) { setPlanPer(p); repaintPlan(1); },
   setSeasMode(x) { setSeasMode(x); repaintPlan(1); },
+  setPlanRows(x) { setPlanRows(x); repaintPlan(1); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {
