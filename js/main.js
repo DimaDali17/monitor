@@ -58,6 +58,8 @@ async function reload(n, force = false) {
     /* Возвраты к выдаче — отдельным лёгким запросом, не задерживая кабинет */
     /* План / факт — большая таблица, грузим фоном и дорисовываем блок */
     if (n === 1 || n === 2) loadPlan().then(() => { if (curTab === 1) repaintPlan(1); });
+    /* План общий на оба кабинета: открыли Easyform — подгружаем EZFR фоном (его свежие заказы нужны блоку плана) */
+    if (n === 1 && !D[2]) setTimeout(() => { if (!D[2]) reload(2); }, 1500);
     if (n !== 3) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else repaintReturns(n); });
   } catch (e) {
     view.innerHTML = `<div class="sb"><span class="sde"></span>

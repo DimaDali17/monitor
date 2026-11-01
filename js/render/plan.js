@@ -75,10 +75,9 @@ function factByArt() {
   const price = {};
   for (const g of Object.keys(gq)) price[g] = gq[g] > 0 ? gr[g] / gq[g] : 0;
   for (const cab of [1, 2]) {
-    const after = PLAN.factMax[cab] || "";
     for (const o of (D[cab] && D[cab].allOrders) || []) {
       const day = (o.date || "").slice(0, 10);
-      if (!day || day <= after || day < PLAN.seasonStart) continue;
+      if (!day || PLAN.factDays[cab].has(day) || day < PLAN.seasonStart) continue;   /* день есть в отчёте — берём отчёт */
       const a = (o.supplierArticle || "").toLowerCase();
       const g = PLAN.group[a];
       if (!g) continue;
@@ -134,10 +133,9 @@ function allByArt() {
     if (q > 0) price[a] = r / q;
   }
   for (const cab of [1, 2]) {
-    const after = PLAN.factMax[cab] || "";
     for (const o of (D[cab] && D[cab].allOrders) || []) {
       const day = (o.date || "").slice(0, 10);
-      if (!day || day <= after) continue;
+      if (!day || PLAN.factDays[cab].has(day)) continue;   /* день есть в отчёте — берём отчёт */
       const a = (o.supplierArticle || "").toLowerCase();
       if (!a) continue;
       const q = o.quantity || 1;
@@ -486,6 +484,7 @@ export function seasonHTML(n) {
       ${td(nfR(x.ar), "font-weight:700;" + sep)}${td(nfR(br), "color:var(--ink2)")}${td(relTxt(pr), `font-weight:700;color:${relCol(pr)}`)}
       ${td(pa ? nfQ(pa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(pb ? nfQ(pb) : "—", "color:var(--ink2)") + td(dTxt(pp), `font-weight:700;color:${dTone(pp)}`)}</tr>`;
   }).join("");
+  const Wq = Object.values(months).reduce((t, x) => t + x.bqAll, 0), Wr = Object.values(months).reduce((t, x) => t + x.brAll, 0);
   const sq = rel(S.aq, S.bq), sr = rel(S.ar, S.br), spa = price1(S.ar, S.aq), spb = price1(S.br, S.bq), spp = dp(spa, spb);
   const bName = isPlan ? "план" : sYs(C.sY - 1), aName = isPlan ? "факт" : sYs(C.sY);
   const th = (t, st = "") => `<th style="text-align:right;white-space:nowrap;${st}">${t}</th>`;
@@ -499,17 +498,21 @@ export function seasonHTML(n) {
         ${td(nfQ(S.aq), "font-weight:700")}${td(nfQ(S.bq), "color:var(--ink2)")}${td(relTxt(sq), `font-weight:700;color:${relCol(sq)}`)}
         ${td(nfR(S.ar), "font-weight:700;" + sep)}${td(nfR(S.br), "color:var(--ink2)")}${td(relTxt(sr), `font-weight:700;color:${relCol(sr)}`)}
         ${td(spa ? nfQ(spa) : "—", "font-weight:700;" + sep)}${isPlan ? "" : td(spb ? nfQ(spb) : "—", "color:var(--ink2)") + td(dTxt(spp), `font-weight:700;color:${dTone(spp)}`)}</tr>
+      <tr><td style="color:var(--ink2)" data-tip="${isPlan ? "План на весь сезон и сколько от него уже сделано" : "Прошлый сезон целиком (сен–янв) и сколько от него уже набрано в этом"}">Весь сезон</td>
+        ${td(nfQ(S.aq), "color:var(--ink2)")}${td(nfQ(Wq), "font-weight:700")}${td(Wq > 0 ? Math.round((S.aq / Wq) * 100) + "%" : "—", "color:var(--ink2)")}
+        ${td(nfR(S.ar), "color:var(--ink2);" + sep)}${td(nfR(Wr), "font-weight:700")}${td(Wr > 0 ? Math.round((S.ar / Wr) * 100) + "%" : "—", "color:var(--ink2)")}
+        ${td("", sep)}${isPlan ? "" : td(Wq > 0 ? nfQ(Wr / Wq) : "—", "color:var(--ink2)") + td("")}</tr>
     </tbody>
   </table></div>
   <div style="font-size:10px;color:var(--ink3);margin-top:4px">${isPlan
-    ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. План в ₽ = план в шт × средняя цена штуки группы за сезон, поэтому «цена плана» не показывается — она равна фактической по построению."
-    : "Идущий месяц — к той же дате год назад. Будущие месяцы — прошлый год целиком, серым. Цена — ₽ «минус комиссия WB» на штуку."}</div>`;
+    ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. «Весь сезон» — план на сезон целиком и какая доля его выполнена. План в ₽ = план в шт × средняя цена штуки группы за сезон, поэтому «цена плана» не показывается — она равна фактической по построению."
+    : "Идущий месяц — к той же дате год назад. Будущие месяцы — прошлый год целиком, серым. «Сезон к дате» — сравнение на сегодняшнюю дату; «Весь сезон» — прошлый сезон целиком и какая доля его уже набрана. Цена — ₽ «минус комиссия WB» на штуку."}</div>`;
 
   /* Откуда факт: отчёт по такой-то день, дальше — заказы по API (окно ORDERS_DAYS дней) */
   const fmx = [PLAN.factMax[1], PLAN.factMax[2]].filter(Boolean).sort()[0] || "";
   const apiFrom = addDays(C.today, -ORDERS_DAYS);
   const gap = fmx && addDays(fmx, 1) < apiFrom;
-  const srcNote = `<div style="font-size:10px;color:${gap ? "var(--red)" : "var(--ink3)"};margin-top:10px">Факт: отчёт WB из таблицы — по ${fmx ? dShort(fmx) : "—"}${PLAN.factMax[1] !== PLAN.factMax[2] && PLAN.factMax[2] ? ` (EZFR — по ${dShort(PLAN.factMax[2])})` : ""}; дальше — заказы по API монитора (последние ${ORDERS_DAYS} дн.).` +
+  const srcNote = `<div style="font-size:10px;color:${gap ? "var(--red)" : "var(--ink3)"};margin-top:10px">Факт: отчёт WB из таблицы — по ${fmx ? dShort(fmx) : "—"}${PLAN.factMax[1] !== PLAN.factMax[2] && PLAN.factMax[2] ? ` (EZFR — по ${dShort(PLAN.factMax[2])})` : ""}; дни, которых в отчёте нет, — заказы по API монитора (последние ${ORDERS_DAYS} дн.). Если день есть в отчёте — берём отчёт.${!D[2] ? " ⏳ EZFR ещё загружается — его свежие заказы появятся через минуту." : ""}` +
     (gap ? ` ⚠️ Отчёт старше окна API: дни ${dShort(addDays(fmx, 1))} – ${dShort(addDays(apiFrom, -1))} не покрыты — обновите историю в таблице.` : "") + `</div>`;
 
   const sub = (t) => `<div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;margin-top:16px">${t}</div>`;

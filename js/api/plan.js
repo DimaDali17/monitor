@@ -7,12 +7,14 @@ import { PLAN_EXTRA } from "../planMap.js";
    PLAN.plan[арт][месяц 1..12] — штук по плану (размеры сложены)
    PLAN.group[арт]             — группа плана («Кратко»): артикулы плана + PLAN_EXTRA
    PLAN.fact[cab][арт][YYYY-MM-DD] — { q: «Заказано, шт.», r: «Сумма заказов минус комиссия WB, руб.» }
-   PLAN.factMax[cab]           — последний день в отчёте (дальше берём живые заказы)
+   PLAN.factMax[cab]           — последний день в отчёте
+   PLAN.factDays[cab]          — дни, которые есть в ручном отчёте. Правило: день есть в отчёте —
+                                 цифры из отчёта; нет — заказы по API монитора (последние 62 дня)
    PLAN.all[арт][YYYY-MM-DD]   — { q, r } по ВСЕМ артикулам обоих кабинетов с 1 сентября
                                  прошлого сезона — для сравнения с прошлым годом
    Артикулы — в нижнем регистре.
    ══════════════════════════════════════════════════════════ */
-export const PLAN = { disp: {}, ready: false, error: null, plan: {}, group: {}, months: [], all: {}, lyStart: "", fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, seasonStart: "" };
+export const PLAN = { disp: {}, ready: false, error: null, plan: {}, group: {}, months: [], all: {}, lyStart: "", fact: { 1: {}, 2: {} }, factMax: { 1: "", 2: "" }, factDays: { 1: new Set(), 2: new Set() }, seasonStart: "" };
 
 let inflight = null;
 const num = (s) => parseFloat(String(s || "0").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -58,6 +60,7 @@ export function loadPlan() {
           if (!m) continue;
           const day = `${m[3]}-${m[2]}-${m[1]}`;
           if (day > PLAN.factMax[cab]) PLAN.factMax[cab] = day;
+          PLAN.factDays[cab].add(day);   /* этот день есть в ручном отчёте — API за него не берём */
           if (day < PLAN.lyStart) continue;
           const a = (r["Артикул поставщика"] || "").trim().toLowerCase();
           if (!a) continue;
