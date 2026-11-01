@@ -2,6 +2,7 @@ import { D, FA, FP, FG } from "../state.js";
 import { artGroup } from "../api/sheets.js";
 import { esc, wbPrice } from "../utils.js";
 import { PLAN } from "../api/plan.js";
+import { ORDERS_DAYS } from "../config.js";
 
 /* ══════════════════════════════════════════════════════════
    План / факт и сравнение с прошлым годом (кабинет Easyform; план общий на оба кабинета WB).
@@ -504,6 +505,13 @@ export function seasonHTML(n) {
     ? "Идущий месяц — к сегодняшней дате: план берётся той же долей. Будущие месяцы — план целиком, серым. План в ₽ = план в шт × средняя цена штуки группы за сезон, поэтому «цена плана» не показывается — она равна фактической по построению."
     : "Идущий месяц — к той же дате год назад. Будущие месяцы — прошлый год целиком, серым. Цена — ₽ «минус комиссия WB» на штуку."}</div>`;
 
+  /* Откуда факт: отчёт по такой-то день, дальше — заказы по API (окно ORDERS_DAYS дней) */
+  const fmx = [PLAN.factMax[1], PLAN.factMax[2]].filter(Boolean).sort()[0] || "";
+  const apiFrom = addDays(C.today, -ORDERS_DAYS);
+  const gap = fmx && addDays(fmx, 1) < apiFrom;
+  const srcNote = `<div style="font-size:10px;color:${gap ? "var(--red)" : "var(--ink3)"};margin-top:10px">Факт: отчёт WB из таблицы — по ${fmx ? dShort(fmx) : "—"}${PLAN.factMax[1] !== PLAN.factMax[2] && PLAN.factMax[2] ? ` (EZFR — по ${dShort(PLAN.factMax[2])})` : ""}; дальше — заказы по API монитора (последние ${ORDERS_DAYS} дн.).` +
+    (gap ? ` ⚠️ Отчёт старше окна API: дни ${dShort(addDays(fmx, 1))} – ${dShort(addDays(apiFrom, -1))} не покрыты — обновите историю в таблице.` : "") + `</div>`;
+
   const sub = (t) => `<div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;margin-top:16px">${t}</div>`;
   return box(`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -524,7 +532,8 @@ export function seasonHTML(n) {
     <div style="font-size:11px;color:var(--ink3);margin-top:2px">Каждая точка — календарная неделя пн–вс${isPlan ? "; план недели — план месяца поровну по дням" : "; прошлый год — те же дни недели год назад"}. Текущая неделя неполная — пустая точка. Наведите на неделю — даты и цифры.</div>
     ${svg}
     ${sub("По месяцам — штуки, рубли и цена")}
-    ${table}`);
+    ${table}
+    ${srcNote}`);
 }
 
 export function repaintPlan(n) {
