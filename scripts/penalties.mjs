@@ -47,26 +47,28 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
     }
   };
 
-  const art = (cab, nm) => artOf(cab, nm) || `nm ${nm}`;
+  /* артикул в <code> — иначе Telegram превращает «Termshort.men.EF.black» в ссылку */
+  const art = (cab, nm) => `<code>${esc(artOf(cab, nm) || `nm ${nm}`)}</code>`;
+  const codeA = (a) => `<code>${esc(a)}</code>`;
   const SECTIONS = [
     {
       name: "Габариты упаковки", url: `${HOST}/api/analytics/v1/measurement-penalties?dateFrom=${fromT}&dateTo=${toT}&limit=1000`,
       rows: (d) => (d && d.data && d.data.reports) || [],
       key: (x) => `mp:${x.dimId}:${x.dtBonus}`, date: (x) => x.dtBonus,
-      text: (cab, x) => `${esc(art(cab, x.nmId))} — замер ${x.length}×${x.width}×${x.height} см (${n1(x.volume)} л), в карточке ${x.lengthSup}×${x.widthSup}×${x.heightSup} (${n1(x.volumeSup)} л), +${n1(x.prcOver)}%` +
+      text: (cab, x) => `${art(cab, x.nmId)} — замер ${x.length}×${x.width}×${x.height} см (${n1(x.volume)} л), в карточке ${x.lengthSup}×${x.widthSup}×${x.heightSup} (${n1(x.volumeSup)} л), +${n1(x.prcOver)}%` +
         (x.penaltyAmount ? `; штраф ${rub(x.penaltyAmount)}` : "") + (x.isValid === false ? " · обмер отменён" : ""),
     },
     {
       name: "Замеры склада", url: `${HOST}/api/analytics/v1/warehouse-measurements?dateFrom=${fromT}&dateTo=${toT}&limit=1000`,
       rows: (d) => (d && d.data && d.data.reports) || [],
       key: (x) => `wm:${x.dimId}`, date: (x) => x.dt,
-      text: (cab, x) => `${esc(art(cab, x.nmId))} — ${x.length}×${x.width}×${x.height} см, ${n1(x.volume)} л`,
+      text: (cab, x) => `${art(cab, x.nmId)} — ${x.length}×${x.width}×${x.height} см, ${n1(x.volume)} л`,
     },
     {
       name: "Подмены", url: `${HOST}/api/analytics/v1/deductions?dateFrom=${fromT}&dateTo=${toT}&limit=1000&sort=dtBonus&order=desc`,
       rows: (d) => (d && d.data && d.data.reports) || [],
       key: (x) => `dd:${x.nmId}:${x.dtBonus}:${x.newShkId || x.oldShkId}`, date: (x) => x.dtBonus,
-      text: (cab, x) => `${esc(x.oldVendorCode || art(cab, x.nmId))}${x.newVendorCode && x.newVendorCode !== x.oldVendorCode ? ` → ${esc(x.newVendorCode)}` : ""}` +
+      text: (cab, x) => `${x.oldVendorCode ? codeA(x.oldVendorCode) : art(cab, x.nmId)}${x.newVendorCode && x.newVendorCode !== x.oldVendorCode ? ` → ${codeA(x.newVendorCode)}` : ""}` +
         ` (${esc([x.oldColor, x.oldSize].filter(Boolean).join(" "))}${x.newColor || x.newSize ? ` → ${esc([x.newColor, x.newSize].filter(Boolean).join(" "))}` : ""}) — ${esc(x.bonusType || "удержание")}` +
         (x.bonusSumm ? `, ${rub(x.bonusSumm)}` : ""),
     },
@@ -74,13 +76,13 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
       name: "Самовыкупы", urls: [`${HOST}/api/v1/analytics/antifraud-details?date=${today}`, `${HOST}/api/v1/analytics/antifraud-details?date=${addDays(today, -7)}`],
       rows: (d) => (d && d.details) || [],
       key: (x) => `af:${x.nmID}:${x.dateFrom}:${x.sum}`, date: (x) => x.dateTo || x.dateFrom,
-      text: (cab, x) => `${esc(art(cab, x.nmID))} — заказ на ${rub(x.sum)}, неделя ${dShort(x.dateFrom)}–${dShort(x.dateTo)}`,
+      text: (cab, x) => `${art(cab, x.nmID)} — заказ на ${rub(x.sum)}, неделя ${dShort(x.dateFrom)}–${dShort(x.dateTo)}`,
     },
     {
       name: "Маркировка товара", url: `${HOST}/api/v1/analytics/goods-labeling?dateFrom=${from}&dateTo=${today}`,
       rows: (d) => (d && d.report) || [],
       key: (x) => `gl:${x.shkID}:${x.date}`, date: (x) => x.date,
-      text: (cab, x) => `${esc(art(cab, x.nmID))} — поставка ${x.incomeId}, баркод ${esc(x.sku)}` + (x.amount ? `, штраф ${rub(x.amount)}` : ""),
+      text: (cab, x) => `${art(cab, x.nmID)} — поставка ${x.incomeId}, баркод ${esc(x.sku)}` + (x.amount ? `, штраф ${rub(x.amount)}` : ""),
     },
   ];
 
