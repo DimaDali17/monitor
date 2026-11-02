@@ -11,6 +11,7 @@ import { deficitHTML, defTbl, rawModeTog } from "./deficit.js";
 import { issuesHTML } from "./issues.js";
 import { returnsHTML } from "./returns.js";
 import { planHTML, seasonHTML } from "./plan.js";
+import { adsHTML } from "./ads.js";
 import { setRawScope } from "../api/sheets.js";
 
 /* Артикулы кабинета (без фильтров) — чтобы общий пул сырья показывался
@@ -50,7 +51,8 @@ export function renderCabinet(n) {
     deficitHTML(n) +
     stocksHTML(n) +
     fbsStocksHTML(n) +
-    seasonHTML(n);
+    seasonHTML(n) +
+    adsHTML(n);
 }
 
 /* Точечная перерисовка — сортировка таблицы не должна пересобирать график */

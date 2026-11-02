@@ -7,6 +7,8 @@ import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
+import { loadAds } from "./api/ads.js";
+import { repaintAds, setAdPer, setAdRows } from "./render/ads.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -58,6 +60,8 @@ async function reload(n, force = false) {
     /* Возвраты к выдаче — отдельным лёгким запросом, не задерживая кабинет */
     /* План / факт — большая таблица, грузим фоном и дорисовываем блок */
     if (n === 1 || n === 2) loadPlan().then(() => { if (curTab === 1) repaintPlan(1); });
+    /* Реклама — после кабинета, в общей очереди запросов WB (лимит рекламы 3 в минуту) */
+    if (n !== 3) loadAds(n, { force }).then(() => repaintAds(n));
     /* План общий на оба кабинета: открыли Easyform — подгружаем EZFR фоном (его свежие заказы нужны блоку плана) */
     if (n === 1 && !D[2]) setTimeout(() => { if (!D[2]) reload(2); }, 1500);
     if (n !== 3) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else repaintReturns(n); });
@@ -164,6 +168,9 @@ const App = {
   setPlanPer(p) { setPlanPer(p); repaintPlan(1); },
   setSeasMode(x) { setSeasMode(x); repaintPlan(1); },
   setPlanRows(x) { setPlanRows(x); repaintPlan(1); },
+  setAdPer(n, p) { setAdPer(p); repaintAds(n); },
+  setAdRows(n, r) { setAdRows(r); repaintAds(n); },
+  reloadAds(n) { const el = document.getElementById("ads" + n); if (el) el.innerHTML = '<span class="st">📣 Эффективность рекламы</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем заново…</div>'; loadAds(n, { force: true }).then(() => repaintAds(n)); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {

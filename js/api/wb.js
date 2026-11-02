@@ -42,7 +42,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* Дедупликация в полёте */
 const inflight = new Map();
 
-function wbGet(url, cab, force, onRetry) {
+export function wbGet(url, cab, force, onRetry) {
   const key = cab + "|" + url;
   if (inflight.has(key)) return inflight.get(key);
   const p = enqueue(() => attempt("GET", url, null, cab, force, onRetry))
@@ -78,8 +78,11 @@ async function attempt(method, url, body, cab, force, onRetry) {
       /* 401 от Analytics/Content API означает неверный токен Аналитика,
          а не истёкшую сессию — не выкидываем пользователя на логин */
       const isAnalDomain = url.includes("analytics-api") || url.includes("content-api");
-      if (!isAnalDomain) expired();
-      throw new Error(isAnalDomain
+      const isAdv = url.includes("advert-api");
+      if (!isAnalDomain && !isAdv) expired();
+      throw new Error(isAdv
+        ? `401 — проверьте токен «Продвижение» WB_ADV_KEY_${cab} в секретах воркера`
+        : isAnalDomain
         ? `401 — проверьте токен Аналитика WB_ANAL_KEY_${cab} в секретах воркера`
         : "Сессия истекла");
     }
