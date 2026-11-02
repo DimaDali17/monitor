@@ -7,16 +7,16 @@ import { ADS } from "../api/ads.js";
    Блок «📣 Эффективность рекламы» (кабинеты WB).
    Из рекламного кабинета: показы, клики, CTR, CPC, корзины, расход (по товару, по дням).
    Заказы — реальные, из API статистики монитора (allOrders) по тем же товарам и дням,
-   а не атрибуция WB (её показываем серым для сравнения).
+   а не атрибуция WB (её не показываем).
    ДРР = расход / сумма реальных заказов рекламируемых товаров (вкл. органику).
    Цена заказа = расход / реальные заказы. CR — клики → корзины.
    ══════════════════════════════════════════════════════════ */
 
 const LS = (k, ok, def) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : def; } catch { return def; } };
 const SV = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
-let PER = LS("adPer", ["7", "14", "30"], "7");
+let PER = LS("adPer", ["1", "7", "14", "30"], "7");
 let ROWS = LS("adRows", ["g", "a"], "a");
-export function setAdPer(p) { PER = ["7", "14", "30"].includes(p) ? p : "7"; SV("adPer", PER); }
+export function setAdPer(p) { PER = ["1", "7", "14", "30"].includes(p) ? p : "7"; SV("adPer", PER); }
 export function setAdRows(r) { ROWS = r === "g" ? "g" : "a"; SV("adRows", ROWS); }
 
 const pill = (opts, cur, fn, n) => `<span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:10px">
@@ -117,17 +117,15 @@ export function adsHTML(n) {
       <td style="text-align:right;${b}">${nf(x.q)}</td>
       <td style="text-align:right;${b}">${rub(x.r)}</td>
       <td style="text-align:right;font-weight:700;color:${drrTone(v)}">${v == null ? "—" : v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%"}</td>
-      <td style="text-align:right">${x.q ? nf(x.sum / x.q) : "—"}</td>
-      <td style="text-align:right;color:var(--ink3);border-left:1px solid var(--border)">${nf(x.wbo)}${x.q ? ` <span style="font-size:10px">(${pct(x.wbo, x.q, 0)})</span>` : ""}</td>`;
+      <td style="text-align:right">${x.q ? nf(x.sum / x.q) : "—"}</td>`;
   };
   const list = Object.entries(rows).sort((a, b) => b[1].sum - a[1].sum);
   const body = list.map(([k, x]) => `<tr><td style="white-space:nowrap"><span class="${ROWS === "a" ? "art" : ""}">${esc(k)}</span></td>${cells(x)}</tr>`).join("");
   const table = list.length ? `<div class="sw" style="margin-top:10px"><table style="font-size:12px">
     <thead>
-      <tr><th></th><th colspan="6" style="text-align:center">Рекламный кабинет</th><th colspan="5" style="text-align:center;border-left:1px solid var(--border)">Расход и реальные заказы</th><th style="text-align:center;border-left:1px solid var(--border)">WB</th></tr>
+      <tr><th></th><th colspan="6" style="text-align:center">Рекламный кабинет</th><th colspan="5" style="text-align:center;border-left:1px solid var(--border)">Расход и реальные заказы</th></tr>
       <tr><th>${ROWS === "g" ? "Группа" : "Артикул"}</th><th style="text-align:right">Показы</th><th style="text-align:right">Клики</th><th style="text-align:right">CTR</th><th style="text-align:right">CPC, ₽</th><th style="text-align:right">Корзины</th><th style="text-align:right" data-tip="Клики → добавления в корзину">CR</th>
-        <th style="text-align:right;border-left:1px solid var(--border)">Расход, ₽</th><th style="text-align:right" data-tip="Все реальные заказы рекламируемых товаров за период (вкл. органику), из API монитора">Заказы, шт</th><th style="text-align:right">Заказы, ₽</th><th style="text-align:right" data-tip="Доля рекламных расходов: расход / сумма реальных заказов">ДРР</th><th style="text-align:right" data-tip="Расход / реальные заказы, шт">₽ на заказ</th>
-        <th style="text-align:right;border-left:1px solid var(--border)" data-tip="Заказы по атрибуции рекламного кабинета WB — для сравнения; в скобках — доля от реальных">заказы по WB</th></tr>
+        <th style="text-align:right;border-left:1px solid var(--border)">Расход, ₽</th><th style="text-align:right" data-tip="Все реальные заказы рекламируемых товаров за период (вкл. органику), из API монитора">Заказы, шт</th><th style="text-align:right">Заказы, ₽</th><th style="text-align:right" data-tip="Доля рекламных расходов: расход / сумма реальных заказов">ДРР</th><th style="text-align:right" data-tip="Расход / реальные заказы, шт">₽ на заказ</th></tr>
     </thead>
     <tbody>${body}<tr style="border-top:2px solid var(--border2)"><td><b>Итого</b></td>${cells(T, true)}</tr></tbody>
   </table></div>` : `<div style="font-size:12px;color:var(--ink3);margin-top:10px">За этот период рекламы${ok ? " по фильтру" : ""} не было.</div>`;
@@ -136,7 +134,7 @@ export function adsHTML(n) {
   const tDrr = drr(T);
   const kpi = (lbl, val, sub, col) => `<div class="mc"><div class="ml">${lbl}</div><div class="mv sm"${col ? ` style="color:${col}"` : ""}>${val}</div>${sub ? `<div class="md" style="color:var(--ink3)">${sub}</div>` : ""}</div>`;
   const kpis = `<div class="mg" style="margin:10px 0 0">
-    ${kpi("Расход на рекламу", rub(T.sum) + " ₽", `${dShort(from)} – ${dShort(to)}`)}
+    ${kpi("Расход на рекламу", rub(T.sum) + " ₽", PER === "1" ? `вчера, ${dShort(to)}` : `${dShort(from)} – ${dShort(to)}`)}
     ${kpi("Реальные заказы этих товаров", rub(T.r) + " ₽", nf(T.q) + " шт")}
     ${kpi("ДРР", tDrr == null ? "—" : tDrr.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%", T.q ? `≈ ${nf(T.sum / T.q)} ₽ рекламы на заказ` : "", drrTone(tDrr))}
     ${kpi("Воронка", pct(T.clicks, T.views, 2) + " CTR", `${T.clicks ? nf(T.sum / T.clicks) : "—"} ₽ клик · ${pct(T.atbs, T.clicks)} в корзину`)}
@@ -164,7 +162,7 @@ export function adsHTML(n) {
   };
   const spend = dl.map((x) => (days[x] ? days[x].sum : 0));
   const drrD = dl.map((x) => (days[x] && days[x].r > 0 ? (days[x].sum / days[x].r) * 100 : null));
-  const charts = list.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:12px">
+  const charts = list.length && PER !== "1" ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:12px">
       <div><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">Расход по дням, ₽</div>${mini(spend, (v) => rub(v), "#8B4513", "расход", false)}</div>
       <div><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">ДРР по дням, %</div>${mini(drrD, (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%", "#4A6FA5", "ДРР", true)}</div>
     </div>` : "";
@@ -173,7 +171,7 @@ export function adsHTML(n) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <span>${title}${ok ? ` <span style="font-size:11px;color:var(--ink3)">· по фильтру</span>` : ""}</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        ${pill([["7", "7 дней"], ["14", "14 дней"], ["30", "30 дней"]], PER, "setAdPer", n)}
+        ${pill([["1", "Вчера"], ["7", "7 дней"], ["14", "14 дней"], ["30", "30 дней"]], PER, "setAdPer", n)}
         ${pill([["g", "Группы"], ["a", "Артикулы"]], ROWS, "setAdRows", n)}
         <span onclick="App.reloadAds(${n})" style="font-size:10px;color:var(--ink2);cursor:pointer;border-bottom:1px dotted var(--ink3)" data-tip="Загрузить статистику рекламы заново">↻</span>
       </span>
