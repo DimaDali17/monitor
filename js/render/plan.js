@@ -372,6 +372,8 @@ export function seasonHTML(n) {
   const months = {};
   const M = (k) => (months[k] ||= { aq: 0, ar: 0, bqTo: 0, brTo: 0, bqAll: 0, brAll: 0 });
   const lyToday = minusYear(C.today);
+  const wkStart = addDays(base0, curW * 7);
+  let bCur = 0;                                             /* план / прошлый год за те же дни текущей недели */
   if (isPlan) {
     for (const a of Object.keys(PLAN.group)) {
       if (ok && !ok(a)) continue;
@@ -387,6 +389,7 @@ export function seasonHTML(n) {
         if (!q) continue;
         const r = q * (price[g] || 0);
         B[wOf(d)] += R ? r : q;
+        if (d >= wkStart && d <= C.today) bCur += (R ? r : q) * (d === C.today ? C.frac : 1);
         const mm = M(d.slice(5, 7));
         mm.bqAll += q; mm.brAll += r;
         const k = d < C.today ? 1 : d === C.today ? C.frac : 0;
@@ -403,6 +406,8 @@ export function seasonHTML(n) {
         } else if (d >= C.lStart && d <= C.lEnd) {
           const w = wOf(addDays(d, 364));
           if (w >= 0 && w < W) B[w] += R ? c.r : c.q;
+          const d364 = addDays(d, 364);
+          if (d364 >= wkStart && d364 <= C.today) bCur += (R ? c.r : c.q) * (d364 === C.today ? C.frac : 1);
           const mm = M(d.slice(5, 7));
           mm.bqAll += c.q; mm.brAll += c.r;
           const k = d < lyToday ? 1 : d === lyToday ? C.frac : 0;      /* тот же день год назад */
@@ -417,7 +422,8 @@ export function seasonHTML(n) {
   const nameA = isPlan ? "факт" : `этот сезон ${sYs(C.sY)}`, nameB = isPlan ? "план" : `прошлый ${sYs(C.sY - 1)}`;
 
   const VW = 1000, VH = 250, pl = 56, pr = 78, pt = 14, pb = 30;
-  const shown = Math.min(W, curW + 1);
+  /* По неделям — только полные недели; накопительно — по сегодня */
+  const shown = SMODE === "c" ? Math.min(W, curW + 1) : Math.min(W, curW);
   const max = Math.max(1, ...TB, ...TA.slice(0, shown)) * 1.08;
   const wd = (VW - pl - pr) / W;
   const xs = (i) => pl + (i + 0.5) * wd;
@@ -433,10 +439,10 @@ export function seasonHTML(n) {
   });
   const path = (arr, upto) => arr.slice(0, upto).map((y, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)},${ys(y).toFixed(1)}`).join("");
   const bPath = `<path d="${path(TB, W)}" fill="none" stroke="${cB}" stroke-width="2" ${isPlan ? 'stroke-dasharray="6 4"' : ""} stroke-linejoin="round"/>`;
-  const full = SMODE === "c" ? shown : curW;
+  const full = shown;
   const aPath = `<path d="${path(TA, full)}" fill="none" stroke="${C_TY}" stroke-width="2.5" stroke-linejoin="round"/>` +
-    (SMODE === "w" && curW < W && curW > 0 ? `<path d="M${xs(curW - 1)},${ys(TA[curW - 1])}L${xs(curW)},${ys(TA[curW])}" fill="none" stroke="${C_TY}" stroke-width="2" stroke-dasharray="4 3"/>` : "");
-  const dots = TA.slice(0, shown).map((y, i) => `<circle cx="${xs(i)}" cy="${ys(y)}" r="${i === curW ? 4 : 3}" fill="${i === curW && SMODE === "w" ? "var(--card)" : C_TY}" stroke="${C_TY}" stroke-width="2"/>`).join("");
+    "";
+  const dots = TA.slice(0, shown).map((y, i) => `<circle cx="${xs(i)}" cy="${ys(y)}" r="3" fill="${C_TY}" stroke="${C_TY}" stroke-width="2"/>`).join("");
   const endLbl = (x, y, txt, c) => `<text x="${x + 8}" y="${y + 4}" font-size="11" font-weight="700" fill="var(--ink)"><tspan fill="${c}">●</tspan> ${txt}</text>`;
   const lblA = shown ? endLbl(xs(shown - 1), ys(TA[shown - 1]), isPlan ? "факт" : sYs(C.sY), C_TY) : "";
   const lblB = endLbl(xs(W - 1), ys(TB[W - 1]), isPlan ? "план" : sYs(C.sY - 1), cB);
@@ -532,8 +538,10 @@ export function seasonHTML(n) {
     ${summary}
     ${rowsHTML}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">${sub("По неделям сезона")}<span style="display:flex;gap:10px;align-items:center;margin-top:14px">${legend}${pill([["w", "По неделям"], ["c", "Накопительно"]], SMODE, "setSeasMode")}</span></div>
-    <div style="font-size:11px;color:var(--ink3);margin-top:2px">Каждая точка — календарная неделя пн–вс${isPlan ? "; план недели — план месяца поровну по дням" : "; прошлый год — те же дни недели год назад"}. Текущая неделя неполная — пустая точка. Наведите на неделю — даты и цифры.</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:2px">Каждая точка — календарная неделя пн–вс${isPlan ? "; план недели — план месяца поровну по дням" : "; прошлый год — те же дни недели год назад"}. ${SMODE === "w" ? "Показаны только полные недели." : "Накопительно — по сегодня."} Наведите на неделю — даты и цифры.</div>
     ${svg}
+    ${curW < W ? (() => { const a = A[curW], rel = isPlan ? pc(a, bCur) : dp(a, bCur);
+      return `<div style="font-size:11px;color:var(--ink2);margin-top:4px">Текущая неделя (${dShort(wkStart)} – сегодня, ${dayIdx(C.today, wkStart) + 1} дн.): <b>${nf(a)}</b> · ${isPlan ? "план" : "год назад"} за те же дни ${nf(bCur)}${rel != null ? ` · <b style="color:${isPlan ? tone(rel) : dTone(rel)}">${isPlan ? rel + "% плана" : dTxt(rel)}</b>` : ""}</div>`; })() : ""}
     ${sub("По месяцам — штуки, рубли и цена")}
     ${table}
     ${srcNote}`);
