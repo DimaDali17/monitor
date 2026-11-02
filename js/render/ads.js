@@ -110,7 +110,7 @@ export function adsHTML(n) {
     return `<td style="text-align:right">${nf(x.views)}</td>
       <td style="text-align:right">${nf(x.clicks)}</td>
       <td style="text-align:right">${pct(x.clicks, x.views, 2)}</td>
-      <td style="text-align:right">${x.clicks ? nf(x.sum / x.clicks) : "—"}</td>
+      <td style="text-align:right">${x.clicks ? (x.sum / x.clicks).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}</td>
       <td style="text-align:right">${nf(x.atbs)}</td>
       <td style="text-align:right">${pct(x.atbs, x.clicks)}</td>
       <td style="text-align:right;${b}border-left:1px solid var(--border)">${rub(x.sum)}</td>
@@ -137,7 +137,7 @@ export function adsHTML(n) {
     ${kpi("Расход на рекламу", rub(T.sum) + " ₽", PER === "1" ? `вчера, ${dShort(to)}` : `${dShort(from)} – ${dShort(to)}`)}
     ${kpi("Реальные заказы этих товаров", rub(T.r) + " ₽", nf(T.q) + " шт")}
     ${kpi("ДРР", tDrr == null ? "—" : tDrr.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%", T.q ? `≈ ${nf(T.sum / T.q)} ₽ рекламы на заказ` : "", drrTone(tDrr))}
-    ${kpi("Воронка", pct(T.clicks, T.views, 2) + " CTR", `${T.clicks ? nf(T.sum / T.clicks) : "—"} ₽ клик · ${pct(T.atbs, T.clicks)} в корзину`)}
+    ${kpi("Воронка", pct(T.clicks, T.views, 2) + " CTR", `${T.clicks ? (T.sum / T.clicks).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"} ₽ клик · ${pct(T.atbs, T.clicks)} в корзину`)}
   </div>`;
 
   /* По дням: расход и ДРР — два маленьких графика (одна шкала на график) */
