@@ -5,6 +5,7 @@
    node scripts/bot.mjs morning  — сводка за вчера + «срочно на ВБ» (дефицит) + «закончилось на FBS»
    node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час 4:00–0:00 МСК)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
+   node scripts/bot.mjs penalties — только «Удержания и замеры WB» (в morning входит)
 
    «Закончилось на FBS»: бот помнит остатки прошлой проверки (файл BOT_STATE,
    между запусками его хранит кэш GitHub) и пишет, только если на обязательном
@@ -36,7 +37,10 @@ if (!DASH_PASSWORD || !TG_BOT_TOKEN || !TG_CHAT_ID) {
 
 const { login } = await import("../js/api/auth.js");
 const { loadExternal, setRawScope, getStocksForArt } = await import("../js/api/sheets.js");
-const { loadWB } = await import("../js/api/wb.js");
+const { loadWB, cardByNm } = await import("../js/api/wb.js");
+const { WORKER } = await import("../js/config.js");
+const { authHeader } = await import("../js/api/auth.js");
+const { checkPenalties } = await import("./penalties.mjs");
 const { loadOZ } = await import("../js/api/ozon.js");
 const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
@@ -96,7 +100,7 @@ if (process.env.BOT_FAKE) {
   for (const n of [1, 2]) {
     try { await loadWB(n, {}); } catch (e) { problems.push(`⚠️ ${cabName(n)}: не загрузился — ${esc(e.message)}`); }
   }
-  if (MODE !== "drop") {
+  if (MODE !== "drop" && MODE !== "penalties") {
     try { await loadOZ({}); } catch (e) { problems.push(`⚠️ Ozon: не загрузился — ${esc(e.message)}`); }
   }
 }
@@ -228,6 +232,22 @@ if (MODE === "drop") {
       (lines.length ? "\n" + cap(lines.map((x) => `• <code>${esc(x.art)}</code> — ${x.now} вместо обычных ~${Math.round(x.expected)}`)).join("\n") : ""));
   }
   if (drops.length) msgs.push(`📉 <b>Заказы упали — сегодня к ${hhmm}</b>\nСравнение со средним за 7 дней к тому же часу. Проверьте карточку, цену, остатки по размерам.\n\n` + drops.join("\n\n"));
+}
+
+/* ── Удержания и замеры WB (габариты, замеры склада, подмены, самовыкупы, маркировка) — раз в день ── */
+if ((MODE === "morning" || MODE === "penalties") && !process.env.BOT_FAKE) {
+  const artOf = (cab, nm) => {
+    const c = cardByNm(cab, nm);
+    if (c && c.supplierArticle) return c.supplierArticle;
+    const o = ((D[cab] && D[cab].allOrders) || []).find((x) => String(x.nmId) === String(nm));
+    return o ? o.supplierArticle : null;
+  };
+  try {
+    const text = await checkPenalties({ WORKER, authHeader, cabName, artOf, fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "pen.json") });
+    msgs.push({ link: false, text });
+  } catch (e) {
+    problems.push(`⚠️ Удержания и замеры: проверка не удалась — ${esc(e.message)}`);
+  }
 }
 
 if (problems.length) msgs.push(problems.join("\n"));
