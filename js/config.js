@@ -60,3 +60,7 @@ export const MSK_RE = /коледино|электросталь|тула|под
 export const CSV_PLAN = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFg-5T74ZxxPalXrw1GTZg5ekvP7So_HZmzLGVLIqC_h5FBOQPhtvdKWCNVngUXXhXoRBlKVWG7iaF/pub?gid=594715177&single=true&output=csv";
 export const CSV_FACT_1 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHmDOfUKYgGrjZl6iocQ-gkkXET4_Ts7fw7dYIBB9_nGk-_KCU8pjnFoawiqbjZEZBHTgtJubJm3lT/pub?gid=1646776592&single=true&output=csv";
 export const CSV_FACT_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHmDOfUKYgGrjZl6iocQ-gkkXET4_Ts7fw7dYIBB9_nGk-_KCU8pjnFoawiqbjZEZBHTgtJubJm3lT/pub?gid=2136621481&single=true&output=csv";
+
+/* Реклама: цели на графиках блока «Эффективность рекламы» */
+export const ADS_DRR_TARGET = 5;                        /* цель ДРР, % */
+export const ADS_DAY_BUDGET = { 1: 10000, 2: 10000 };   /* бюджет расхода в день, ₽ (по кабинету) */

@@ -162,7 +162,7 @@ async function loadCards(cab, onRetry) {
       const art  = c.vendorCode || "";
       const subj = c.subjectName || "";
       const nm   = c.nmID || c.nmId;
-      if (nm) cards.byNm[String(nm)] = { supplierArticle: art, subject: subj };
+      if (nm) cards.byNm[String(nm)] = { supplierArticle: art, subject: subj, imt: c.imtID || c.imtId || null };   /* imt — склейка */
 
       for (const sz of c.sizes || []) {
         const chrt = sz.chrtID || sz.chrtId;
@@ -194,6 +194,11 @@ async function loadCards(cab, onRetry) {
   console.log(`Кабинет ${cab}: каталог ${Object.keys(cards.byChrt).length} размеров, ${Object.keys(cards.byNm).length} товаров`);
   return cards;
 }
+
+/* Склейка товара: nmId → imtID (из карточек). Нет карточек — null. */
+export const imtOf = (cab, nm) => { const x = CARDS[cab] && CARDS[cab].byNm[String(nm)]; return x ? x.imt || null : null; };
+export const cardByNm = (cab, nm) => (CARDS[cab] && CARDS[cab].byNm[String(nm)]) || null;
+export const cardsNmList = (cab) => Object.keys((CARDS[cab] && CARDS[cab].byNm) || {});
 
 /* Запасной справочник: артикул по nmId из заказов. Размера в нём нет. */
 function buildFallbackFromOrders(cab, orders) {
@@ -407,7 +412,8 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
   try {
     /* старый кэш без byBarcode не годится — из-за него FBS пропускался */
     const hit0 = force ? null : cacheGet(`wb${n}:cards`);
-    const hit = hit0 && hit0.byBarcode && Object.keys(hit0.byBarcode).length ? hit0 : null;
+    /* …и кэш без склеек (imt) — тоже: по ним реклама объединяет артикулы */
+    const hit = hit0 && hit0.byBarcode && Object.keys(hit0.byBarcode).length && hit0.withImt ? hit0 : null;
     if (hit) {
       /* byBarcode тоже из кэша: без него FBS-остатки молча пропускались («нет баркодов») */
       CARDS[n] = { byChrt: hit.byChrt, byNm: hit.byNm, byBarcode: hit.byBarcode || {}, ready: true, degraded: false };
@@ -415,7 +421,7 @@ export async function loadWB(n, { force = false, onRetry } = {}) {
     } else {
       onRetry?.("загружаю справочник артикулов", 0, 0);
       const c = await loadCards(n, onRetry);
-      cacheSet(`wb${n}:cards`, { byChrt: c.byChrt, byNm: c.byNm, byBarcode: c.byBarcode });
+      cacheSet(`wb${n}:cards`, { byChrt: c.byChrt, byNm: c.byNm, byBarcode: c.byBarcode, withImt: true });
     }
   } catch (e) {
     cardsOf(n).degraded = true;
