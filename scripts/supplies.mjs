@@ -10,7 +10,7 @@
    Память — .bot-state/sup.json.
    ══════════════════════════════════════════════════════════ */
 
-export const SUPPLY_CABS = [2];          /* ИП2 (EZFR). Добавить ИП1 — [1, 2] */
+export const SUPPLY_CABS = [1, 2];       /* ИП1 (Easyform) и ИП2 (EZFR) */
 export const WARN_HOURS = 96;
 const HOST = "https://supplies-api.wildberries.ru";
 const STATUS = { 1: "Не запланировано", 2: "Запланировано", 3: "Отгрузка разрешена", 4: "Идёт приёмка", 5: "Принято", 6: "Отгружено на воротах" };
