@@ -115,7 +115,7 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
       if (fresh.length) lines.push(`<i>${esc(cabName(cab))}</i>\n` + fresh.slice(0, 15).map((x) => `• ${dShort(S.date(x))} ${S.text(cab, x)}`).join("\n") +
         (fresh.length > 15 ? `\n…и ещё ${fresh.length - 15}` : ""));
     }
-    blocks.push(lines.length ? `<b>${S.name}</b> — новые события:\n${lines.join("\n")}` : `${S.name} — новых нет`);
+    if (lines.length) blocks.push(`<b>${S.name}</b>\n${lines.join("\n")}`);   /* только разделы с новым */
   }
 
   /* память: храним ключи за 30 дней, чтобы файл не рос бесконечно */
@@ -126,8 +126,8 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
   fs.writeFileSync(statePath, JSON.stringify(state));
 
   const period = `${dShort(from)}–${dShort(today)}`;
-  const head = `🧾 <b>Удержания и замеры WB</b> · проверка за ${period}`;
+  const head = `🧾 <b>Удержания и замеры WB</b> · новое за ${period}`;
   const errTxt = errors.length ? `\n\n⚠️ Не удалось проверить:\n${errors.join("\n")}` : "";
-  if (!newCount) return `${head}\nЗа прошедшие 7 дней новых событий нет ✅\n<i>Габариты упаковки, замеры склада, подмены, самовыкупы, маркировка — оба кабинета.</i>${firstRun ? `\n<i>Отсчёт с ${dShort(PEN_START)}.</i>` : ""}` + errTxt;
+  if (!newCount) return `🧾 Удержания и замеры WB: проверено за ${period} — нового нет ✅` + errTxt;
   return `${head}\n\n${blocks.join("\n\n")}\n\n<a href="https://seller.wildberries.ru/analytics-reports/dimensions-penalties">Открыть в кабинете WB</a>` + errTxt;
 }
