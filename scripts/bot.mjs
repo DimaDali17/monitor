@@ -6,6 +6,7 @@
    node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час 4:00–0:00 МСК)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
    node scripts/bot.mjs urgent    — только «Срочно на ВБ» (в morning входит)
+   node scripts/bot.mjs supplies  — только поставки (в fbs/morning/drop входит — каждый час)
    node scripts/bot.mjs penalties — только «Удержания и замеры WB» (в morning входит)
 
    «Закончилось на FBS»: бот помнит остатки прошлой проверки (файл BOT_STATE,
@@ -42,6 +43,7 @@ const { loadWB, cardByNm } = await import("../js/api/wb.js");
 const { WORKER } = await import("../js/config.js");
 const { authHeader } = await import("../js/api/auth.js");
 const { checkPenalties } = await import("./penalties.mjs");
+const { checkSupplies } = await import("./supplies.mjs");
 const { loadOZ } = await import("../js/api/ozon.js");
 const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
@@ -101,7 +103,7 @@ if (process.env.BOT_FAKE) {
   for (const n of [1, 2]) {
     try { await loadWB(n, {}); } catch (e) { problems.push(`⚠️ ${cabName(n)}: не загрузился — ${esc(e.message)}`); }
   }
-  if (MODE !== "drop" && MODE !== "penalties" && MODE !== "urgent") {
+  if (!["drop", "penalties", "urgent", "supplies"].includes(MODE)) {
     try { await loadOZ({}); } catch (e) { problems.push(`⚠️ Ozon: не загрузился — ${esc(e.message)}`); }
   }
 }
@@ -250,6 +252,16 @@ if ((MODE === "morning" || MODE === "penalties") && !process.env.BOT_FAKE) {
     msgs.push({ link: false, text });
   } catch (e) {
     problems.push(`⚠️ Удержания и замеры: проверка не удалась — ${esc(e.message)}`);
+  }
+}
+
+/* ── Поставки FBW: за 96 ч до дня поставки + смена статуса (каждый час) ── */
+if (["morning", "fbs", "drop", "supplies"].includes(MODE) && !process.env.BOT_FAKE) {
+  try {
+    const out = await checkSupplies({ WORKER, authHeader, cabName, fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "sup.json") });
+    for (const text of out) msgs.push({ link: false, text });
+  } catch (e) {
+    problems.push(`⚠️ Поставки: проверка не удалась — ${esc(e.message)}`);
   }
 }
 
