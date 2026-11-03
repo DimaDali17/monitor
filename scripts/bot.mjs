@@ -5,6 +5,7 @@
    node scripts/bot.mjs morning  — сводка за вчера + «срочно на ВБ» (дефицит) + «закончилось на FBS»
    node scripts/bot.mjs fbs      — только «закончилось на FBS» (каждый час 4:00–0:00 МСК)
    node scripts/bot.mjs drop     — резкое падение заказов сегодня к этому часу
+   node scripts/bot.mjs urgent    — только «Срочно на ВБ» (в morning входит)
    node scripts/bot.mjs penalties — только «Удержания и замеры WB» (в morning входит)
 
    «Закончилось на FBS»: бот помнит остатки прошлой проверки (файл BOT_STATE,
@@ -100,7 +101,7 @@ if (process.env.BOT_FAKE) {
   for (const n of [1, 2]) {
     try { await loadWB(n, {}); } catch (e) { problems.push(`⚠️ ${cabName(n)}: не загрузился — ${esc(e.message)}`); }
   }
-  if (MODE !== "drop" && MODE !== "penalties") {
+  if (MODE !== "drop" && MODE !== "penalties" && MODE !== "urgent") {
     try { await loadOZ({}); } catch (e) { problems.push(`⚠️ Ozon: не загрузился — ${esc(e.message)}`); }
   }
 }
@@ -134,21 +135,23 @@ if (MODE === "morning") {
       (lead.length ? `\n\nТоп: ` + lead.join(", ") : "") });
   }
 
-  /* ── 2. Срочно на ВБ: запаса FBW+FBS меньше 14 дней (тот же статус, что в дефиците) ── */
+}
+
+if (MODE === "morning" || MODE === "urgent") {
+  /* ── 2. Срочно на ВБ: запаса FBW+FBS меньше URGENT_DAYS дней. Только то, что есть чем пополнить
+     (СГП или сырьё) — остальное в сообщение не идёт. Коротко: артикул и дни. ── */
+  const URGENT_DAYS = 7;
   const urgent = [];
   for (const n of [1, 2]) {
     if (!prepare(n)) continue;
     const rows = defTbl(n, { rowsOnly: true })
-      .filter((r) => r.o7 > 0 && Math.round(r.dr) >= 1 && statusKey(r.dStock) === "urgent")
+      .filter((r) => r.o7 > 0 && Math.round(r.dr) >= 1 && r.dStock != null && r.dStock < URGENT_DAYS && (r.sgp || 0) + (r.raw || 0) > 0)
       .sort((a, b) => (a.dStock ?? 0) - (b.dStock ?? 0));
     if (!rows.length) continue;
-    const lines = rows.map((r) => {
-      const src = [r.sgp ? "СГП " + r.sgp : "", r.raw ? "сырьё " + r.raw : ""].filter(Boolean).join(", ");
-      return `• <code>${esc(r.art)}</code> — ~${r.dStock} дн. · ${src || "❗ нечем пополнить"}`;
-    });
+    const lines = rows.map((r) => `• <code>${esc(r.art)}</code> — ${r.dStock} дн.`);
     urgent.push(`\n<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
   }
-  if (urgent.length) msgs.push(`🔥 <b>Срочно на ВБ</b> (запаса меньше 14 дн.)\n` + urgent.join("\n"));
+  if (urgent.length) msgs.push(`🔥 <b>Срочно на ВБ</b> (запаса меньше ${URGENT_DAYS} дн.)\n` + urgent.join("\n"));
 }
 
 if (MODE === "morning" || MODE === "fbs") {
