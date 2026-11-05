@@ -26,16 +26,28 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
   try { state = { warned: {}, status: {}, ...JSON.parse(fs.readFileSync(statePath, "utf8")) }; } catch { /* первый запуск */ }
   const first = !state.ran;
 
+  /* запрос через воркер; сетевой сбой, 429 и 5xx — до 3 попыток с паузой 10 и 30 с */
   const call = async (cab, method, url, body) => {
-    const r = await fetch(`${WORKER}/?cab=${cab}&url=${encodeURIComponent(url)}`, {
-      method, headers: { ...authHeader(), "X-Force": "1", "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (r.status === 204) return null;
-    const t = await r.text();
-    if (!r.ok) throw new Error(`WB ${r.status}: ${t.slice(0, 150)}`);
-    return t.trim() ? JSON.parse(t) : null;
+    const waits = [10000, 30000];
+    for (let i = 0; ; i++) {
+      let r, t;
+      try {
+        r = await fetch(`${WORKER}/?cab=${cab}&url=${encodeURIComponent(url)}`, {
+          method, headers: { ...authHeader(), "X-Force": "1", "Content-Type": "application/json" },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (r.status === 204) return null;
+        t = await r.text();
+      } catch (e) {
+        if (i < waits.length) { await new Promise((ok) => setTimeout(ok, waits[i])); continue; }
+        throw new Error("нет связи с воркером (" + e.message + ")");
+      }
+      if (r.ok) return t.trim() ? JSON.parse(t) : null;
+      if ((r.status === 429 || r.status >= 500) && i < waits.length) { await new Promise((ok) => setTimeout(ok, waits[i])); continue; }
+      throw new Error(`WB ${r.status}: ${t.slice(0, 150)}`);
+    }
   };
+  state.fails ||= {};   /* сколько проверок подряд кабинет не проверился */
 
   const warn = [], changed = [], errors = [];
   for (const cab of SUPPLY_CABS) {
@@ -45,9 +57,12 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
       const from = isoDay(now - 60 * 864e5), till = isoDay(now + 864e5);
       list = (await call(cab, "POST", `${HOST}/api/v1/supplies?limit=1000&offset=0`, { dates: [{ from, till, type: "createDate" }] })) || [];
     } catch (e) {
-      errors.push(`${cabName(cab)}: ${esc(e.message)}`);
+      state.fails[cab] = (state.fails[cab] || 0) + 1;
+      /* разовый сбой — молчим; пишем, только если не проверилось 3 раза подряд (≈3 часа) */
+      if (state.fails[cab] >= 3) errors.push(`${cabName(cab)}: ${esc(e.message)} (уже ${state.fails[cab]} проверки подряд)`);
       continue;
     }
+    state.fails[cab] = 0;
     for (const s of list) {
       const id = s.supplyID || s.preorderID;
       if (!id) continue;
@@ -95,7 +110,7 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
   const out = [];
   if (warn.length) out.push(`⏰ <b>До поставки ${WARN_HOURS} ч или меньше</b> (считаем до 00:00 дня поставки)\n\n` + warn.join("\n\n"));
   if (changed.length) out.push(`🔄 <b>Статус поставки изменился</b>\n\n` + changed.join("\n\n"));
-  /* ошибку (например, нет токена) — не чаще раза в день, чтобы не спамить каждый час */
+  /* устойчивую ошибку (например, нет токена) — не чаще раза в день */
   if (errors.length && state.errDay !== isoDay(now)) {
     out.push(`⚠️ Поставки: не удалось проверить — ${errors.join("; ")}`);
     state.errDay = isoDay(now);

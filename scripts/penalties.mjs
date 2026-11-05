@@ -38,7 +38,9 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
   /* GET через воркер; 204 — пусто; 429 — подождать и повторить один раз */
   const get = async (cab, url) => {
     for (let i = 0; i < 2; i++) {
-      const r = await fetch(`${WORKER}/?cab=${cab}&url=${encodeURIComponent(url)}`, { headers: { ...authHeader(), "X-Force": "1" } });
+      let r;
+      try { r = await fetch(`${WORKER}/?cab=${cab}&url=${encodeURIComponent(url)}`, { headers: { ...authHeader(), "X-Force": "1" } }); }
+      catch (e) { if (i === 0) { await sleep(15000); continue; } throw new Error("нет связи с воркером (" + e.message + ")"); }   /* сетевой сбой — ещё раз */
       if (r.status === 204) return null;
       const t = await r.text();
       if (r.ok) return t.trim() ? JSON.parse(t) : null;
