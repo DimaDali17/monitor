@@ -29,8 +29,10 @@ export function fmtDays(d, msk = false) {
 }
 
 /* ── Цены и количества ── */
+/* Сумма заказа как в кабинете WB и WB Partners: цена продавца со своей скидкой (priceWithDisc), до СПП.
+   finishedPrice — что заплатил покупатель после скидки WB (СПП) — на ~30% меньше, его не берём. */
 export const wbPrice = (o) =>
-  o.finishedPrice || o.priceWithDisc || o.totalPrice * (1 - (o.discountPercent || 0) / 100) || o.totalPrice || 0;
+  o.priceWithDisc || o.totalPrice * (1 - (o.discountPercent || 0) / 100) || o.finishedPrice || o.totalPrice || 0;
 export const wbQty = (s) => s.quantity || 0;
 export const ozRev = (o) =>
   (o.products || []).reduce((s, p) => s + parseFloat(p.price || p.offer_price || 0) * (p.quantity || 1), 0);
