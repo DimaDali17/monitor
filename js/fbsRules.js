@@ -45,6 +45,56 @@ export const FBS_RULES = [
   { cab: 2, name: "Легги",       rule: "all",   arts: ["EFlegblack", "Leg.Dov.black.gift01"] },
 ];
 
+/* ── Правила из Google-таблицы (вкладка «FBS правила», CSV_FBS_RULES в config.js) ──
+   Колонки: Кабинет | Название | Правило | Артикулы | Кроме
+     Кабинет  — Easyform / EZFR (пусто — оба)
+     Правило  — «все склады», «кроме МСК», «только Пятигорск», «0 на FBS»
+     Артикулы — через запятую; «TermoMai.*» — все артикулы, начинающиеся с TermoMai.
+     Кроме    — артикулы, которые правило не трогает (через запятую)
+   Срабатывает первая подходящая строка сверху, поэтому «0 на FBS» ставим выше общих.
+   Таблица пустая или не загрузилась — работают правила из списка выше. */
+export const FBS_RULES_SRC = { from: "code", count: FBS_RULES.length, bad: [], error: null };
+
+const ruleCode = (t) => {
+  const s = String(t || "").trim().toLowerCase().replace(/ё/g, "е");
+  if (!s) return null;
+  if (/^(none|0|нет)\b|^0 на|fbo/.test(s)) return "none";
+  if (/exmsk|кроме\s*(мск|моск)/.test(s)) return "exMsk";
+  if (/pyat|пятигорск/.test(s)) return "pyat";
+  if (/^(all|все)/.test(s)) return "all";
+  return null;
+};
+const cabCode = (t) => {
+  const s = String(t || "").trim().toLowerCase();
+  if (!s) return 0;
+  if (/ezfr|ип\s*-?\s*2|^2$/.test(s)) return 2;
+  if (/easy|ип\s*-?\s*1|^1$/.test(s)) return 1;
+  return -1;
+};
+const list = (t) => String(t || "").split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
+
+/* rows — строки CSV объектами {заголовок: значение}. Есть хоть одно верное правило — заменяем список. */
+export function applyFbsRulesSheet(rows) {
+  const get = (r, ...names) => { const k = Object.keys(r).find((x) => names.includes(x.trim().toLowerCase())); return k ? String(r[k] || "").trim() : ""; };
+  const out = [], bad = [];
+  rows.forEach((r, i) => {
+    const arts = list(get(r, "артикулы", "артикул"));
+    const rawRule = get(r, "правило");
+    if (!arts.length && !rawRule) return;                     /* пустая строка */
+    const rule = ruleCode(rawRule), cab = cabCode(get(r, "кабинет", "ип"));
+    const name = get(r, "название", "группа") || arts[0] || "";
+    if (!arts.length || !rule || cab < 0) {
+      bad.push(`строка ${i + 2}${name ? " (" + name + ")" : ""}: ${!arts.length ? "нет артикулов" : !rule ? `правило «${rawRule}» не понял` : "кабинет не понял"}`);
+      return;
+    }
+    const ex = list(get(r, "кроме", "исключить", "exclude"));
+    out.push({ cab, name, rule, arts, ...(ex.length ? { exclude: ex } : {}) });
+  });
+  FBS_RULES_SRC.bad = bad;
+  if (out.length) { FBS_RULES.splice(0, FBS_RULES.length, ...out); FBS_RULES_SRC.from = "sheet"; FBS_RULES_SRC.count = out.length; }
+  return out.length;
+}
+
 /* Артикулы, которые шьются из одного сырья (общий пул), даже если в «Арт производ»
    это видно не целиком. Для «есть ли из чего пополнить» берём сырьё всего пула. */
 export const RAW_POOLS = [

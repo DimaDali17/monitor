@@ -2,7 +2,8 @@ import { VM, SS, FSS, FS, FSZ, OA, OAF, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, normSz } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { ozBase, cabWarehouses, whUsed, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates } from "../fbsRules.js";
+import { ozBase, cabWarehouses, whUsed, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates, FBS_RULES_SRC } from "../fbsRules.js";
+const rulesFrom = () => (FBS_RULES_SRC.from === "sheet" ? `из таблицы «FBS правила», ${FBS_RULES_SRC.count} шт` : "встроенные (js/fbsRules.js)");
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
    в колонке сырья «—», но сырьё у него есть — лежит на главном артикуле). */
@@ -352,9 +353,12 @@ export function fbsStocksHTML(n) {
   const red = rows.filter((r) => r.st === "red").length, amber = rows.filter((r) => r.st === "amber").length;
   const okN = rows.filter((r) => r.st === "ok").length;
   const summary = (red || amber || okN)
-    ? `<span class="sm2" data-tip="По правилам наличия на FBS-складах (js/fbsRules.js): пусто или мало (${hasWhData ? "хватит на ≤" + FBS_LOW_DAYS + " дн. по FBS-заказам этого склада за 7 дней" : "≤" + FBS_LOW + " шт — нет данных о складах заказов"}) на обязательном складе">Правила:
+    ? `<span class="sm2" data-tip="По правилам наличия на FBS-складах (${rulesFrom()}): пусто или мало (${hasWhData ? "хватит на ≤" + FBS_LOW_DAYS + " дн. по FBS-заказам этого склада за 7 дней" : "≤" + FBS_LOW + " шт — нет данных о складах заказов"}) на обязательном складе">Правила:
          ${red ? `<b style="color:#B3261E">🔴 ${red}</b>` : ""} ${amber ? `<b style="color:#8A5A00">🟠 ${amber}</b>` : ""} ${okN ? `<span style="color:#2F7D55">✅ ${okN}</span>` : ""}</span>`
     : "";
+  /* что не так с таблицей правил — видно сразу, а не молча */
+  const rulesWarn = [...FBS_RULES_SRC.bad, ...(FBS_RULES_SRC.error && FBS_RULES_SRC.from !== "sheet" ? [FBS_RULES_SRC.error] : [])];
+  const rulesNote = rulesWarn.length ? `<div style="font-size:11px;color:#8A5A00;margin:4px 0">⚠︎ Таблица «FBS правила»: ${esc(rulesWarn.join("; "))}</div>` : "";
 
   return `<div class="sec">
     <div class="sh">
@@ -366,6 +370,7 @@ export function fbsStocksHTML(n) {
         <button class="b" style="padding:3px 9px;font-size:10px" onclick="App.exportXlsx(this,'FBS','fbs')" data-tip="Скачать в Excel — как на экране">⤓ Excel</button>
       </span>
     </div>
+    ${rulesNote}
     <div class="sw" id="fbstbl${n}">${fbsStocksTbl(n)}</div>
   </div>`;
 }
@@ -501,7 +506,7 @@ export function fbsStocksTbl(n) {
   return `<table>
     <thead><tr>
       <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortFS(${n},'art')">Артикул${arrow('art')}</th>
-      <th style="text-align:center" data-tip="Где товар должен быть на FBS. Правила — в js/fbsRules.js">Правило</th>
+      <th style="text-align:center" data-tip="Где товар должен быть на FBS. Правила — ${rulesFrom()}">Правило</th>
       <th class="${cls('st')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'st')" data-tip="🔴 пусто на обязательном складе · 🟠 мало (${lowTxt}) · ✅ правило выполняется. Клик — сортировка, проблемы сверху">Статус${arrow('st')}</th>
       <th class="${cls('base')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'base')" data-tip="Из чего пополнить: СГП + сырьё (в наборах, всего пула)">Сырьё+СГП${arrow('base')}</th>
       <th class="${cls('fbs')}" data-sort style="text-align:center" onclick="App.sortFS(${n},'fbs')" data-tip="Остаток FBS по всем вашим складам">FBS общий${arrow('fbs')}</th>

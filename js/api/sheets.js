@@ -1,5 +1,6 @@
 import { RAW_SPLIT_GROUPS, RAW_SPLIT_DEFAULT, RAW_SAME_AS } from "../rawSplit.js";
-import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, DEFAULT_BUYRATE } from "../config.js";
+import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, CSV_FBS_RULES, DEFAULT_BUYRATE } from "../config.js";
+import { applyFbsRulesSheet, FBS_RULES_SRC } from "../fbsRules.js";
 import { normSz } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
@@ -209,6 +210,14 @@ export function loadExternal() {
         return txt;
       }).catch((e) => { console.warn(e.message); return { err: e.message }; });
 
+      /* Правила FBS из таблицы — необязательные: не загрузились — работают встроенные (js/fbsRules.js) */
+      const rFbsP = fetch(CSV_FBS_RULES).then(async (r) => {
+        if (!r.ok) throw new Error(`FBS правила: HTTP ${r.status}`);
+        const txt = await r.text();
+        if (/^\s*<(!doctype|html)/i.test(txt)) throw new Error("FBS правила: Google вернул страницу вместо CSV");
+        return txt;
+      }).catch((e) => { console.warn(e.message); return { err: e.message }; });
+
       const [rB, rR, rM, rN, rS] = await Promise.all(
         [CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_SEASON].map((u, i) => fetch(u).then(async (r) => {
           const nm = ["Выкупаемость", "Остатки сводная (СГП+сырьё)", "Арт производ", "Номенклатура", "Сезон"][i];
@@ -355,6 +364,14 @@ export function loadExternal() {
           if (a === anchor) sheets.map[art + ";" + z] = v.map((m) => ({ ...m, col: 2 }));   /* старший остаётся главным в режиме «Пул» */
         }
       }
+
+      /* Правила FBS */
+      const rFbs = await rFbsP;
+      if (typeof rFbs === "string") {
+        const n = applyFbsRulesSheet(parseCSV(rFbs));
+        FBS_RULES_SRC.error = n ? null : "в таблице нет правил — работают встроенные";
+        console.log(`FBS правила: ${n ? `из таблицы ${n}` : "таблица пустая — встроенные"}${FBS_RULES_SRC.bad.length ? `; не понял: ${FBS_RULES_SRC.bad.join("; ")}` : ""}`);
+      } else FBS_RULES_SRC.error = rFbs.err + " — работают встроенные";
 
       buildIndexes();
       sheets.loaded = true;
