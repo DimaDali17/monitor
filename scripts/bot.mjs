@@ -100,12 +100,32 @@ if (process.env.BOT_FAKE) {
 } else {
   await login(DASH_PASSWORD);
   await loadExternal();
-  for (const n of [1, 2]) {
-    try { await loadWB(n, {}); } catch (e) { problems.push(`⚠️ ${cabName(n)}: не загрузился — ${esc(e.message)}`); }
-  }
-  if (!["drop", "penalties", "urgent", "supplies"].includes(MODE)) {
-    try { await loadOZ({}); } catch (e) { problems.push(`⚠️ Ozon: не загрузился — ${esc(e.message)}`); }
-  }
+  /* Загрузка кабинета: сбой сети («fetch failed») — ещё 2 попытки через 15 и 45 с.
+     Не загрузился и так — пишем, только если не загружается 3 запуска подряд (≈3 часа), не чаще раза в день.
+     Память — .bot-state/load.json */
+  const LOAD_STATE = (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "load.json");
+  let ls = { fails: {}, errDay: {} };
+  try { ls = { fails: {}, errDay: {}, ...JSON.parse(fs.readFileSync(LOAD_STATE, "utf8")) }; } catch { /* первый запуск */ }
+  const mskDay = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+  const tryLoad = async (key, name, fn) => {
+    const waits = [15000, 45000];
+    for (let i = 0; ; i++) {
+      try { await fn(); ls.fails[key] = 0; return; }
+      catch (e) {
+        if (i < waits.length) { await new Promise((ok) => setTimeout(ok, waits[i])); continue; }
+        ls.fails[key] = (ls.fails[key] || 0) + 1;
+        console.log(`${name}: не загрузился (${ls.fails[key]} подряд) — ${e.message}`);
+        if (ls.fails[key] >= 3 && ls.errDay[key] !== mskDay) {
+          problems.push(`⚠️ ${name}: не загружается уже ${ls.fails[key]} проверки подряд — ${esc(e.message)}`);
+          ls.errDay[key] = mskDay;
+        }
+        return;
+      }
+    }
+  };
+  for (const n of [1, 2]) await tryLoad(`wb${n}`, cabName(n), () => loadWB(n, {}));
+  if (!["drop", "penalties", "urgent", "supplies"].includes(MODE)) await tryLoad("oz", "Ozon", () => loadOZ({}));
+  try { fs.mkdirSync(LOAD_STATE.replace(/\/[^/]*$/, ""), { recursive: true }); fs.writeFileSync(LOAD_STATE, JSON.stringify(ls)); } catch { /* не страшно */ }
 }
 
 const msgs = [];   /* каждое — отдельным сообщением в Telegram */
