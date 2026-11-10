@@ -180,8 +180,9 @@ if (MODE === "morning" || MODE === "fbs") {
   /* ── 3. Закончилось на FBS: на обязательном складе было > 0 — стало 0 ── */
   let prev = null;
   try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { /* первый запуск */ }
-  const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) } };
-  const gone = [];
+  const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) }, zero: { ...(prev?.zero || {}) } };
+  const gone = [], again = [];
+  const REPEAT_H = 23.5;   /* «сутки» — с запасом на то, что запуски идут в начале часа с разбросом */
   for (const n of [1, 2, 3]) {
     if (!D[n] || !prepare(n)) continue;           /* кабинет не загрузился — помним прошлое */
     const { rows, whList } = fbsRows(n);
@@ -200,23 +201,45 @@ if (MODE === "morning" || MODE === "fbs") {
     }
     next.cabs[n] = snap;
     if (!old) continue;
-    /* арт → склад → размеры, которые закончились */
-    const byArt = {};
+    /* Память о нулях: ключ → { since: когда стал 0, last: когда последний раз писали }.
+       Стал 0 — пишем сразу. Через сутки после сообщения всё ещё 0 — повтор (и так раз в сутки),
+       пока не пополнят. Пополнили (>0) или правило/спрос пропали — забываем. */
+    const zm = (next.zero[n] ||= {});
+    const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
+    const byArt = {}, rep = {};
     for (const [k, q] of Object.entries(snap)) {
-      if (q > 0 || !(old[k] > 0)) continue;
+      if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
-      ((byArt[art] ||= {})[w] ||= []).push(sz);
+      if (old[k] > 0) {                                   /* только что закончилось */
+        zm[k] = { since: nowIso, last: nowIso };
+        ((byArt[art] ||= {})[w] ||= []).push(sz);
+      } else if (!zm[k]) {
+        zm[k] = { since: null, last: nowIso };           /* был 0 ещё до этой функции: с какого дня — не знаем; сутки считаем с сейчас */
+      } else if (nowMs - Date.parse(zm[k].last) >= REPEAT_H * 3600e3) {
+        zm[k].last = nowIso;
+        ((rep[art] ||= {})[w] ||= []).push({ sz, days: zm[k].since ? Math.floor((nowMs - Date.parse(zm[k].since)) / 864e5) : null });
+      }
     }
+    for (const k of Object.keys(zm)) if (!(k in snap)) delete zm[k];
     const lines = Object.entries(byArt).map(([art, ws]) => {
       if (n === 3) return `• <code>${esc(art)}</code> — FBS 0`;
       const where = Object.entries(ws).map(([w, szs]) => szs.filter(Boolean).length ? `${w} (${szs.map(esc).join(", ")})` : w).join(", ");
       return `• <code>${esc(art)}</code> — ${where}`;
     });
     if (lines.length) gone.push(`\n<b>${cabName(n)}</b>\n` + cap(lines).join("\n"));
+    const rlines = Object.entries(rep).map(([art, ws]) => {
+      const dmax = Math.max(0, ...Object.values(ws).flat().map((x) => x.days || 0));
+      const ago = dmax >= 1 ? ` · 0 уже ${dmax} дн.` : "";
+      if (n === 3) return `• <code>${esc(art)}</code> — FBS 0${ago}`;
+      const where = Object.entries(ws).map(([w, xs]) => xs.some((x) => x.sz) ? `${w} (${xs.map((x) => esc(x.sz)).join(", ")})` : w).join(", ");
+      return `• <code>${esc(art)}</code> — ${where}${ago}`;
+    });
+    if (rlines.length) again.push(`\n<b>${cabName(n)}</b>\n` + cap(rlines).join("\n"));
   }
   fs.mkdirSync(STATE.replace(/\/[^/]*$/, ""), { recursive: true });
   fs.writeFileSync(STATE, JSON.stringify(next));
   if (gone.length) msgs.push(`🔴 <b>Закончилось на FBS</b>\n` + gone.join("\n"));
+  if (again.length) msgs.push(`🔁 <b>Повтор: всё ещё 0 на FBS</b> (прошли сутки с сообщения, не пополнили)\n` + again.join("\n"));
 }
 
 if (MODE === "drop") {
