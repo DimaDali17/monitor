@@ -91,6 +91,24 @@ const groupOfArt = (() => {
   return m;
 })();
 const lowerKeys = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k.toLowerCase(), v]));
+/* Инвентаризация действует, только пока остаток сырья в таблице такой же, как на её дату (inv.stock).
+   Остаток изменился — инвентаризация устарела, делим по пропорциям. Без inv.stock — действует всегда. */
+let invCache = { raw: null, ok: new Map() };
+export function invValid(g) {
+  if (!g || !g.inv) return false;
+  if (!g.inv.stock) return true;
+  if (invCache.raw !== sheets.raw) invCache = { raw: sheets.raw, ok: new Map() };
+  if (invCache.ok.has(g)) return invCache.ok.get(g);
+  let ok = true;
+  for (const [code, qty] of Object.entries(g.inv.stock)) {
+    const c = code.trim().toLowerCase();
+    let now = 0;
+    for (const [k, v] of Object.entries(sheets.raw)) if (k.split(";")[0] === c) now += +v || 0;
+    if (Math.round(now) !== Math.round(qty)) { ok = false; break; }
+  }
+  invCache.ok.set(g, ok);
+  return ok;
+}
 /* Доля пула rk, которая достаётся артикулу ka (0…1), или null — делить «по-старому» (на главного) */
 export function rawShare(rk, ka) {
   if (rawMode === "pool") return null;
@@ -102,7 +120,7 @@ export function rawShare(rk, ka) {
   const wOf = (u) => {
     const g = groupOfArt[u];
     if (!g) return 0;
-    const w = lowerKeys(rawMode === "inv" && g.inv ? g.inv.weights : g.prop);
+    const w = lowerKeys(rawMode === "inv" && invValid(g) ? g.inv.weights : g.prop);
     const tot = Object.values(w).reduce((a, b) => a + b, 0);
     return tot > 0 ? (w[u] || 0) / tot : 0;
   };
@@ -117,11 +135,12 @@ export function rawSplitInfo(ka) {
   if (rawMode === "pool") return null;
   const g = groupOfArt[ka];
   if (!g) return null;
-  const inv = rawMode === "inv" && g.inv;
+  const inv = rawMode === "inv" && invValid(g);
+  const stale = rawMode === "inv" && g.inv && !inv;
   /* реальная доля: сколько сырья досталось артикулу от всего его пула */
   const total = dedupRawTotal([ka]);
   const mine = getStocksForArt(ka).raw;
-  return { group: g.name, how: inv ? "инвентаризация " + g.inv.date : "пропорции", pct: total > 0 ? Math.round(mine / total * 100) : 0 };
+  return { group: g.name, how: inv ? "инвентаризация " + g.inv.date : stale ? `пропорции (инвентаризация ${g.inv.date} устарела — остаток сырья изменился)` : "пропорции", pct: total > 0 ? Math.round(mine / total * 100) : 0 };
 }
 
 function effPrimary(rk) {
