@@ -58,6 +58,15 @@ export function normSz(sz) {
   return m ? "X".repeat(parseInt(m[1], 10)) + "L" : s;
 }
 
+/* ── Ключи для сопоставления между таблицами ──
+   Русские буквы, похожие на латинские (А/A, В/B, С/C, Е/E, К/K, М/M, Н/H, О/O, Р/P, Т/T, У/Y, Х/X),
+   в ключах считаем одной буквой: «А1905» с русской и с английской «А» — один и тот же код.
+   Использование: строка.toLowerCase().replace(LAT_RE, latCh). Только для ключей, не для текста на экране. */
+const LAT_MAP = { "а": "a", "в": "b", "е": "e", "ё": "e", "к": "k", "м": "m", "н": "h", "о": "o", "р": "p", "с": "c", "т": "t", "у": "y", "х": "x" };
+export const LAT_RE = /[авеёкмнорстух]/g;
+export const latCh = (c) => LAT_MAP[c];
+export const nk = (s) => String(s ?? "").toLowerCase().replace(LAT_RE, latCh);
+
 /* ── Прочее ── */
 export function yestToHour(orders, type) {
   const now = new Date(), h = now.getHours(), m = now.getMinutes();

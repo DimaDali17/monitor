@@ -1,7 +1,7 @@
 import { RAW_SPLIT_GROUPS, RAW_SPLIT_DEFAULT, RAW_SAME_AS } from "../rawSplit.js";
 import { CSV_BUYRATE, CSV_RAW, CSV_MAP, CSV_NOMEN, CSV_NOMEN_2, CSV_SEASON, CSV_FBS_RULES, DEFAULT_BUYRATE } from "../config.js";
 import { applyFbsRulesSheet, FBS_RULES_SRC } from "../fbsRules.js";
-import { normSz } from "../utils.js";
+import { normSz, LAT_RE, latCh } from "../utils.js";
 
 /* ══════════════════════════════════════════════════════════
    Справочники: выкупаемость, сырьё + СГП, маппинг. Индексы строятся
@@ -47,7 +47,7 @@ function colorHex(raw) {
   return COLOR_MAP[k] || null;
 }
 
-const SGP_RE = /^СГП\s+/i;
+const SGP_RE = /^[СC]ГП\s+/i;   /* «С» в «СГП» — русская или английская */
 
 /* Число в конце артикула (…num1 → 1). Нет числа → в конец очереди. */
 function trailingNum(s) {
@@ -71,7 +71,7 @@ function primaryOf(users) {
 let rawScope = null;
 const effCache = new Map();
 export function setRawScope(arts) {
-  rawScope = arts ? new Set([...arts].map((a) => String(a || "").toLowerCase()).filter(Boolean)) : null;
+  rawScope = arts ? new Set([...arts].map((a) => String(a || "").toLowerCase().replace(LAT_RE, latCh)).filter(Boolean)) : null;
   effCache.clear();
 }
 /* ── Как делим общий пул сырья: pool | prop | inv (js/rawSplit.js) ──
@@ -85,12 +85,12 @@ export function setRawSplitMode(m) {
 const groupOfArt = (() => {
   const m = {};
   for (const g of RAW_SPLIT_GROUPS) {
-    for (const a of Object.keys(g.prop || {})) m[a.toLowerCase()] = g;
-    for (const a of Object.keys((g.inv && g.inv.weights) || {})) m[a.toLowerCase()] = g;
+    for (const a of Object.keys(g.prop || {})) m[a.toLowerCase().replace(LAT_RE, latCh)] = g;
+    for (const a of Object.keys((g.inv && g.inv.weights) || {})) m[a.toLowerCase().replace(LAT_RE, latCh)] = g;
   }
   return m;
 })();
-const lowerKeys = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k.toLowerCase(), v]));
+const lowerKeys = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k.toLowerCase().replace(LAT_RE, latCh), v]));
 /* Инвентаризация действует, только пока остаток сырья в таблице такой же, как на её дату (inv.stock).
    Остаток изменился — инвентаризация устарела, делим по пропорциям. Без inv.stock — действует всегда. */
 let invCache = { raw: null, ok: new Map() };
@@ -101,7 +101,7 @@ export function invValid(g) {
   if (invCache.ok.has(g)) return invCache.ok.get(g);
   let ok = true;
   for (const [code, qty] of Object.entries(g.inv.stock)) {
-    const c = code.trim().toLowerCase();
+    const c = code.trim().toLowerCase().replace(LAT_RE, latCh);
     let now = 0;
     for (const [k, v] of Object.entries(sheets.raw)) if (k.split(";")[0] === c) now += +v || 0;
     if (Math.round(now) !== Math.round(qty)) { ok = false; break; }
@@ -131,7 +131,7 @@ export function rawShare(rk, ka) {
 }
 /* Как делится пул артикула — для подсказки в ячейке «Сырьё» */
 export function rawSplitInfo(ka) {
-  ka = (ka || "").toLowerCase();
+  ka = (ka || "").toLowerCase().replace(LAT_RE, latCh);
   if (rawMode === "pool") return null;
   const g = groupOfArt[ka];
   if (!g) return null;
@@ -252,7 +252,7 @@ export function loadExternal() {
 
       /* Выкупаемость */
       parseCSV(rB).forEach((row) => {
-        const art = (row["supplierArticle"] || "").toLowerCase();
+        const art = (row["supplierArticle"] || "").toLowerCase().replace(LAT_RE, latCh);
         const p = (row["Выкупаемость"] || "").replace("%", "").trim();
         if (art && p) sheets.buyrate[art] = parseFloat(p) / 100;
       });
@@ -273,7 +273,7 @@ export function loadExternal() {
       const parseNomen = (txt) => {
         let n = 0;
         parseCSV(txt).forEach((row) => {
-          const art = col(row, "Артикул поставщика", "Артикул продавца", "Артикул").toLowerCase();
+          const art = col(row, "Артикул поставщика", "Артикул продавца", "Артикул").toLowerCase().replace(LAT_RE, latCh);
           if (!art) return;
           const predmet = col(row, "Предмет");
           const kratko = col(row, "Кратко", "Группа");
@@ -313,7 +313,7 @@ export function loadExternal() {
         /* Сколько штук сырья в одном наборе (готовом артикуле ВБ). Пусто/1 — не делим. */
         const setN = parseInt(row["В наборе штук"] || row["В набор штук"] || "1", 10) || 1;
         if (artPr && setN > 1) {
-          const rkSet = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+          const rkSet = artPr.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh);
           sheets.setByRawKey[rkSet] = setN;
         }
         /* «Арт ВБ»/«Арт ВБ2» могут содержать несколько артикулов через перенос
@@ -325,9 +325,9 @@ export function loadExternal() {
           if (!artPr) return;
           String(cell || "").split(/[\r\n]+/).map((x) => x.trim()).filter(Boolean)
             .forEach((wbArt) => {
-              const k = wbArt.toLowerCase() + ";" + szWB.toLowerCase();
+              const k = wbArt.toLowerCase().replace(LAT_RE, latCh) + ";" + szWB.toLowerCase().replace(LAT_RE, latCh);
               (sheets.map[k] ||= []).push({ artPr, szPr, col });
-              sheets.artDisplay[wbArt.toLowerCase()] = wbArt;
+              sheets.artDisplay[wbArt.toLowerCase().replace(LAT_RE, latCh)] = wbArt;
             });
         };
         pushLinks(row["Арт ВБ"], 1);
@@ -342,9 +342,9 @@ export function loadExternal() {
         const forceRaw = String(row["Пул на"] || row["Главный"] || "").trim();
         if (artPr && forceRaw) {
           const [fa, fc] = forceRaw.split(":");
-          const rkF = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+          const rkF = artPr.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh);
           const cap = fc != null && String(fc).trim() !== "" ? (parseInt(fc, 10) || null) : null;
-          sheets.rawPrimaryForce[rkF] = { art: (fa || "").trim().toLowerCase(), cap };
+          sheets.rawPrimaryForce[rkF] = { art: (fa || "").trim().toLowerCase().replace(LAT_RE, latCh), cap };
         }
       });
 
@@ -359,16 +359,16 @@ export function loadExternal() {
         if (SGP_RE.test(art)) {
           const wbArt = art.replace(SGP_RE, "").trim();
           if (!wbArt || !qty) return;
-          const k = wbArt.toLowerCase() + ";" + normSz(sz).toLowerCase();
+          const k = wbArt.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(sz).toLowerCase().replace(LAT_RE, latCh);
           sheets.sgp[k] = (sheets.sgp[k] || 0) + qty;
           return;
         }
 
-        const kSz = normSz(sz).toLowerCase();
-        const k = art.toLowerCase() + ";" + kSz;
+        const kSz = normSz(sz).toLowerCase().replace(LAT_RE, latCh);
+        const k = art.toLowerCase().replace(LAT_RE, latCh) + ";" + kSz;
         sheets.raw[k] = (sheets.raw[k] || 0) + qty;
-        if (art.toLowerCase().includes(" nobrand")) {
-          const k2 = art.toLowerCase().replace(" nobrand", "").trim() + ";" + kSz;
+        if (art.toLowerCase().replace(LAT_RE, latCh).includes(" nobrand")) {
+          const k2 = art.toLowerCase().replace(LAT_RE, latCh).replace(" nobrand", "").trim() + ";" + kSz;
           sheets.raw[k2] = (sheets.raw[k2] || 0) + qty;
         }
       });
@@ -376,7 +376,7 @@ export function loadExternal() {
       /* «То же сырьё, что у …» (js/rawSplit.js): привязку артикула из «Арт производ»
          заменяем привязкой старшего — по тем же размерам. */
       for (const [art0, anchor0] of Object.entries(RAW_SAME_AS)) {
-        const art = art0.toLowerCase(), anchor = anchor0.toLowerCase();
+        const art = art0.toLowerCase().replace(LAT_RE, latCh), anchor = anchor0.toLowerCase().replace(LAT_RE, latCh);
         for (const k of Object.keys(sheets.map)) if (k.split(";")[0] === art) delete sheets.map[k];
         for (const [k, v] of Object.entries(sheets.map)) {
           const [a, z] = k.split(";");
@@ -438,7 +438,7 @@ function buildIndexes() {
     const wbArt = k.split(";")[0];
     (seenPerArt[wbArt] ||= new Set());
     for (const { artPr, szPr, col } of mappings) {
-      const kp = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+      const kp = artPr.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh);
       /* приоритет главного: артикулы из колонки «Арт ВБ» (col=1) — вне дедупа,
          чтобы пометка не потерялась, если артикул есть и в «Арт ВБ», и в «Арт ВБ2» */
       if (col === 1) (sheets.rawPrimaryCol[kp] ||= new Set()).add(wbArt);
@@ -447,7 +447,7 @@ function buildIndexes() {
       (sheets.rawKeysByArt[wbArt] ||= new Set()).add(kp);
       (sheets.rawUsers[kp] ||= new Set()).add(wbArt);
 
-      const rk = wbArt + ";" + normSz(szPr).toLowerCase();
+      const rk = wbArt + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh);
       if (!sheets.revMap[rk]) sheets.revMap[rk] = k.split(";")[1] || "";
     }
   }
@@ -491,7 +491,7 @@ function buildIndexes() {
 /* ── Выкупаемость (мемоизирована) ── */
 export function getBuyrate(art) {
   if (!art) return { val: DEFAULT_BUYRATE, est: true };
-  const k = art.toLowerCase();
+  const k = art.toLowerCase().replace(LAT_RE, latCh);
   if (buyrateCache.has(k)) return buyrateCache.get(k);
 
   let res = { val: DEFAULT_BUYRATE, est: true };
@@ -508,13 +508,13 @@ export function getBuyrate(art) {
 
 /* ── Остатки СГП/Сырьё ── */
 export function getStocksForSz(wbArt, wbSz) {
-  const ka = (wbArt || "").toLowerCase();
-  const kzRaw = (wbSz || "").toLowerCase();            /* маппинг хранит сырой размер ВБ */
-  const kzNorm = normSz(wbSz || "").toLowerCase();     /* СГП хранится нормализованным */
+  const ka = (wbArt || "").toLowerCase().replace(LAT_RE, latCh);
+  const kzRaw = (wbSz || "").toLowerCase().replace(LAT_RE, latCh);            /* маппинг хранит сырой размер ВБ */
+  const kzNorm = normSz(wbSz || "").toLowerCase().replace(LAT_RE, latCh);     /* СГП хранится нормализованным */
   const sgp = sheets.sgp[ka + ";" + kzNorm] || 0;
   let raw = 0;
   for (const { artPr, szPr } of sheets.map[ka + ";" + kzRaw] || []) {
-    const rk = artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase();
+    const rk = artPr.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh);
     const sh = rawShare(rk, ka);
     if (sh != null) { raw += rawSets(rk) * sh; continue; }   /* пул делится по пропорциям/инвентаризации */
     const pr = effPrimary(rk);
@@ -525,7 +525,7 @@ export function getStocksForSz(wbArt, wbSz) {
 }
 
 export function getStocksForArt(wbArt) {
-  const ka = (wbArt || "").toLowerCase();
+  const ka = (wbArt || "").toLowerCase().replace(LAT_RE, latCh);
   if (!rawScope && rawMode === "pool") return { sgp: sheets.sgpByArt[ka] || 0, raw: sheets.rawByArt[ka] || 0 };
   let raw = 0;
   for (const rk of sheets.rawKeysByArt[ka] || []) {
@@ -540,7 +540,7 @@ export function getStocksForArt(wbArt) {
    rawDebug("TermSocks.Al-ESS.black.01") — покажет все ключи сырья, их остаток,
    делитель «В наборе штук», кто назначен главным и что реально идёт в сумму. */
 export function rawDebug(wbArt) {
-  const ka = (wbArt || "").toLowerCase();
+  const ka = (wbArt || "").toLowerCase().replace(LAT_RE, latCh);
   const keys = sheets.rawKeysByArt[ka] ? [...sheets.rawKeysByArt[ka]].sort() : [];
   console.log(`=== Сырьё для «${wbArt}» ===  (rawByArt = ${sheets.rawByArt[ka] || 0})`);
   let total = 0;
@@ -563,30 +563,30 @@ if (typeof window !== "undefined") window.rawDebug = rawDebug;
 
 /* Как артикул записан в справочнике (для подсказок). */
 export function artDisp(a) {
-  const ka = (a || "").toLowerCase();
+  const ka = (a || "").toLowerCase().replace(LAT_RE, latCh);
   return sheets.artDisplay[ka] || a || "";
 }
 
 /* Группа спроса по артикулу поставщика: { predmet, kratko } или null. */
 export function artGroup(art) {
-  return sheets.nomen[(art || "").toLowerCase()] || null;
+  return sheets.nomen[(art || "").toLowerCase().replace(LAT_RE, latCh)] || null;
 }
 
 /* Сезон по артикулу поставщика: "winter" | "summer" | null. */
 export function artSeason(art) {
-  const g = sheets.nomen[(art || "").toLowerCase()];
+  const g = sheets.nomen[(art || "").toLowerCase().replace(LAT_RE, latCh)];
   return g ? (g.season || null) : null;
 }
 
 /* Цвет артикула (hex из справочника) или null. */
 export function artColor(art) {
-  const g = sheets.nomen[(art || "").toLowerCase()];
+  const g = sheets.nomen[(art || "").toLowerCase().replace(LAT_RE, latCh)];
   return g ? (g.color || null) : null;
 }
 
 /* Другие артикулы ВБ, делящие пул сырья с wbArt (пусто — если сырьё эксклюзивно). */
 export function rawSharedWith(wbArt) {
-  const ka = (wbArt || "").toLowerCase();
+  const ka = (wbArt || "").toLowerCase().replace(LAT_RE, latCh);
   const sibs = new Set();
   for (const rk of sheets.rawKeysByArt[ka] || []) {
     const users = sheets.rawUsers[rk];
@@ -598,7 +598,7 @@ export function rawSharedWith(wbArt) {
 /* Главный артикул пула, на котором лежит сырьё для wbArt (если wbArt — спутник).
    Если wbArt сам главный или пул не общий — вернёт его же. */
 export function rawPrimaryFor(wbArt) {
-  const ka = (wbArt || "").toLowerCase();
+  const ka = (wbArt || "").toLowerCase().replace(LAT_RE, latCh);
   for (const rk of sheets.rawKeysByArt[ka] || []) {
     const users = sheets.rawUsers[rk];
     if (rawShare(rk, ka) != null) continue;   /* пул поделён — у артикула своя доля, «спутника» нет */
@@ -613,7 +613,7 @@ export function rawPrimaryFor(wbArt) {
 export function dedupRawTotal(wbArts) {
   const keys = new Set();
   for (const a of wbArts) {
-    for (const rk of sheets.rawKeysByArt[(a || "").toLowerCase()] || []) keys.add(rk);
+    for (const rk of sheets.rawKeysByArt[(a || "").toLowerCase().replace(LAT_RE, latCh)] || []) keys.add(rk);
   }
   let sum = 0;
   for (const rk of keys) sum += rawSets(rk); /* в наборах */
@@ -623,11 +623,11 @@ export function dedupRawTotal(wbArts) {
 /* Сырьё пула для размера — у всех артикулов из списка, каждый пул один раз и
    независимо от того, у какого артикула пул «показан». Для проверки «FBS завышен». */
 export function rawPoolForSz(wbArts, wbSz) {
-  const kz = (wbSz || "").toLowerCase();
+  const kz = (wbSz || "").toLowerCase().replace(LAT_RE, latCh);
   const keys = new Set();
   for (const a of wbArts) {
-    for (const { artPr, szPr } of sheets.map[(a || "").toLowerCase() + ";" + kz] || []) {
-      keys.add(artPr.toLowerCase() + ";" + normSz(szPr).toLowerCase());
+    for (const { artPr, szPr } of sheets.map[(a || "").toLowerCase().replace(LAT_RE, latCh) + ";" + kz] || []) {
+      keys.add(artPr.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(szPr).toLowerCase().replace(LAT_RE, latCh));
     }
   }
   let sum = 0;
@@ -642,6 +642,6 @@ export function parseOzonArt(offerId) {
   if (i < 0) return { baseArt: s, ozSz: "", wbSz: "" };
   const baseArt = s.slice(0, i);
   const ozSz = s.slice(i + 1);
-  const rk = baseArt.toLowerCase() + ";" + normSz(ozSz).toLowerCase();
+  const rk = baseArt.toLowerCase().replace(LAT_RE, latCh) + ";" + normSz(ozSz).toLowerCase().replace(LAT_RE, latCh);
   return { baseArt, ozSz, wbSz: sheets.revMap[rk] || ozSz };
 }

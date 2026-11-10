@@ -1,6 +1,6 @@
 import { VM, DS, OAD, EXD, FA, DRW } from "../state.js";
 import { LIM } from "../config.js";
-import { esc, q, szCmp, fmtDays, pct, normSz } from "../utils.js";
+import { esc, q, szCmp, fmtDays, pct, normSz, nk } from "../utils.js";
 import { poolMates } from "../fbsRules.js";
 import { rawPoolForSz } from "../api/sheets.js";
 import { sheets, getBuyrate, getStocksForArt, getStocksForSz, rawSharedWith, rawPrimaryFor, dedupRawTotal, artDisp, artSeason, rawSplitMode, rawSplitInfo } from "../api/sheets.js";
@@ -298,10 +298,10 @@ export function defTbl(n, opts) {
   /* Размеры, которых нет в стоках WB, но есть в СГП/сырье */
   for (const [mapKey] of Object.entries(sheets.map)) {
     const [wbArt, wbSz] = mapKey.split(";");
-    const artName = Object.keys(byArt).find((a) => a.toLowerCase() === wbArt);
+    const artName = Object.keys(byArt).find((a) => nk(a) === wbArt);
     if (!artName) continue;
     const g = byArt[artName];
-    if (g.sizes.some((s) => (s.sz || "").toLowerCase() === wbSz)) continue;
+    if (g.sizes.some((s) => nk(s.sz) === wbSz)) continue;
     const { sgp, raw } = getStocksForSz(artName, wbSz);
     if (sgp > 0 || raw > 0) {
       g.sizes.push({ art: artName, sz: wbSz, name: g.name, total: 0, wh: {}, o7: 0, msk: 0 });
