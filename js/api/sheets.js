@@ -103,7 +103,7 @@ export function invValid(g) {
   for (const [code, qty] of Object.entries(g.inv.stock)) {
     const c = code.trim().toLowerCase().replace(LAT_RE, latCh);
     let now = 0;
-    for (const [k, v] of Object.entries(sheets.raw)) if (k.split(";")[0] === c) now += +v || 0;
+    for (const [k, v] of Object.entries(sheets.raw)) if (k.split(";")[0].replace(LAT_RE, latCh) === c) now += +v || 0;
     if (Math.round(now) !== Math.round(qty)) { ok = false; break; }
   }
   invCache.ok.set(g, ok);
