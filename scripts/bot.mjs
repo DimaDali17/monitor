@@ -301,7 +301,7 @@ if ((MODE === "morning" || MODE === "penalties") && !process.env.BOT_FAKE) {
 /* ── Поставки FBW: за 96 ч до дня поставки + смена статуса (каждый час) ── */
 if (["morning", "fbs", "drop", "supplies"].includes(MODE) && !process.env.BOT_FAKE) {
   try {
-    const out = await checkSupplies({ WORKER, authHeader, cabName, fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "sup.json") });
+    const out = await checkSupplies({ WORKER, authHeader, cabName, fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "sup.json"), daily: MODE === "morning" || MODE === "supplies" });
     for (const text of out) msgs.push({ link: false, text });
   } catch (e) {
     problems.push(`⚠️ Поставки: проверка не удалась — ${esc(e.message)}`);

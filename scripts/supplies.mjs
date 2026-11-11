@@ -7,6 +7,8 @@
    1) ⏰ Предупреждение: до 00:00 (МСК) дня, на который запланирована поставка, осталось 96 часов
       или меньше — пишем один раз по каждой поставке (статусы «Запланировано», «Отгрузка разрешена»).
    2) 🔄 Смена статуса поставки — пишем при каждом изменении. Первая проверка только запоминает статусы.
+   3) 📦 Каждое утро (daily) — все поставки, до дня которых ≤ 96 ч, и сколько часов осталось,
+      пока день поставки не прошёл (в сам день — «сегодня»).
    Память — .bot-state/sup.json.
    ══════════════════════════════════════════════════════════ */
 
@@ -21,7 +23,7 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 const mskDate = (s) => { const t = Date.parse(s); if (!t) return "—"; const d = new Date(t + 3 * 3600e3); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
 const nf = (x) => Math.round(+x || 0).toLocaleString("ru-RU").replace(/ /g, " ");
 
-export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs, now = Date.now() }) {
+export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs, now = Date.now(), daily = false }) {
   let state = { warned: {}, status: {} };
   try { state = { warned: {}, status: {}, ...JSON.parse(fs.readFileSync(statePath, "utf8")) }; } catch { /* первый запуск */ }
   const first = !state.ran;
@@ -49,7 +51,7 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
   };
   state.fails ||= {};   /* сколько проверок подряд кабинет не проверился */
 
-  const warn = [], changed = [], errors = [];
+  const warn = [], changed = [], errors = [], remind = [];
   for (const cab of SUPPLY_CABS) {
     let list = [];
     try {
@@ -77,13 +79,19 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
       if (t0 && hours > 0 && hours <= WARN_HOURS && [2, 3].includes(st) && !state.warned[key]) { state.warned[key] = isoDay(now); why = "warn"; }
       /* 2) смена статуса (не в первую проверку) */
       const statusChanged = !first && prev != null && prev !== st;
-      if (!why && !statusChanged) continue;
+      /* 3) утренняя сводка: до дня поставки ≤ 96 ч или уже сегодня; кроме тех, о ком пишем прямо сейчас */
+      const soon = daily && t0 && hours > -24 && hours <= WARN_HOURS && [2, 3].includes(st) && why !== "warn";
+      if (!why && !statusChanged && !soon) continue;
       let det = {};
       try { det = (await call(cab, "GET", `${HOST}/api/v1/supplies/${id}${s.supplyID ? "" : "?isPreorderID=true"}`)) || {}; } catch { /* без деталей */ }
       const no = s.supplyID ? `№${s.supplyID}` : `заказ №${s.preorderID}`;
       const wh = det.actualWarehouseName || det.warehouseName || "";
       const qty = det.quantity != null ? `${nf(det.quantity)} шт` : "";
       const base = `<b>${esc(cabName(cab))}</b> · поставка ${no}${wh ? ` → ${esc(wh)}` : ""}${qty ? `, ${qty}` : ""}${BOX[s.boxTypeID] ? `, ${BOX[s.boxTypeID]}` : ""}`;
+      if (soon) {
+        const left = hours <= 0 ? "<b>сегодня</b>" : `осталось <b>${Math.floor(hours)} ч</b>${hours >= 24 ? ` (${Math.floor(hours / 24)} дн. ${Math.floor(hours % 24)} ч)` : ""}`;
+        remind.push({ t0, text: `${base}\nплановая дата ${mskDate(s.supplyDate)} — ${left} · ${esc(STATUS[st] || st)}` });
+      }
       if (why === "warn") {
         const d = Math.floor(hours / 24), h = Math.floor(hours % 24);
         warn.push(`${base}\nплановая дата ${mskDate(s.supplyDate)} — осталось ${d ? `${d} дн. ` : ""}${h} ч · ${esc(STATUS[st] || st)}`);
@@ -109,6 +117,7 @@ export async function checkSupplies({ WORKER, authHeader, cabName, statePath, fs
 
   const out = [];
   if (warn.length) out.push(`⏰ <b>До поставки ${WARN_HOURS} ч или меньше</b> (считаем до 00:00 дня поставки)\n\n` + warn.join("\n\n"));
+  if (remind.length) out.push(`📦 <b>Поставки в ближайшие ${WARN_HOURS} ч</b> (до 00:00 дня поставки)\n\n` + remind.sort((a, b) => a.t0 - b.t0).map((x) => x.text).join("\n\n"));
   if (changed.length) out.push(`🔄 <b>Статус поставки изменился</b>\n\n` + changed.join("\n\n"));
   /* устойчивую ошибку (например, нет токена) — не чаще раза в день */
   if (errors.length && state.errDay !== isoDay(now)) {
