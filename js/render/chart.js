@@ -2,10 +2,22 @@ import { CM, CV, CP, CD, GB, FP, FG } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
 
-/* Контрастная палитра под топ-5 категорий + серый для «Прочее» */
-const PAL = ["#C0504D", "#4F81BD", "#9BBB59", "#8064A2", "#E0A030"];
-const OTHER = "#B8B2A7";
-const BAR = "#6B6357", FUT = "#E8E4DC", GHOST = "#C7C2B6";
+/* Палитра под топ-5 категорий + тёплый серый для «Прочее» (спокойные, но различимые тона) */
+const PAL = ["#E07A5F", "#3D7EAA", "#7FB069", "#8E7DBE", "#E9A93B"];
+const OTHER = "#CEC6B9";
+const BAR = "#7A6E5F", FUT = "#E8E4DC", GHOST = "#D3CDC1";
+
+/* Столбик со скруглённым верхом (низ прямой — стоит на оси) */
+const barPath = (x, y, w, h, r = 4) => {
+  if (h <= 0) return "";
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+};
+/* Мягкий вертикальный градиент: сверху чуть светлее */
+const gradDefs = (id, colors) => `<defs>${colors.map((c, k) =>
+  `<linearGradient id="${id}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".78"/><stop offset="1" stop-color="${c}"/></linearGradient>`).join("")}</defs>`;
+/* Наведение на столбик — остальные приглушаются */
+const HOVER_CSS = `<style>.cc .bcol{transition:opacity .15s}.cc:hover .bcol{opacity:.5}.cc .bcol:hover{opacity:1}</style>`;
 const PRICE = "#1F1B16";   /* линия «Цена на сайте» */
 const rub = (v) => Math.round(v).toLocaleString("ru") + " ₽";
 const PRICE_MIN_SPAN = 0.6;   /* минимальный размах шкалы цены: 60% от средней (±30%) */
@@ -64,6 +76,7 @@ export function chartHTML(n, vm, type) {
     if (seg != null) { const a = ((pSeg[seg] ||= {})[i] ||= [0, 0]); a[0] += rubles; a[1] += qty; }
   };
 
+  const topY = [];   /* где стоит подпись итога над столбиком — чтобы подпись цены на неё не налезала */
   const W = 700, H = 155, L = 38, R = showPrice ? 40 : 10, T = 13, B = 20;
   const cW = W - L - R, cH = H - T - B;
   const gW = cW / N;
@@ -74,7 +87,7 @@ export function chartHTML(n, vm, type) {
     [0, Math.round(max / 2), max].forEach((v) => {
       const y = T + cH - (v / max) * cH;
       out += `<text x="${L - 3}" y="${y + 3}" text-anchor="end" font-size="7" fill="var(--ink3)">${fv(v)}</text>` +
-        `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
+        `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--border2)" stroke-width="0.5"${v ? ` stroke-dasharray="2 3"` : ""}/>`;
     });
     return out;
   };
@@ -132,7 +145,11 @@ export function chartHTML(n, vm, type) {
         if (parts.length > 1) tip += "\n" + parts.join("\n");
       }
       out += `<circle cx="${x(p.i)}" cy="${y(p.v)}" r="2.3" fill="#fff" stroke="${PRICE}" stroke-width="1.2"><title>${esc(tip)}</title></circle>`;
-      if (lbl.has(p.i)) out += `<text x="${x(p.i)}" y="${y(p.v) + 9}" text-anchor="middle" font-size="6.5" fill="${PRICE}" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="2">${Math.round(p.v).toLocaleString("ru")}</text>`;
+      /* подпись цены — под точкой; если там подпись столбика — над точкой */
+      let ly = y(p.v) + 9;
+      if (topY[p.i] != null && Math.abs(ly - topY[p.i]) < 9) ly = y(p.v) - 5;
+      if (topY[p.i] != null && Math.abs(ly - topY[p.i]) < 9) ly = y(p.v) + 9 + (ly < topY[p.i] ? -18 : 9);
+      if (lbl.has(p.i)) out += `<text x="${x(p.i)}" y="${ly}" text-anchor="middle" font-size="6.5" fill="${PRICE}" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="2">${Math.round(p.v).toLocaleString("ru")}</text>`;
     }
     return out;
   };
@@ -213,18 +230,21 @@ export function chartHTML(n, vm, type) {
         if (cur[i] > 0) tops += `<text x="${tx + pW / 2}" y="${T + cH - tH - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(cur[i])}</text>`;
       }
     } else {
-      const bW = Math.max(2, Math.floor(gW * 0.55));
+      const bW = Math.max(2, Math.floor(gW * 0.6));
+      bars += gradDefs(`cb${n}_`, [BAR]);
       for (let i = 0; i < N; i++) {
         const bH = (cur[i] / max) * cH, bx = L + i * gW + (gW - bW) / 2, by = T + cH - bH;
-        bars += `<rect x="${bx}" y="${by}" width="${bW}" height="${bH}" rx="2" fill="${BAR}" opacity=".9"/>`;
-        if (cur[i] > 0) tops += `<text x="${bx + bW / 2}" y="${by - 3}" text-anchor="middle" font-size="${lblFs}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(cur[i])}</text>`;
+        bars += `<g class="bcol"><rect x="${bx}" y="${T}" width="${bW}" height="${cH}" rx="4" fill="var(--bg)" opacity=".6"/>` +
+          `<path d="${barPath(bx, by, bW, bH, Math.min(5, bW / 4))}" fill="url(#cb${n}_0)"><title>${labelOf(i)}: ${fv(cur[i])}</title></path></g>`;
+        if (cur[i] > 0) topY[i] = by - 4;
+        if (cur[i] > 0) tops += `<text x="${bx + bW / 2}" y="${by - 4}" text-anchor="middle" font-size="${lblFs + 1}" fill="var(--ink)" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="2.5">${fv(cur[i])}</text>`;
       }
     }
     return `<div class="sec" style="margin-bottom:14px">
       <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName}${ghost ? ` <span style="color:var(--ink3);font-weight:400;font-size:11px">· серым — вчера</span>` : ""}</span>${controls}</div>
       <div class="tw" style="padding:8px">
         ${priceLegend()}
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${priceLine()}${tops}${xLabels()}</svg>
+        <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine()}${tops}${xLabels()}</svg>
       </div>
     </div>`;
   }
@@ -288,16 +308,26 @@ export function chartHTML(n, vm, type) {
   let max = 1;
   for (let i = 0; i < N; i++) { let s = 0; segOrder.forEach((k) => (s += per[k][i])); if (s > max) max = s; }
 
-  let bars = "", tops = "";
+  /* Столбик: подложка на всю высоту, сегменты с тонким просветом, верхний — со скруглением */
+  const gid = `cg${n}_`;
+  let bars = gradDefs(gid, segOrder.map(colorOf)), tops = "";
   for (let i = 0; i < N; i++) {
-    const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.6)), bx = gx + (gW - bW) / 2;
-    let yAcc = T + cH, colTot = 0;
-    segOrder.forEach((seg) => {
-      const v = per[seg][i]; if (v <= 0) return;
-      const h = (v / max) * cH; yAcc -= h; colTot += v;
-      bars += `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${h}" fill="${colorOf(seg)}" opacity="0.95"><title>${esc(seg)}: ${fv(v)}</title></rect>`;
+    const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.62)), bx = gx + (gW - bW) / 2;
+    const segs = segOrder.map((seg, k) => ({ seg, k, v: per[seg][i] })).filter((x) => x.v > 0);
+    const colTot = segs.reduce((a, x) => a + x.v, 0);
+    let yAcc = T + cH, col = `<rect x="${bx}" y="${T}" width="${bW}" height="${cH}" rx="4" fill="var(--bg)" opacity=".6"/>`;
+    segs.forEach((x, j) => {
+      const h = (x.v / max) * cH; yAcc -= h;
+      const gap = j > 0 && h > 3 ? 1 : 0;                 /* просвет между сегментами */
+      const isTop = j === segs.length - 1;
+      const tip = `${labelOf(i)} · ${x.seg}: ${fv(x.v)} (${Math.round((x.v / colTot) * 100)}%)`;
+      col += isTop
+        ? `<path d="${barPath(bx, yAcc, bW, h - gap, Math.min(5, bW / 4))}" fill="url(#${gid}${x.k})"><title>${esc(tip)}</title></path>`
+        : `<rect x="${bx}" y="${yAcc}" width="${bW}" height="${Math.max(0, h - gap)}" fill="url(#${gid}${x.k})"><title>${esc(tip)}</title></rect>`;
     });
-    if (colTot > 0) tops += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 3}" text-anchor="middle" font-size="${mode === "month" ? 6 : 7}" fill="var(--ink)" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="2">${fv(colTot)}</text>`;
+    bars += `<g class="bcol">${col}</g>`;
+    if (colTot > 0) topY[i] = T + cH - (colTot / max) * cH - 4;
+    if (colTot > 0) tops += `<text x="${bx + bW / 2}" y="${T + cH - (colTot / max) * cH - 4}" text-anchor="middle" font-size="${mode === "month" ? 6.5 : 8}" fill="var(--ink)" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="2.5">${fv(colTot)}</text>`;
   }
 
   const levelName = level === 1 ? "по предметам" : level === 2 ? "по группам" : "по артикулам";
@@ -306,14 +336,14 @@ export function chartHTML(n, vm, type) {
   const shortName = (s) => (s.length > 22 ? "…" + s.slice(-21) : s);
   const legend = segOrder.map((seg) =>
     `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink2);white-space:nowrap">
-      <span style="flex:0 0 9px;width:9px;height:9px;border-radius:2px;background:${colorOf(seg)}"></span>${esc(shortName(seg))}</span>`
+      <span style="flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:${colorOf(seg)}"></span>${esc(shortName(seg))}</span>`
   ).join("");
 
   return `<div class="sec" style="margin-bottom:14px">
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName} · раскрывается сверху в «Структуре спроса»</span></span>${controls}</div>
     <div class="tw" style="padding:8px">
       <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${legend}${priceLegend(true)}</div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${axis(max)}${bars}${priceLine(segOrder)}${tops}${xLabels()}</svg>
+      <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine(segOrder)}${tops}${xLabels()}</svg>
     </div>
   </div>`;
 }
