@@ -48,7 +48,8 @@ export const FBS_RULES = [
 /* ── Правила из Google-таблицы (вкладка «FBS правила», CSV_FBS_RULES в config.js) ──
    Колонки: Кабинет | Название | Правило | Артикулы | Кроме
      Кабинет  — Easyform / EZFR (пусто — оба)
-     Правило  — «все склады», «кроме МСК», «только Пятигорск», «0 на FBS»
+     Правило  — «все склады», «кроме МСК», «только Пятигорск», «0 на FBS»;
+                «стоп» — эти артикулы бот не упоминает ни в одном сообщении Telegram
      Артикулы — через запятую; «TermoMai.*» — все артикулы, начинающиеся с TermoMai.
      Кроме    — артикулы, которые правило не трогает (через запятую)
    Срабатывает первая подходящая строка сверху, поэтому «0 на FBS» ставим выше общих.
@@ -58,6 +59,7 @@ export const FBS_RULES_SRC = { from: "code", count: FBS_RULES.length, bad: [], e
 const ruleCode = (t) => {
   const s = String(t || "").trim().toLowerCase().replace(/ё/g, "е");
   if (!s) return null;
+  if (/^(стоп|stop)/.test(s)) return "stop";
   if (/^(none|0|нет)\b|^0 на|fbo/.test(s)) return "none";
   if (/exmsk|кроме\s*(мск|моск)/.test(s)) return "exMsk";
   if (/pyat|пятигорск/.test(s)) return "pyat";
@@ -76,21 +78,24 @@ const list = (t) => String(t || "").split(/[,;\n]+/).map((x) => x.trim()).filter
 /* rows — строки CSV объектами {заголовок: значение}. Есть хоть одно верное правило — заменяем список. */
 export function applyFbsRulesSheet(rows) {
   const get = (r, ...names) => { const k = Object.keys(r).find((x) => names.includes(x.trim().toLowerCase())); return k ? String(r[k] || "").trim() : ""; };
-  const out = [], bad = [];
+  const out = [], bad = [], stop = [];
   rows.forEach((r, i) => {
     const arts = list(get(r, "артикулы", "артикул"));
     const rawRule = get(r, "правило");
     if (!arts.length && !rawRule) return;                     /* пустая строка */
-    const rule = ruleCode(rawRule), cab = cabCode(get(r, "кабинет", "ип"));
     const name = get(r, "название", "группа") || arts[0] || "";
+    /* «стоп» в Правиле (или пустое Правило и Название «Стоп …») — артикулы не пишем в Telegram */
+    const rule = ruleCode(rawRule) || (!rawRule && /^\s*(стоп|stop)/i.test(name) ? "stop" : null), cab = cabCode(get(r, "кабинет", "ип"));
     if (!arts.length || !rule || cab < 0) {
       bad.push(`строка ${i + 2}${name ? " (" + name + ")" : ""}: ${!arts.length ? "нет артикулов" : !rule ? `правило «${rawRule}» не понял` : "кабинет не понял"}`);
       return;
     }
     const ex = list(get(r, "кроме", "исключить", "exclude"));
+    if (rule === "stop") { stop.push({ cab, name, arts, ...(ex.length ? { exclude: ex } : {}) }); return; }
     out.push({ cab, name, rule, arts, ...(ex.length ? { exclude: ex } : {}) });
   });
   FBS_RULES_SRC.bad = bad;
+  STOP_LIST.splice(0, STOP_LIST.length, ...stop);
   if (out.length) { FBS_RULES.splice(0, FBS_RULES.length, ...out); FBS_RULES_SRC.from = "sheet"; FBS_RULES_SRC.count = out.length; }
   return out.length;
 }
@@ -135,6 +140,15 @@ export const isPyat = (wh) => /пятигорск/i.test(wh || "");
 /* Ozon (кабинет 3): у Ozon свои артикулы, но товары те же — сравниваем по базовому
    артикулу (без хвоста размера «_XL») и берём правила обоих ИП. */
 export const ozBase = (x) => { const s = String(x || ""); const i = s.lastIndexOf("_"); return i > 0 ? s.slice(0, i) : s; };
+/* Стоп-артикулы (строки «стоп» во вкладке правил): бот не пишет о них в Telegram. На монитор не влияют. */
+export const STOP_LIST = [];
+const artMatch = (a, list) => list.some((x) => { const p = x.toLowerCase(); return p.endsWith("*") ? a.startsWith(p.slice(0, -1)) : p === a; });
+export function isStopped(art, n) {
+  const a = String(n === 3 ? ozBase(art) : art || "").trim().toLowerCase();
+  if (!a) return false;
+  return STOP_LIST.some((r) => (!r.cab || n === 3 || r.cab === n) && !artMatch(a, r.exclude || []) && artMatch(a, r.arts));
+}
+
 export function ruleFor(art, n) {
   const a = String(n === 3 ? ozBase(art) : art || "").trim().toLowerCase();
   for (const r of FBS_RULES) {

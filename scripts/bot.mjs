@@ -49,7 +49,7 @@ const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
 const { defTbl, statusKey } = await import("../js/render/deficit.js");
 const { fbsRows } = await import("../js/render/stocks.js");
-const { whRequired, ozBase } = await import("../js/fbsRules.js");
+const { whRequired, ozBase, isStopped, STOP_LIST } = await import("../js/fbsRules.js");   /* isStopped — «стоп» во вкладке правил: в Telegram не пишем */
 const { wbPrice, ozRev } = await import("../js/utils.js");
 const fs = await import("node:fs");
 const STATE = process.env.BOT_STATE || ".bot-state/fbs.json";
@@ -145,8 +145,8 @@ if (MODE === "morning") {
     totC += yC; totR += yR;
     lines.push(`${esc(cabName(n))}: ${yC} зак. · ${rub(yR)}`);
     for (const o of y) {
-      if (d.isOz) for (const p of o.products || []) { const a = ozBase(p.offer_id); top[a] = (top[a] || 0) + (p.quantity || 1); }
-      else top[o.supplierArticle] = (top[o.supplierArticle] || 0) + (o.quantity || 1);
+      if (d.isOz) for (const p of o.products || []) { const a = ozBase(p.offer_id); if (!isStopped(a, 3)) top[a] = (top[a] || 0) + (p.quantity || 1); }
+      else if (!isStopped(o.supplierArticle, n)) top[o.supplierArticle] = (top[o.supplierArticle] || 0) + (o.quantity || 1);
     }
   }
   if (lines.length) {
@@ -167,7 +167,7 @@ if (MODE === "morning" || MODE === "urgent") {
   for (const n of [1, 2]) {
     if (!prepare(n)) continue;
     const rows = defTbl(n, { rowsOnly: true })
-      .filter((r) => r.o7 > 0 && Math.round(r.dr) >= 1 && r.dStock != null && r.dStock < URGENT_DAYS && (r.sgp || 0) + (r.raw || 0) > 0)
+      .filter((r) => !isStopped(r.art, n) && r.o7 > 0 && Math.round(r.dr) >= 1 && r.dStock != null && r.dStock < URGENT_DAYS && (r.sgp || 0) + (r.raw || 0) > 0)
       .sort((a, b) => (a.dStock ?? 0) - (b.dStock ?? 0));
     if (!rows.length) continue;
     const lines = rows.map((r) => `• <code>${esc(r.art)}</code> — ${r.dStock} дн.`);
@@ -210,6 +210,7 @@ if (MODE === "morning" || MODE === "fbs") {
     for (const [k, q] of Object.entries(snap)) {
       if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
+      if (isStopped(art, n)) { delete zm[k]; continue; }   /* стоп-артикул — молчим */
       if (old[k] > 0) {                                   /* только что закончилось */
         zm[k] = { since: nowIso, last: nowIso };
         ((byArt[art] ||= {})[w] ||= []).push(sz);
@@ -269,7 +270,7 @@ if (MODE === "drop") {
     for (const [art, byDay] of Object.entries(cnt)) {
       const expected = days.reduce((s, dd) => s + (byDay[dd] || 0), 0) / 7;
       const now = byDay[today] || 0;
-      if (expected >= MIN_EXPECTED && now <= expected * DROP) lines.push({ art, now, expected });
+      if (expected >= MIN_EXPECTED && now <= expected * DROP && !isStopped(art, n)) lines.push({ art, now, expected });
     }
     lines.sort((a, b) => b.expected - a.expected);
     const avgTot = totPast / 7;
@@ -291,7 +292,7 @@ if ((MODE === "morning" || MODE === "penalties") && !process.env.BOT_FAKE) {
     return o ? o.supplierArticle : null;
   };
   try {
-    const text = await checkPenalties({ WORKER, authHeader, cabName, artOf, fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "pen.json") });
+    const text = await checkPenalties({ WORKER, authHeader, cabName, artOf, skip: (cab, a) => !!a && isStopped(a, cab), fs, statePath: (process.env.BOT_STATE || ".bot-state/fbs.json").replace(/[^/]*$/, "pen.json") });
     msgs.push({ link: false, text });
   } catch (e) {
     problems.push(`⚠️ Удержания и замеры: проверка не удалась — ${esc(e.message)}`);

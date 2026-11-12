@@ -26,7 +26,7 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 const n1 = (x) => (x == null ? "—" : (+x).toLocaleString("ru-RU", { maximumFractionDigits: 2 }));   /* 1,5 */
 const rub = (x) => Math.round(+x || 0).toLocaleString("ru-RU").replace(/ /g, " ") + " ₽";
 
-export async function checkPenalties({ WORKER, authHeader, cabName, artOf, statePath, fs, cabs = [1, 2] }) {
+export async function checkPenalties({ WORKER, authHeader, cabName, artOf, statePath, fs, cabs = [1, 2], skip = () => false }) {
   const today = mskToday();
   const from = [addDays(today, -DAYS), PEN_START].sort().pop();          /* не раньше даты старта */
   const fromT = encodeURIComponent(`${from}T00:00:00+03:00`), toT = encodeURIComponent(`${today}T23:59:59+03:00`);
@@ -110,6 +110,8 @@ export async function checkPenalties({ WORKER, authHeader, cabName, artOf, state
         if (d && d < PEN_START) continue;              /* до даты старта не сообщаем */
         if (state.seen[k]) continue;
         state.seen[k] = today;
+        /* стоп-артикул (вкладка правил) — запоминаем как увиденное, но не пишем */
+        if (skip(cab, artOf(cab, x.nmId || x.nmID) || x.oldVendorCode)) continue;
         fresh.push(x);
       }
       fresh.sort((a, b) => String(S.date(a)).localeCompare(String(S.date(b))));
