@@ -182,6 +182,7 @@ if (MODE === "morning" || MODE === "fbs") {
   try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { /* первый запуск */ }
   const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) }, zero: { ...(prev?.zero || {}) } };
   const gone = [], again = [];
+  const FBS_MIN_HAVE = 3;   /* меньше 3 шт СГП + сырья — пополнять нечем, не пишем */
   const REPEAT_H = 23.5;   /* «сутки» — с запасом на то, что запуски идут в начале часа с разбросом */
   for (const n of [1, 2, 3]) {
     if (!D[n] || !prepare(n)) continue;           /* кабинет не загрузился — помним прошлое */
@@ -211,10 +212,11 @@ if (MODE === "morning" || MODE === "fbs") {
       if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
       if (isStopped(art, n)) { delete zm[k]; continue; }   /* стоп-артикул — молчим */
-      /* Пополнить нечем: СГП + сырьё у размера ≤ 0 (с минусами тоже) — не пишем ни «закончилось», ни повтор.
-         Ноль запоминаем; как только СГП или сырьё появятся, а на FBS всё ещё 0 — сразу придёт повтор. */
+      /* Пополнить нечем: СГП + сырьё у размера меньше FBS_MIN_HAVE шт (1–2 шт, ноль и минусы считаем как 0) —
+         не пишем ни «закончилось», ни повтор. Ноль запоминаем; как только станет ≥ FBS_MIN_HAVE,
+         а на FBS всё ещё 0 — сразу придёт повтор. */
       const have = sz && n !== 3 ? getStocksForSz(art, sz) : getStocksForArt(art);
-      if ((+have.sgp || 0) + (+have.raw || 0) <= 0) {
+      if ((+have.sgp || 0) + (+have.raw || 0) < FBS_MIN_HAVE) {
         if (!zm[k]) zm[k] = { since: old[k] > 0 ? nowIso : null, last: new Date(0).toISOString() };
         else zm[k].last = new Date(0).toISOString();
         continue;
