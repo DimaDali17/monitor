@@ -38,7 +38,7 @@ if (!DASH_PASSWORD || !TG_BOT_TOKEN || !TG_CHAT_ID) {
 }
 
 const { login } = await import("../js/api/auth.js");
-const { loadExternal, setRawScope, getStocksForArt } = await import("../js/api/sheets.js");
+const { loadExternal, setRawScope, getStocksForArt, getStocksForSz } = await import("../js/api/sheets.js");
 const { loadWB, cardByNm } = await import("../js/api/wb.js");
 const { WORKER } = await import("../js/config.js");
 const { authHeader } = await import("../js/api/auth.js");
@@ -211,6 +211,14 @@ if (MODE === "morning" || MODE === "fbs") {
       if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
       if (isStopped(art, n)) { delete zm[k]; continue; }   /* стоп-артикул — молчим */
+      /* Пополнить нечем: СГП + сырьё у размера ≤ 0 (с минусами тоже) — не пишем ни «закончилось», ни повтор.
+         Ноль запоминаем; как только СГП или сырьё появятся, а на FBS всё ещё 0 — сразу придёт повтор. */
+      const have = sz && n !== 3 ? getStocksForSz(art, sz) : getStocksForArt(art);
+      if ((+have.sgp || 0) + (+have.raw || 0) <= 0) {
+        if (!zm[k]) zm[k] = { since: old[k] > 0 ? nowIso : null, last: new Date(0).toISOString() };
+        else zm[k].last = new Date(0).toISOString();
+        continue;
+      }
       if (old[k] > 0) {                                   /* только что закончилось */
         zm[k] = { since: nowIso, last: nowIso };
         ((byArt[art] ||= {})[w] ||= []).push(sz);
