@@ -24,18 +24,20 @@ export const RAW_SPLIT_GROUPS = [
   {
     name: "Нумы",
     prop: { "TS21num1": 50, "TS26num3new": 25, "TS21num4": 25 },
-    inv: { date: "26.10.2026", weights: { "TS21num4": 100 }, stock: { "А1905": 2568 } },   /* всё сырьё сейчас — Нум4 */
+    /* 14.11: Нум3 — точно 100 наб., остальное (100) — Нум4. Остаток А1905 изменится — инвентаризация перестанет действовать */
+    inv: { date: "14.11.2026", weights: { "TS26num3new": 100, "TS21num4": 100 }, stock: { "А1905": 600 } },
   },
   {
     name: "Аляска",
     prop: { "TermSocks.Al-ESS.black.01": 40, "TermSocks.Al-ESS.grey.01": 40, "TermSocks.Al-ESS.purp.01": 20 },
+    /* 14.11: черная — точно 21 наб., остальное (32) — серая и фиолетовая 50/50 */
+    inv: { date: "14.11.2026", weights: { "TermSocks.Al-ESS.black.01": 21, "TermSocks.Al-ESS.grey.01": 16, "TermSocks.Al-ESS.purp.01": 16 }, stock: { "2581-2": 159 } },
   },
   {
     name: "Rabbit",
     prop: { "TermSocks.EF.Rab.01": 25, "TermSocks.EF.Rab.02": 25, "TermSocks.EF.Rab.03": 25, "TermSocks.EF.Rab.04": 25 },
-    /* факт по наборам (Раб.02 ~650 = 250 готовых + короба, Раб.03 ~550 = 130 + короба);
-       сумма не совпадает с остатком — делим остаток пропорционально */
-    inv: { date: "26.10.2026", weights: { "TermSocks.EF.Rab.01": 32, "TermSocks.EF.Rab.02": 650, "TermSocks.EF.Rab.03": 550, "TermSocks.EF.Rab.04": 280 } },
+    /* 14.11: Раб4 — точно 47 наб., остальное (206) — Раб2 и Раб3 50/50, Раб1 — 0 */
+    inv: { date: "14.11.2026", weights: { "TermSocks.EF.Rab.01": 0, "TermSocks.EF.Rab.02": 103, "TermSocks.EF.Rab.03": 103, "TermSocks.EF.Rab.04": 47 }, stock: { "А1906": 759 } },
   },
   {
     name: "Каш01/04",
