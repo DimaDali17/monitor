@@ -1,7 +1,7 @@
 import { D, FA, FP, FG } from "../state.js";
 import { artGroup } from "../api/sheets.js";
 import { esc, wbPrice } from "../utils.js";
-import { ADS } from "../api/ads.js";
+import { ADS, ADQ, adqKey, loadQueries } from "../api/ads.js";
 import { cardByNm, cardsNmList } from "../api/wb.js";
 import { ADS_DRR_TARGET } from "../config.js";
 
@@ -20,6 +20,10 @@ let PER = LS("adPer", ["1", "7", "14", "30"], "7");
 let ROWS = LS("adRows", ["g", "a"], "a");
 export function setAdPer(p) { PER = ["1", "7", "14", "30"].includes(p) ? p : "7"; SV("adPer", PER); }
 export function setAdRows(r) { ROWS = r === "g" ? "g" : "a"; SV("adRows", ROWS); }
+/* раскрытые группы (поисковые запросы) и «показать все запросы» — по кабинету, только на время сессии */
+const OPEN = { 1: new Set(), 2: new Set() }, ALLQ = { 1: new Set(), 2: new Set() };
+export function togAdQ(n, k) { const s = OPEN[n]; s.has(k) ? s.delete(k) : s.add(k); }
+export function togAdQAll(n, k) { const s = ALLQ[n]; s.has(k) ? s.delete(k) : s.add(k); }
 
 const pill = (opts, cur, fn, n) => `<span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:10px">
     ${opts.map(([k, t]) => `<span onclick="App.${fn}(${n},'${k}')" style="padding:1px 7px;cursor:pointer;white-space:nowrap;${cur === k ? "background:var(--ink);color:var(--bg3)" : "color:var(--ink2)"}">${t}</span>`).join("")}
@@ -140,11 +144,15 @@ export function adsHTML(n) {
       <td style="text-align:right">${x.q ? nf(x.sum / x.q) : "—"}</td>`;
   };
   const list = Object.entries(rows).sort((a, b) => b[1].sum - a[1].sum);
+  /* Поисковые запросы: грузим один раз на кабинет и период, как только раскрыли хоть одну группу */
+  const qk = adqKey(n, from, to), Q = ADQ[qk];
+  if (OPEN[n].size && !Q) loadQueries(n, from, to).then(() => repaintAds(n));
   const body = list.map(([k, x]) => {
-    const others = [...new Set(x.arts)].filter((a) => a !== k);
     const all = [...new Set(x.arts)];
     const tip = all.length ? ` data-tip="${esc("Артикулы: " + all.join(", "))}"` : "";
-    return `<tr><td style="white-space:nowrap"${tip}>${esc(k)}${all.length > 1 ? ` <span style="color:var(--ink3);font-size:10px">${all.length} арт.</span>` : ""}</td>${cells(x)}</tr>`;
+    const open = OPEN[n].has(k);
+    const row = `<tr onclick="App.togAdQ(${n}, this.dataset.k)" data-k="${esc(k)}" style="cursor:pointer"><td style="white-space:nowrap"${tip}><span style="display:inline-block;width:12px;color:var(--ink3);font-size:9px">${open ? "▼" : "▶"}</span>${esc(k)}${all.length > 1 ? ` <span style="color:var(--ink3);font-size:10px">${all.length} арт.</span>` : ""}</td>${cells(x)}</tr>`;
+    return open ? row + `<tr><td colspan="12" style="background:var(--bg3);padding:6px 10px 10px 22px">${queriesHTML(n, k, members[k], Q)}</td></tr>` : row;
   }).join("");
   const table = list.length ? `<div class="sw" style="margin-top:10px"><table style="font-size:12px">
     <thead>
@@ -219,6 +227,46 @@ export function adsHTML(n) {
     </div>
     <div style="font-size:11px;color:var(--ink3);margin-top:4px">Показы, клики, корзины и расход — из рекламного кабинета WB (кампаний за период: ${A.campaigns}). Артикулы объединены по группе «Кратко» (реклама одного артикула продаёт и остальные): заказы — реальные, из API статистики, по всем артикулам группы, вкл. органику. Полные дни, без сегодня.</div>
     ${kpis}${charts}${table}`);
+}
+
+/* Запросы одной группы: все артикулы группы сложены по запросу, сортировка по расходу.
+   Красным — запрос съел не меньше, чем группе в среднем стоит один заказ WB, а заказов не дал. */
+function queriesHTML(n, k, nms, Q) {
+  const msg = (t, col) => `<div style="font-size:11px;color:${col || "var(--ink3)"};padding:4px 0">${t}</div>`;
+  if (!Q || Q.status === "loading") return msg("загружаем поисковые запросы…");
+  if (Q.status === "error") return msg("Запросы не загрузились: " + esc(Q.error), "var(--red)");
+  const by = {};
+  for (const nm of nms || []) for (const [q, x] of Object.entries(Q.nm[nm] || {})) {
+    const t = (by[q] ||= { views: 0, clicks: 0, atbs: 0, orders: 0, spend: 0, posW: 0 });
+    for (const f in t) t[f] += x[f];
+  }
+  const rowsQ = Object.entries(by).filter(([, x]) => x.views || x.spend).sort((a, b) => b[1].spend - a[1].spend);
+  if (!rowsQ.length) return msg("По этой группе WB не отдал поисковых запросов за период (они есть только у единых кампаний).");
+  const S = rowsQ.reduce((a, [, x]) => { a.spend += x.spend; a.orders += x.orders; return a; }, { spend: 0, orders: 0 });
+  const lim = S.orders ? S.spend / S.orders : 300;                       /* цена одного заказа WB по группе */
+  const showAll = ALLQ[n].has(k), TOP = 20;
+  const shown = showAll ? rowsQ : rowsQ.slice(0, TOP);
+  const bad = rowsQ.filter(([, x]) => !x.orders && x.spend >= lim);
+  const badSum = bad.reduce((a, [, x]) => a + x.spend, 0);
+  const R = (v) => `<td style="text-align:right">${v}</td>`;
+  const tr = shown.map(([q, x]) => {
+    const isBad = !x.orders && x.spend >= lim;
+    return `<tr${isBad ? ' style="background:rgba(184,64,64,.08)"' : ""}><td style="white-space:normal;min-width:180px">${esc(q)}</td>
+      ${R(nf(x.views))}${R(nf(x.clicks))}${R(pct(x.clicks, x.views, 2))}
+      ${R(x.clicks ? (x.spend / x.clicks).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—")}
+      ${R(nf(x.atbs))}
+      <td style="text-align:right;${isBad ? "color:var(--red);font-weight:700" : ""}">${nf(x.spend)}</td>
+      <td style="text-align:right;font-weight:700${x.orders ? "" : ";color:var(--ink3)"}">${nf(x.orders)}</td>
+      ${R(x.orders ? nf(x.spend / x.orders) : "—")}
+      ${R(x.views ? (x.posW / x.views).toLocaleString("ru-RU", { maximumFractionDigits: 0 }) : "—")}</tr>`;
+  }).join("");
+  const th = (t, tip) => `<th style="text-align:right"${tip ? ` data-tip="${esc(tip)}"` : ""}>${t}</th>`;
+  return `<div style="font-size:11px;color:var(--ink2);margin:2px 0 6px">Поисковые запросы: ${rowsQ.length} · расход ${rub(S.spend)} ₽ · заказов по WB ${nf(S.orders)}${bad.length ? ` · <b style="color:var(--red)">без заказов: ${bad.length} запр. на ${rub(badSum)} ₽</b>` : ""}</div>
+    <table style="font-size:11px;width:100%">
+      <thead><tr><th>Запрос (кластер WB)</th>${th("Показы")}${th("Клики")}${th("CTR")}${th("CPC, ₽")}${th("Корзины")}${th("Расход, ₽")}${th("Заказы WB", "Заказы, которые WB приписывает рекламе по этому запросу")}${th("₽ на заказ WB")}${th("Позиция", "Средняя позиция в поиске")}</tr></thead>
+      <tbody>${tr}</tbody></table>
+    ${rowsQ.length > TOP ? `<div style="margin-top:6px"><span onclick="App.togAdQAll(${n}, this.dataset.k)" data-k="${esc(k)}" style="font-size:11px;color:var(--ink2);cursor:pointer;border-bottom:1px dotted var(--ink3)">${showAll ? "свернуть до " + TOP : "показать все " + rowsQ.length}</span></div>` : ""}
+    <div style="font-size:10px;color:var(--ink3);margin-top:6px">Заказы здесь — как их считает WB (атрибуция рекламы), не реальные. Красным — запрос потратил не меньше, чем группе стоит один заказ WB (${nf(lim)} ₽), а заказов не дал.</div>`;
 }
 
 export function repaintAds(n) {

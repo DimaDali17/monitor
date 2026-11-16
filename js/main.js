@@ -8,7 +8,7 @@ import { loadPass, login, logout as dropPass } from "./api/auth.js";
 import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
 import { loadAds } from "./api/ads.js";
-import { repaintAds, setAdPer, setAdRows } from "./render/ads.js";
+import { repaintAds, setAdPer, setAdRows, togAdQ, togAdQAll } from "./render/ads.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -170,6 +170,8 @@ const App = {
   setPlanRows(x) { setPlanRows(x); repaintPlan(1); },
   setAdPer(n, p) { setAdPer(p); repaintAds(n); },
   setAdRows(n, r) { setAdRows(r); repaintAds(n); },
+  togAdQ(n, k) { togAdQ(n, k); repaintAds(n); },
+  togAdQAll(n, k) { togAdQAll(n, k); repaintAds(n); },
   reloadAds(n) { const el = document.getElementById("ads" + n); if (el) el.innerHTML = '<span class="st">📣 Эффективность рекламы</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем заново…</div>'; loadAds(n, { force: true }).then(() => repaintAds(n)); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */

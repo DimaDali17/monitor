@@ -1,4 +1,4 @@
-import { wbGet } from "./wb.js";
+import { wbGet, wbPost } from "./wb.js";
 
 /* ══════════════════════════════════════════════════════════
    Реклама WB (кабинеты 1 и 2) — через воркер, ключ «Продвижение» (WB_ADV_KEY_n).
@@ -61,4 +61,58 @@ export function loadAds(cab, { force = false } = {}) {
     return res;
   })();
   return inflight[cab];
+}
+
+/* ══════════════════════════════════════════════════════════
+   Поисковые запросы (кластеры WB) — для раскрытия групп в блоке рекламы.
+   1) GET /adv/v1/promotion/count — единые кампании (type 9): идут, пауза, завершённые в периоде
+   2) GET /api/advert/v2/adverts?ids=… — какие товары (nm_id) в каждой кампании (до 50 id за запрос)
+   3) POST /adv/v0/normquery/stats {from,to,items:[{advert_id,nm_id}]} — по каждому запросу за период:
+      показы, клики, корзины, заказы (атрибуция WB), расход, средняя позиция. Один запрос на кабинет.
+   Результат: ADQ[key].nm[nmId][запрос] = { views, clicks, atbs, orders, spend, posW } (posW = позиция × показы)
+   ══════════════════════════════════════════════════════════ */
+export const ADQ = {};
+export const adqKey = (cab, from, to) => `${cab}|${from}|${to}`;
+
+export function loadQueries(cab, from, to) {
+  const key = adqKey(cab, from, to);
+  if (ADQ[key] && ADQ[key].status !== "error") return ADQ[key].p || Promise.resolve(ADQ[key]);
+  const res = (ADQ[key] = { status: "loading", nm: {}, error: null });
+  res.p = (async () => {
+    try {
+      const cnt = await wbGet(`${BASE}/adv/v1/promotion/count`, cab, false);
+      const ids = [];
+      for (const g of cnt.adverts || []) {
+        if (g.type !== 9 || ![7, 9, 11].includes(g.status)) continue;
+        for (const a of g.advert_list || []) {
+          if (g.status === 7 && (a.changeTime || "").slice(0, 10) < from) continue;
+          ids.push(a.advertId);
+        }
+      }
+      const items = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const ad = await wbGet(`${BASE}/api/advert/v2/adverts?ids=${ids.slice(i, i + 50).join(",")}`, cab, false);
+        for (const a of ad.adverts || []) for (const x of a.nm_settings || []) if (x.nm_id) items.push({ advert_id: a.id, nm_id: x.nm_id });
+      }
+      for (let i = 0; i < items.length; i += 100) {
+        const d = await wbPost(`${BASE}/adv/v0/normquery/stats`, { from, to, items: items.slice(i, i + 100) }, cab);
+        for (const g of (d && d.stats) || []) {
+          const byQ = (res.nm[g.nm_id] ||= {});
+          for (const x of g.stats || []) {
+            const q = String(x.norm_query || "").trim();
+            if (!q) continue;
+            const t = (byQ[q] ||= { views: 0, clicks: 0, atbs: 0, orders: 0, spend: 0, posW: 0 });
+            t.views += x.views || 0; t.clicks += x.clicks || 0; t.atbs += x.atbs || 0;
+            t.orders += x.orders || 0; t.spend += x.spend || 0; t.posW += (x.avg_pos || 0) * (x.views || 0);
+          }
+        }
+      }
+      res.status = "ok";
+    } catch (e) {
+      res.status = "error"; res.error = e.message;
+    }
+    delete res.p;
+    return res;
+  })();
+  return res.p;
 }

@@ -51,7 +51,7 @@ export function wbGet(url, cab, force, onRetry) {
   return p;
 }
 
-function wbPost(url, body, cab, onRetry, minGap) {
+export function wbPost(url, body, cab, onRetry, minGap) {
   /* POST не дедуплицируем — каждый вызов уникален (разный offset) */
   return enqueue(() => attempt("POST", url, body, cab, false, onRetry), minGap);
 }
