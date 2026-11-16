@@ -64,4 +64,3 @@ export const CSV_FACT_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHmD
 
 /* Реклама: цели на графиках блока «Эффективность рекламы» */
 export const ADS_DRR_TARGET = 5;                        /* цель ДРР, % */
-export const ADS_DAY_BUDGET = { 1: 10000, 2: 10000 };   /* бюджет расхода в день, ₽ (по кабинету) */

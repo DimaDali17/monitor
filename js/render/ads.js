@@ -3,7 +3,7 @@ import { artGroup } from "../api/sheets.js";
 import { esc, wbPrice } from "../utils.js";
 import { ADS } from "../api/ads.js";
 import { cardByNm, cardsNmList } from "../api/wb.js";
-import { ADS_DRR_TARGET, ADS_DAY_BUDGET } from "../config.js";
+import { ADS_DRR_TARGET } from "../config.js";
 
 /* ══════════════════════════════════════════════════════════
    Блок «📣 Эффективность рекламы» (кабинеты WB).
@@ -35,7 +35,7 @@ const pct = (a, b, d = 1) => (b > 0 ? ((a / b) * 100).toLocaleString("ru-RU", { 
 const addDays = (iso, k) => new Date(Date.parse(iso + "T00:00:00Z") + k * 864e5).toISOString().slice(0, 10);
 const dShort = (iso) => `${+iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 /* ДРР: зелёный — в пределах цели (ADS_DRR_TARGET), жёлтый — до 1,5 цели, красный выше */
-const drrTone = (v) => (v == null ? "var(--ink3)" : v <= ADS_DRR_TARGET ? "var(--green)" : v <= ADS_DRR_TARGET * 1.5 ? "#B7791F" : "var(--red)");
+const drrTone = (v) => (v == null ? "var(--ink3)" : v <= ADS_DRR_TARGET ? "var(--green)" : v <= ADS_DRR_TARGET * 1.5 ? "var(--amber)" : "var(--red)");
 
 /* Фильтры кабинета: артикул / предмет / группа («Кратко») */
 function filterFor(n) {
@@ -155,11 +155,16 @@ export function adsHTML(n) {
     <tbody>${body}<tr style="border-top:2px solid var(--border2)"><td><b>Итого</b></td>${cells(T, true)}</tr></tbody>
   </table></div>` : `<div style="font-size:12px;color:var(--ink3);margin-top:10px">За этот период рекламы${ok ? " по фильтру" : ""} не было.</div>`;
 
+  /* Бюджет в день = цель ДРР (5%) от реальных заказов этих групп, в среднем за выбранный период.
+     Не константа из настроек: каждый день период сдвигается, и бюджет пересчитывается по свежим заказам. */
+  const nDays = +PER;
+  const budget = T.r > 0 ? (T.r * ADS_DRR_TARGET) / 100 / nDays : 0;
+
   /* KPI сверху */
   const tDrr = drr(T);
   const kpi = (lbl, val, sub, col) => `<div class="mc"><div class="ml">${lbl}</div><div class="mv sm"${col ? ` style="color:${col}"` : ""}>${val}</div>${sub ? `<div class="md" style="color:var(--ink3)">${sub}</div>` : ""}</div>`;
   const kpis = `<div class="mg" style="margin:10px 0 0">
-    ${kpi("Расход на рекламу", rub(T.sum) + " ₽", PER === "1" ? `вчера, ${dShort(to)}` : `${dShort(from)} – ${dShort(to)}`)}
+    ${kpi("Расход на рекламу", rub(T.sum) + " ₽", (PER === "1" ? `вчера, ${dShort(to)}` : `${dShort(from)} – ${dShort(to)} · ${rub(T.sum / nDays)} ₽/день`) + (budget ? ` · бюджет ${rub(budget)} ₽/день` : ""))}
     ${kpi("Реальные заказы этих групп", rub(T.r) + " ₽", nf(T.q) + " шт")}
     ${kpi("ДРР", tDrr == null ? "—" : tDrr.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%", T.q ? `≈ ${nf(T.sum / T.q)} ₽ рекламы на заказ` : "", drrTone(tDrr))}
     ${kpi("Воронка", pct(T.clicks, T.views, 2) + " CTR", `${T.clicks ? (T.sum / T.clicks).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"} ₽ клик · ${pct(T.atbs, T.clicks)} в корзину`)}
@@ -169,26 +174,26 @@ export function adsHTML(n) {
   const dl = []; for (let x = from; x <= to; x = addDays(x, 1)) dl.push(x);
   /* Маленький график: значения подписаны над столбцами/точками, пунктир — цель */
   const mini = (vals, fmtv, color, label, isLine, target, targetTxt) => {
-    const VW = 520, VH = 160, pl = 10, pr = 10, pt = 20, pb = 18;
+    const VW = 720, VH = 190, pl = 6, pr = 6, pt = 18, pb = 18;   /* ≈ реальная ширина на экране — шрифт не раздувается */
     const mx = Math.max(1, target || 0, ...vals.filter((v) => v != null)) * 1.15;
     const w = (VW - pl - pr) / vals.length;
     const ys = (v) => pt + (VH - pt - pb) * (1 - v / mx);
     const xc = (i) => pl + (i + 0.5) * w;
-    const fs = vals.length > 16 ? 8 : 10;                                 /* 30 дней — подписи мельче */
+    const fs = vals.length > 16 ? 9 : 11;                                 /* 30 дней — подписи мельче */
     let g = `<line x1="${pl}" x2="${VW - pr}" y1="${ys(0)}" y2="${ys(0)}" stroke="var(--border)"/>`;
     if (isLine) {
       const pts = vals.map((v, i) => (v == null ? null : [xc(i), ys(v)]));
       g += `<path d="${pts.filter(Boolean).map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join("")}" fill="none" stroke="${color}" stroke-width="2"/>`;
-      pts.forEach((p, i) => { if (p) g += `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${color}"/><text x="${p[0]}" y="${p[1] - 6}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="var(--ink)">${fmtv(vals[i])}</text>`; });
+      pts.forEach((p, i) => { if (p) g += `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${color}"/><text x="${p[0]}" y="${p[1] - 6}" text-anchor="middle" font-size="${fs}" font-weight="600" fill="var(--ink2)">${fmtv(vals[i])}</text>`; });
     } else {
       vals.forEach((v, i) => {
         const y = ys(v || 0);
         g += `<rect x="${pl + i * w + 1}" y="${y}" width="${Math.max(1, w - 2)}" height="${ys(0) - y}" rx="2" fill="${color}"/>`;
-        if (v) g += `<text x="${xc(i)}" y="${y - 4}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="var(--ink)">${fmtv(v)}</text>`;
+        if (v) g += `<text x="${xc(i)}" y="${y - 4}" text-anchor="middle" font-size="${fs}" font-weight="600" fill="var(--ink2)">${fmtv(v)}</text>`;
       });
     }
-    if (target) g += `<line x1="${pl}" x2="${VW - pr}" y1="${ys(target)}" y2="${ys(target)}" stroke="#B3261E" stroke-width="1.5" stroke-dasharray="6 4"/>
-      <text x="${VW - pr}" y="${ys(target) - 4}" text-anchor="end" font-size="10" font-weight="700" fill="#B3261E">${targetTxt}</text>`;
+    /* пунктир цели — поверх столбиков, подпись не на графике, а в заголовке (не сливается со столбиками) */
+    if (target) g += `<line x1="${pl}" x2="${VW - pr}" y1="${ys(target)}" y2="${ys(target)}" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
     const step = vals.length > 16 ? 3 : 1;
     vals.forEach((_, i) => { if (i % step === 0 || i === vals.length - 1) g += `<text x="${xc(i)}" y="${VH - 4}" text-anchor="middle" font-size="${fs}" fill="var(--ink3)">${dShort(dl[i])}</text>`; });
     vals.forEach((v, i) => { g += `<rect x="${pl + i * w}" y="${pt}" width="${w}" height="${VH - pt - pb}" fill="transparent" data-tip="${dShort(dl[i])}: ${label} ${v == null ? "—" : fmtv(v)}"/>`; });
@@ -196,9 +201,12 @@ export function adsHTML(n) {
   };
   const spend = dl.map((x) => (days[x] ? days[x].sum : 0));
   const drrD = dl.map((x) => (days[x] && days[x].r > 0 ? (days[x].sum / days[x].r) * 100 : null));
+  const k1 = (v) => (v / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 });        /* тыс ₽ без буквы — единица в заголовке */
+  const hdr = (t, legend) => `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">
+      <span>${t}</span><span style="color:var(--red);text-transform:none;letter-spacing:0;font-weight:600">${legend}</span></div>`;
   const charts = list.length && PER !== "1" ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:12px">
-      <div><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">Расход по дням, ₽</div>${mini(spend, (v) => (v >= 1000 ? (v / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "т" : nf(v)), "#8B4513", "расход", false, ok ? 0 : ADS_DAY_BUDGET[n], "бюджет " + nf(ADS_DAY_BUDGET[n]) + " ₽/день")}</div>
-      <div><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">ДРР по дням, %</div>${mini(drrD, (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + "%", "#4A6FA5", "ДРР", true, ADS_DRR_TARGET, "цель " + ADS_DRR_TARGET + "%")}</div>
+      <div>${hdr("Расход по дням, тыс ₽", budget ? `- - бюджет ${k1(budget)} тыс/день (${ADS_DRR_TARGET}% от заказов)` : "")}${mini(spend, k1, "#C9B596", "расход, тыс ₽", false, budget)}</div>
+      <div>${hdr("ДРР по дням, %", `- - цель ${ADS_DRR_TARGET}%`)}${mini(drrD, (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }), "#4A6FA5", "ДРР, %", true, ADS_DRR_TARGET)}</div>
     </div>` : "";
 
   return box(`
