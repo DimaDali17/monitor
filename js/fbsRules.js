@@ -51,7 +51,8 @@ export const FBS_RULES = [
      Правило  — «все склады», «кроме МСК», «только Пятигорск», «0 на FBS»;
                 «стоп» — эти артикулы бот не упоминает ни в одном сообщении Telegram
      Артикулы — через запятую; «TermoMai.*» — все артикулы, начинающиеся с TermoMai.
-     Кроме    — артикулы, которые правило не трогает (через запятую)
+     Кроме    — что правило не трогает (через запятую): артикулы; размеры («7XL» — у всех артикулов строки);
+                «артикул 7XL» — один размер одного артикула. Исключённые размеры бот не проверяет и не пишет.
    Срабатывает первая подходящая строка сверху, поэтому «0 на FBS» ставим выше общих.
    Таблица пустая или не загрузилась — работают правила из списка выше. */
 export const FBS_RULES_SRC = { from: "code", count: FBS_RULES.length, bad: [], error: null };
@@ -75,6 +76,21 @@ const cabCode = (t) => {
 };
 const list = (t) => String(t || "").split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
 
+/* Размер — короткое слово без точек: XS, M, XL, 2XL…7XL, XXL, 42, 42-44 (регистр не важен). */
+const SIZE_RE = /^(\d{0,2}x{0,4}[sml]|\d{2,3}(?:[-–\/]\d{2,3})?)$/i;
+export const normSz = (z) => String(z || "").trim().toLowerCase().replace(/–/g, "-");
+/* Разбор «Кроме» / стоп-строки: «артикул», «7XL» (размер у всех артикулов строки), «артикул 7XL» (размер одного артикула). */
+function splitArtSz(items) {
+  const arts = [], sizes = [], artSz = [];
+  for (const t of items) {
+    if (SIZE_RE.test(t)) { sizes.push(normSz(t)); continue; }
+    const m = t.match(/^(\S+)\s+(\S+)$/);
+    if (m && SIZE_RE.test(m[2])) { artSz.push(m[1].toLowerCase() + "|" + normSz(m[2])); continue; }
+    arts.push(t);
+  }
+  return { arts, sizes, artSz };
+}
+
 /* rows — строки CSV объектами {заголовок: значение}. Есть хоть одно верное правило — заменяем список. */
 export function applyFbsRulesSheet(rows) {
   const get = (r, ...names) => { const k = Object.keys(r).find((x) => names.includes(x.trim().toLowerCase())); return k ? String(r[k] || "").trim() : ""; };
@@ -90,9 +106,15 @@ export function applyFbsRulesSheet(rows) {
       bad.push(`строка ${i + 2}${name ? " (" + name + ")" : ""}: ${!arts.length ? "нет артикулов" : !rule ? `правило «${rawRule}» не понял` : "кабинет не понял"}`);
       return;
     }
-    const ex = list(get(r, "кроме", "исключить", "exclude"));
-    if (rule === "stop") { stop.push({ cab, name, arts, ...(ex.length ? { exclude: ex } : {}) }); return; }
-    out.push({ cab, name, rule, arts, ...(ex.length ? { exclude: ex } : {}) });
+    const X = splitArtSz(list(get(r, "кроме", "исключить", "exclude")));
+    const ex = X.arts, exSz = { ...(X.sizes.length ? { exSizes: X.sizes } : {}), ...(X.artSz.length ? { exArtSz: X.artSz } : {}) };
+    if (rule === "stop") {
+      /* в стоп-строке «артикул 7XL» — молчим только про этот размер (FBS-сообщения) */
+      const A = splitArtSz(arts);
+      stop.push({ cab, name, arts: A.arts, ...(A.artSz.length ? { artSz: A.artSz } : {}), ...(A.sizes.length ? { sizes: A.sizes } : {}), ...(ex.length ? { exclude: ex } : {}) });
+      return;
+    }
+    out.push({ cab, name, rule, arts, ...(ex.length ? { exclude: ex } : {}), ...exSz });
   });
   FBS_RULES_SRC.bad = bad;
   STOP_LIST.splice(0, STOP_LIST.length, ...stop);
@@ -147,6 +169,20 @@ export function isStopped(art, n) {
   const a = String(n === 3 ? ozBase(art) : art || "").trim().toLowerCase();
   if (!a) return false;
   return STOP_LIST.some((r) => (!r.cab || n === 3 || r.cab === n) && !artMatch(a, r.exclude || []) && artMatch(a, r.arts));
+}
+
+/* Размер стоит в «Кроме» правила (сам по себе или «артикул размер») — правило его не проверяет */
+export function sizeExcluded(rule, art, sz) {
+  if (!rule || !sz) return false;
+  const z = normSz(sz), a = String(art || "").trim().toLowerCase();
+  return (rule.exSizes || []).includes(z) || (rule.exArtSz || []).includes(a + "|" + z);
+}
+/* Стоп по размеру: «артикул 7XL» в стоп-строке (или просто «7XL» там — этот размер у всех её артикулов) */
+export function isStoppedSize(art, sz, n) {
+  if (!sz) return false;
+  const a = String(n === 3 ? ozBase(art) : art || "").trim().toLowerCase(), z = normSz(sz);
+  return STOP_LIST.some((r) => (!r.cab || n === 3 || r.cab === n) &&
+    ((r.artSz || []).includes(a + "|" + z) || ((r.sizes || []).includes(z) && artMatch(a, r.arts))));
 }
 
 export function ruleFor(art, n) {

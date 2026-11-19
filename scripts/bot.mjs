@@ -49,7 +49,7 @@ const { D, VM, cabName } = await import("../js/state.js");
 const { buildVM } = await import("../js/vm.js");
 const { defTbl, statusKey } = await import("../js/render/deficit.js");
 const { fbsRows } = await import("../js/render/stocks.js");
-const { whRequired, ozBase, isStopped, STOP_LIST } = await import("../js/fbsRules.js");   /* isStopped — «стоп» во вкладке правил: в Telegram не пишем */
+const { whRequired, ozBase, isStopped, isStoppedSize, STOP_LIST } = await import("../js/fbsRules.js");   /* isStopped — «стоп» во вкладке правил: в Telegram не пишем */
 const { wbPrice, ozRev } = await import("../js/utils.js");
 const fs = await import("node:fs");
 const STATE = process.env.BOT_STATE || ".bot-state/fbs.json";
@@ -211,7 +211,7 @@ if (MODE === "morning" || MODE === "fbs") {
     for (const [k, q] of Object.entries(snap)) {
       if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
-      if (isStopped(art, n)) { delete zm[k]; continue; }   /* стоп-артикул — молчим */
+      if (isStopped(art, n) || isStoppedSize(art, sz, n)) { delete zm[k]; continue; }   /* стоп-артикул или стоп-размер — молчим */
       /* Пополнить нечем: СГП + сырьё у размера меньше FBS_MIN_HAVE шт (1–2 шт, ноль и минусы считаем как 0) —
          не пишем ни «закончилось», ни повтор. Ноль запоминаем; как только станет ≥ FBS_MIN_HAVE,
          а на FBS всё ещё 0 — сразу придёт повтор. */

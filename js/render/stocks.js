@@ -2,7 +2,7 @@ import { VM, SS, FSS, FS, FSZ, OA, OAF, EXS, EXFS, FA } from "../state.js";
 import { LIM } from "../config.js";
 import { esc, q, szCmp, normSz } from "../utils.js";
 import { getStocksForArt, getStocksForSz, dedupRawTotal, rawPoolForSz } from "../api/sheets.js";
-import { ozBase, cabWarehouses, whUsed, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates, FBS_RULES_SRC } from "../fbsRules.js";
+import { ozBase, cabWarehouses, whUsed, canonWh, FBS_LOW, FBS_LOW_DAYS, ruleFor, ruleText, whRequired, poolMates, FBS_RULES_SRC, sizeExcluded } from "../fbsRules.js";
 const rulesFrom = () => (FBS_RULES_SRC.from === "sheet" ? `из таблицы «FBS правила», ${FBS_RULES_SRC.count} шт` : "встроенные (js/fbsRules.js)");
 
 /* Из чего можно сделать FBS: СГП артикула + сырьё всего пула (у «спутника» пула
@@ -319,7 +319,9 @@ export function fbsRows(n) {
         }
         const dem = demand[szKey(g.art, sz)] || 0;
         let ev;
-        if (rule.rule !== "none" && !dem) {
+        if (sizeExcluded(rule, g.art, sz)) {
+          ev = { st: "nodem", skip: true, empty: [], low: [], extra: [] };   /* размер в «Кроме» правила — не проверяем */
+        } else if (rule.rule !== "none" && !dem) {
           ev = { st: "nodem", empty: [], low: [], extra: [] };       /* нет заказов за 7 дней — не проверяем */
         } else {
           ev = evalUnit(g.art, sz, rule, wh, fq);
@@ -429,7 +431,9 @@ export function fbsStocksTbl(n) {
       const chip = r.st === "red" ? `<span style="${RED};padding:1px 8px;border-radius:10px;font-size:11px">🔴 пусто</span>` : `<span style="${AMB};padding:1px 8px;border-radius:10px;font-size:11px">🟠 мало</span>`;
       return `<td style="text-align:center;white-space:nowrap" data-tip="${esc(tip)}">${chip}${noSrc ? `<div style="font-size:9px;color:#B3261E">нечем пополнить</div>` : ""}</td>`;
     }
-    if (r.st === "nodem") return `<td style="text-align:center" data-tip="Заказов этого размера за 7 дней не было — правило к нему не применяется"><span style="color:var(--ink3);font-size:10px">нет спроса</span></td>`;
+    if (r.st === "nodem") return r.skip
+      ? `<td style="text-align:center" data-tip="Размер указан в колонке «Кроме» правила — не проверяем, бот о нём не пишет"><span style="color:var(--ink3);font-size:10px">исключён правилом</span></td>`
+      : `<td style="text-align:center" data-tip="Заказов этого размера за 7 дней не было — правило к нему не применяется"><span style="color:var(--ink3);font-size:10px">нет спроса</span></td>`;
     if (r.sz != null && r.st === "amber" && r.empty.length) {
       return `<td style="text-align:center;white-space:nowrap" data-tip="${esc("Нет на складах: " + r.empty.join(", ") + (r.low.length ? "; мало: " + r.low.join(", ") : ""))}">${chip(AMB, "🟠 нет " + r.empty.length)}</td>`;
     }
