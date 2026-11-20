@@ -182,7 +182,7 @@ if (MODE === "morning" || MODE === "fbs") {
   try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { /* первый запуск */ }
   const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) }, zero: { ...(prev?.zero || {}) } };
   const gone = [], again = [];
-  const FBS_MIN_HAVE = 3;   /* меньше 3 шт СГП + сырья — пополнять нечем, не пишем */
+  const FBS_MIN_HAVE = 10;  /* меньше 10 шт СГП + сырья у размера — пополнять толком нечем, не пишем */
   const REPEAT_H = 23.5;   /* «сутки» — с запасом на то, что запуски идут в начале часа с разбросом */
   for (const n of [1, 2, 3]) {
     if (!D[n] || !prepare(n)) continue;           /* кабинет не загрузился — помним прошлое */
