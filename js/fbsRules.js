@@ -47,7 +47,8 @@ export const FBS_RULES = [
 
 /* ── Правила из Google-таблицы (вкладка «FBS правила», CSV_FBS_RULES в config.js) ──
    Колонки: Кабинет | Название | Правило | Артикулы | Кроме
-     Кабинет  — Easyform / EZFR (пусто — оба)
+     Кабинет  — Easyform / EZFR / Ozon (пусто — все; пусто, но в Названии «Ozon» — только Ozon).
+                Строки Easyform/EZFR действуют и на Ozon (по базовому артикулу), строки Ozon — только на Ozon
      Правило  — «все склады», «кроме МСК», «только Пятигорск», «0 на FBS»;
                 «стоп» — эти артикулы бот не упоминает ни в одном сообщении Telegram
      Артикулы — через запятую; «TermoMai.*» — все артикулы, начинающиеся с TermoMai.
@@ -70,6 +71,7 @@ const ruleCode = (t) => {
 const cabCode = (t) => {
   const s = String(t || "").trim().toLowerCase();
   if (!s) return 0;
+  if (/ozon|озон|^3$/.test(s)) return 3;   /* строка только для Ozon */
   if (/ezfr|ип\s*-?\s*2|^2$/.test(s)) return 2;
   if (/easy|ип\s*-?\s*1|^1$/.test(s)) return 1;
   return -1;
@@ -101,7 +103,9 @@ export function applyFbsRulesSheet(rows) {
     if (!arts.length && !rawRule) return;                     /* пустая строка */
     const name = get(r, "название", "группа") || arts[0] || "";
     /* «стоп» в Правиле (или пустое Правило и Название «Стоп …») — артикулы не пишем в Telegram */
-    const rule = ruleCode(rawRule) || (!rawRule && /^\s*(стоп|stop)/i.test(name) ? "stop" : null), cab = cabCode(get(r, "кабинет", "ип"));
+    const rule = ruleCode(rawRule) || (!rawRule && /^\s*(стоп|stop)/i.test(name) ? "stop" : null);
+    let cab = cabCode(get(r, "кабинет", "ип"));
+    if (cab === 0 && /ozon|озон/i.test(name)) cab = 3;      /* Кабинет пустой, а в Названии «Ozon» — строка только для Ozon */
     if (!arts.length || !rule || cab < 0) {
       bad.push(`строка ${i + 2}${name ? " (" + name + ")" : ""}: ${!arts.length ? "нет артикулов" : !rule ? `правило «${rawRule}» не понял` : "кабинет не понял"}`);
       return;
