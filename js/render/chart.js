@@ -315,7 +315,7 @@ export function chartHTML(n, vm, type) {
     const gx = L + i * gW, bW = Math.max(2, Math.floor(gW * 0.62)), bx = gx + (gW - bW) / 2;
     const segs = segOrder.map((seg, k) => ({ seg, k, v: per[seg][i] })).filter((x) => x.v > 0);
     const colTot = segs.reduce((a, x) => a + x.v, 0);
-    let yAcc = T + cH, col = `<rect x="${bx}" y="${T}" width="${bW}" height="${cH}" rx="4" fill="var(--bg)" opacity=".6"/>`;
+    let yAcc = T + cH, col = `<rect x="${bx}" y="${T}" width="${bW}" height="${cH}" rx="4" fill="var(--bg)" opacity=".25"/>`;   /* подложка бледная — не путается со светлыми цветами артикулов */
     segs.forEach((x, j) => {
       const h = (x.v / max) * cH; yAcc -= h;
       const gap = j > 0 && h > 3 ? 1 : 0;                 /* просвет между сегментами */
