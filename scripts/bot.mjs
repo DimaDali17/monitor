@@ -211,7 +211,7 @@ if ((MODE === "morning" && mskNow.getUTCDay() === 1) || MODE === "weekly") {
     const up = gch.filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g, p]) => `${esc(g)} ${arrow(p)}`);
     const dn = gch.filter(([, p]) => p < 0).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([g, p]) => `${esc(g)} ${arrow(p)}`);
     msgs.push({ link: false, text: `📅 <b>Неделя ${ddmm(curFrom)}–${ddmm(curTo)}</b>\n\n` + lines.join("\n") +
-      `\n<b>Всего: ${nfw(T.cur.c)} зак. · ${rubM(T.cur.r)}</b> ${ch != null ? ` (${arrow(ch)} к ${ddmm(prvFrom)}–${ddmm(prvTo)})` : ""}` +
+      `\n<b>Всего: ${nfw(T.cur.c)} зак. · ${rubM(T.cur.r)}</b>${ch != null ? ` (${arrow(ch)} к ${ddmm(prvFrom)}–${ddmm(prvTo)})` : ""}` +
       `\nВ среднем ${rubM(T.cur.r / 7)} в день` +
       (verdict ? `\n\n${verdict}` : "") +
       (lead.length ? `\n\nЛидеры (шт, к прошлой неделе):\n` + lead.join("\n") : "") +
