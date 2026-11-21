@@ -38,7 +38,7 @@ if (!DASH_PASSWORD || !TG_BOT_TOKEN || !TG_CHAT_ID) {
 }
 
 const { login } = await import("../js/api/auth.js");
-const { loadExternal, setRawScope, getStocksForArt, getStocksForSz } = await import("../js/api/sheets.js");
+const { loadExternal, setRawScope, getStocksForArt, getStocksForSz, artGroup } = await import("../js/api/sheets.js");
 const { loadWB, cardByNm } = await import("../js/api/wb.js");
 const { WORKER } = await import("../js/config.js");
 const { authHeader } = await import("../js/api/auth.js");
@@ -157,6 +157,67 @@ if (MODE === "morning") {
       (lead.length ? `\n\nТоп: ` + lead.join(", ") : "") });
   }
 
+}
+
+/* ── Недельная сводка: по понедельникам в 10:00 (вместе с morning) или вручную режимом weekly.
+   Прошлая неделя пн–вс против позапрошлой: заказы и сумма (после СПП, как в ежедневной сводке),
+   вердикт по сумме (±10%), лидеры по штукам, рост/просадка групп «Кратко» (от 50 заказов за неделю). ── */
+const mskNow = new Date(Date.now() + 3 * 3600e3);
+if ((MODE === "morning" && mskNow.getUTCDay() === 1) || MODE === "weekly") {
+  const WEEK_TREND = 10, GROUP_MIN = 50;
+  const rubM = (x) => x >= 1e6 ? (x / 1e6).toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " млн ₽"
+    : Math.round(x / 1000).toLocaleString("ru-RU").replace(/\u00a0/g, " ") + " тыс ₽";
+  const nfw = (x) => Math.round(x).toLocaleString("ru-RU").replace(/\u00a0/g, " ");
+  const pctCh = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+  const arrow = (p) => (p == null ? "" : p > 0 ? `▲ +${p}%` : p < 0 ? `▼ −${-p}%` : "→ 0%");
+  const dISO = (msAgo) => new Date(mskNow.getTime() - msAgo).toISOString().slice(0, 10);
+  /* прошлая неделя: пн…вс перед текущим понедельником (для weekly в другой день — последняя полная неделя) */
+  const sinceMon = (mskNow.getUTCDay() + 6) % 7;                    /* сколько дней прошло с понедельника */
+  const curFrom = dISO((sinceMon + 7) * 864e5), curTo = dISO((sinceMon + 1) * 864e5);
+  const prvFrom = dISO((sinceMon + 14) * 864e5), prvTo = dISO((sinceMon + 8) * 864e5);
+  const ddmm = (d) => d.slice(8, 10) + "." + d.slice(5, 7);
+  const lines = [], arts = { cur: {}, prv: {} }, grp = { cur: {}, prv: {} };
+  let T = { cur: { c: 0, r: 0 }, prv: { c: 0, r: 0 } };
+  for (const n of [1, 2, 3]) {
+    const d = D[n];
+    if (!d) continue;
+    const price = d.isOz ? ozRev : wbPrice;
+    const dayOf = (o) => (d.isOz ? (o.created_at || o.in_process_at || "") : (o.date || "")).slice(0, 10);
+    const sum = { cur: { c: 0, r: 0 }, prv: { c: 0, r: 0 } };
+    for (const o of d.allOrders || []) {
+      const day = dayOf(o);
+      const w = day >= curFrom && day <= curTo ? "cur" : day >= prvFrom && day <= prvTo ? "prv" : null;
+      if (!w) continue;
+      sum[w].c++; sum[w].r += price(o);
+      const items = d.isOz ? (o.products || []).map((p) => [ozBase(p.offer_id), p.quantity || 1]) : [[o.supplierArticle, o.quantity || 1]];
+      for (const [a, q] of items) {
+        if (!a || isStopped(a, n)) continue;
+        arts[w][a] = (arts[w][a] || 0) + q;
+        const g = artGroup(a)?.kratko;
+        if (g) grp[w][g] = (grp[w][g] || 0) + q;
+      }
+    }
+    T.cur.c += sum.cur.c; T.cur.r += sum.cur.r; T.prv.c += sum.prv.c; T.prv.r += sum.prv.r;
+    const ar = arrow(pctCh(sum.cur.r, sum.prv.r));
+    lines.push(`${esc(cabName(n))}: ${nfw(sum.cur.c)} зак. · ${rubM(sum.cur.r)}${ar ? ` (${ar})` : ""}`);
+  }
+  if (lines.length && T.cur.c) {
+    const ch = pctCh(T.cur.r, T.prv.r);
+    const verdict = ch == null ? "" : ch >= WEEK_TREND ? "🚀 <b>Газуем</b>" : ch <= -WEEK_TREND ? "🛑 <b>Тормозим</b>" : "🚗 <b>Катимся ровно</b>";
+    const lead = Object.entries(arts.cur).sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([a, q], i) => `${i + 1}. <code>${esc(a)}</code> — ${nfw(q)}${arts.prv[a] ? ` (${arrow(pctCh(q, arts.prv[a]))})` : ""}`);
+    const gch = Object.entries(grp.cur).filter(([g, q]) => q >= GROUP_MIN && grp.prv[g] >= GROUP_MIN)
+      .map(([g, q]) => [g, pctCh(q, grp.prv[g])]).filter(([, p]) => p != null);
+    const up = gch.filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g, p]) => `${esc(g)} ${arrow(p)}`);
+    const dn = gch.filter(([, p]) => p < 0).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([g, p]) => `${esc(g)} ${arrow(p)}`);
+    msgs.push({ link: false, text: `📅 <b>Неделя ${ddmm(curFrom)}–${ddmm(curTo)}</b>\n\n` + lines.join("\n") +
+      `\n<b>Всего: ${nfw(T.cur.c)} зак. · ${rubM(T.cur.r)}</b> ${ch != null ? ` (${arrow(ch)} к ${ddmm(prvFrom)}–${ddmm(prvTo)})` : ""}` +
+      `\nВ среднем ${rubM(T.cur.r / 7)} в день` +
+      (verdict ? `\n\n${verdict}` : "") +
+      (lead.length ? `\n\nЛидеры (шт, к прошлой неделе):\n` + lead.join("\n") : "") +
+      (up.length ? `\n\nСильнее всех выросли: ` + up.join(", ") : "") +
+      (dn.length ? `\nСильнее всех просели: ` + dn.join(", ") : "") });
+  }
 }
 
 if (MODE === "morning" || MODE === "urgent") {

@@ -9,11 +9,11 @@ on:
   workflow_dispatch:             # ручной запуск: Actions → этот workflow → Run workflow
     inputs:
       mode:
-        description: "morning — сводка, дефицит, FBS, удержания; fbs — только FBS; drop — падение заказов; penalties — только удержания и замеры"
+        description: "morning — сводка, дефицит, FBS, удержания; fbs — только FBS; drop — падение заказов; penalties — только удержания и замеры; weekly — недельная сводка (сама приходит по понедельникам с morning)"
         required: true
         default: morning
         type: choice
-        options: [morning, fbs, drop, penalties, urgent, supplies]
+        options: [morning, fbs, drop, penalties, urgent, supplies, weekly]
 
 # запуски по очереди — чтобы не перезаписывать память остатков друг другу
 concurrency:
