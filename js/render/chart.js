@@ -1,6 +1,14 @@
 import { CM, CV, CP, CD, GB, FP, FG } from "../state.js";
 import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
+import { WX, loadWeather } from "../api/weather.js";
+
+/* Полоска «ночью» под графиком (мин. температура за сутки в Москве) — переключатель «🌡 Ночь», помним выбор */
+let SHOW_WX = true;
+try { SHOW_WX = localStorage.getItem("chartWx") !== "0"; } catch (_) {}
+export function togChartWx() { SHOW_WX = !SHOW_WX; try { localStorage.setItem("chartWx", SHOW_WX ? "1" : "0"); } catch (_) {} }
+const wxFmt = (t) => { const r = Math.round(t); return (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r) + "°"; };
+const wxCol = (t) => (t <= -1 ? "#3D7EAA" : t < 1 ? "#7FA9C9" : t < 3 ? "#C9B79C" : "#E07A5F");   /* мороз → около нуля → +1…+2 → тепло */
 
 /* Палитра под топ-5 категорий + тёплый серый для «Прочее» (спокойные, но различимые тона) */
 const PAL = ["#E07A5F", "#3D7EAA", "#7FB069", "#8E7DBE", "#E9A93B"];
@@ -42,7 +50,7 @@ export function chartHTML(n, vm, type) {
 
   /* ── Шкала интервалов: дни/часы + функция «дата заказа → индекс» ── */
   const isHourly = mode === "day" || mode === "yesterday";
-  let labels = [], idxOf, N;
+  let labels = [], idxOf, N, dayKeys = null;
   if (isHourly) {
     for (let i = 0; i < 24; i++) labels.push(i % 3 === 0 ? i + ":00" : "");
     N = 24;
@@ -58,6 +66,7 @@ export function chartHTML(n, vm, type) {
       ? new Date(d + "T12:00:00").toLocaleDateString("ru", { day: "numeric", month: "short" }).replace(".", "")
       : "");
     N = span;
+    dayKeys = days;
     idxOf = (o) => { const d = dateOf(o); return d in pos ? pos[d] : -1; };
   }
 
@@ -77,8 +86,11 @@ export function chartHTML(n, vm, type) {
   };
 
   const topY = [];   /* где стоит подпись итога над столбиком — чтобы подпись цены на неё не налезала */
-  const W = 700, H = 155, L = 38, R = showPrice ? 40 : 10, T = 13, B = 20;
-  const cW = W - L - R, cH = H - T - B;
+  const wxOn = SHOW_WX && !!dayKeys;                     /* полоска температуры — только Неделя/Месяц */
+  if (wxOn) loadWeather(dayKeys[0], dayKeys[dayKeys.length - 1], iso(Date.now()));
+  const HB = 155, WXH = wxOn ? 20 : 0;
+  const W = 700, H = HB + WXH, L = 38, R = showPrice ? 40 : 10, T = 13, B = 20;
+  const cW = W - L - R, cH = HB - T - B;
   const gW = cW / N;
 
   /* Оси Y + сетка (общее для обоих режимов) */
@@ -97,7 +109,7 @@ export function chartHTML(n, vm, type) {
     for (let i = 0; i < N; i += step) {
       if (!labels[i]) continue;
       const fs = isHourly ? 8 : mode === "month" ? 7 : 9;
-      out += `<text x="${L + i * gW + gW / 2}" y="${H - 4}" text-anchor="middle" font-size="${fs}" fill="var(--ink3)">${labels[i]}</text>`;
+      out += `<text x="${L + i * gW + gW / 2}" y="${HB - 4}" text-anchor="middle" font-size="${fs}" fill="var(--ink3)">${labels[i]}</text>`;
     }
     return out;
   };
@@ -153,6 +165,21 @@ export function chartHTML(n, vm, type) {
     }
     return out;
   };
+  /* Полоска «ночью»: под каждым днём — мин. температура за сутки, цветом мороз/тепло */
+  const wxStrip = () => {
+    if (!wxOn) return "";
+    const y0 = HB + 2, h = 14, fs = mode === "month" ? 6.5 : 8;
+    let out = `<text x="${L - 3}" y="${y0 + 10}" text-anchor="end" font-size="6.5" fill="var(--ink3)">ночью</text>`;
+    dayKeys.forEach((k, i) => {
+      const t = WX.min[k];
+      const x = L + i * gW + 0.75, w = Math.max(1, gW - 1.5);
+      if (t == null) { out += `<rect x="${x}" y="${y0}" width="${w}" height="${h}" rx="3" fill="var(--bg2)" opacity=".5"/>`; return; }
+      out += `<g><title>${labelOf(i)} · ночью (мин. за сутки, Москва): ${t.toLocaleString("ru", { maximumFractionDigits: 1 })}°</title>
+        <rect x="${x}" y="${y0}" width="${w}" height="${h}" rx="3" fill="${wxCol(t)}" opacity=".85"/>
+        <text x="${x + w / 2}" y="${y0 + 10}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="#fff">${wxFmt(t)}</text></g>`;
+    });
+    return out;
+  };
   /* полная подпись интервала для подсказки */
   const labelOf = (i) => {
     if (isHourly) return i + ":00";
@@ -183,6 +210,7 @@ export function chartHTML(n, vm, type) {
       </span>
       <span class="ctog">
         <button class="${showPrice ? "on" : ""}" onclick="App.togChartPrice(${n})" data-tip="Линия — средняя цена на сайте за штуку (финиш-прайс) по каждому интервалу, шкала справа">— Цена</button>
+        <button class="${SHOW_WX ? "on" : ""}" onclick="App.togChartWx(${n})" data-tip="Полоска под графиком (Неделя/Месяц): минимальная температура за сутки в Москве, обычно ночью. Синий — мороз, голубой — около нуля, бежевый — +1…+2°, оранжевый — от +3°. Данные Open-Meteo">🌡 Ночь</button>
       </span>
       <span class="ctog">
         <button class="${on(CV[n], "ord")}" onclick="App.setChartVal(${n},'ord')">Шт</button>
@@ -244,7 +272,7 @@ export function chartHTML(n, vm, type) {
       <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName}${ghost ? ` <span style="color:var(--ink3);font-weight:400;font-size:11px">· серым — вчера</span>` : ""}</span>${controls}</div>
       <div class="tw" style="padding:8px">
         ${priceLegend()}
-        <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine()}${tops}${xLabels()}</svg>
+        <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine()}${tops}${xLabels()}${wxStrip()}</svg>
       </div>
     </div>`;
   }
@@ -343,7 +371,7 @@ export function chartHTML(n, vm, type) {
     <div class="sh"><span class="st">${isRev ? "Выручка" : "Заказы"} · ${modeName} <span style="color:var(--ink3);font-weight:400;font-size:11px">· ${levelName} · раскрывается сверху в «Структуре спроса»</span></span>${controls}</div>
     <div class="tw" style="padding:8px">
       <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${legend}${priceLegend(true)}</div>
-      <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine(segOrder)}${tops}${xLabels()}</svg>
+      <svg class="cc" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${HOVER_CSS}${axis(max)}${bars}${priceLine(segOrder)}${tops}${xLabels()}${wxStrip()}</svg>
     </div>
   </div>`;
 }

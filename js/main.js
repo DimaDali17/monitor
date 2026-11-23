@@ -1,4 +1,5 @@
 import { VERSION } from "./config.js";
+import { togChartWx } from "./render/chart.js";
 import {
   D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
   CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
@@ -163,6 +164,7 @@ const App = {
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
   setChartVal(n, v) { CV[n] = v; renderCabinet(n); },
   togChartPrice(n) { CP[n] = !CP[n]; renderCabinet(n); },
+  togChartWx(n) { togChartWx(); renderCabinet(n); },
   setPlanUnit(u) { setPlanUnit(u); repaintPlan(1); },
   setPlanBase(b) { setPlanBase(b); repaintPlan(1); },
   setPlanPer(p) { setPlanPer(p); repaintPlan(1); },
@@ -377,3 +379,6 @@ function init() {
 }
 
 init();
+
+/* Погода для графика догрузилась — перерисовать открытые кабинеты */
+if (typeof window !== "undefined") window.addEventListener("wx-ready", () => { for (const n of [1, 2, 3]) if (D[n]) renderCabinet(n); });
