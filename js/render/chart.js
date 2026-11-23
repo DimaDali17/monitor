@@ -3,7 +3,7 @@ import { wbPrice, ozRev, iso, esc, q } from "../utils.js";
 import { artGroup, artColor } from "../api/sheets.js";
 import { WX, loadWeather } from "../api/weather.js";
 
-/* Полоска «ночью» под графиком (мин. температура за сутки в Москве) — переключатель «🌡 Ночь», помним выбор */
+/* Полоска «днём» под графиком (макс. температура за сутки в Москве) — переключатель «☀️ День», помним выбор */
 let SHOW_WX = true;
 try { SHOW_WX = localStorage.getItem("chartWx") !== "0"; } catch (_) {}
 export function togChartWx() { SHOW_WX = !SHOW_WX; try { localStorage.setItem("chartWx", SHOW_WX ? "1" : "0"); } catch (_) {} }
@@ -165,16 +165,16 @@ export function chartHTML(n, vm, type) {
     }
     return out;
   };
-  /* Полоска «ночью»: под каждым днём — мин. температура за сутки, цветом мороз/тепло */
+  /* Полоска «днём»: под каждым днём — макс. температура за сутки, цветом мороз/тепло */
   const wxStrip = () => {
     if (!wxOn) return "";
     const y0 = HB + 2, h = 14, fs = mode === "month" ? 6.5 : 8;
-    let out = `<text x="${L - 3}" y="${y0 + 10}" text-anchor="end" font-size="6.5" fill="var(--ink3)">ночью</text>`;
+    let out = `<text x="${L - 3}" y="${y0 + 10}" text-anchor="end" font-size="6.5" fill="var(--ink3)">днём</text>`;
     dayKeys.forEach((k, i) => {
-      const t = WX.min[k];
+      const t = WX.max[k];
       const x = L + i * gW + 0.75, w = Math.max(1, gW - 1.5);
       if (t == null) { out += `<rect x="${x}" y="${y0}" width="${w}" height="${h}" rx="3" fill="var(--bg2)" opacity=".5"/>`; return; }
-      out += `<g><title>${labelOf(i)} · ночью (мин. за сутки, Москва): ${t.toLocaleString("ru", { maximumFractionDigits: 1 })}°</title>
+      out += `<g><title>${labelOf(i)} · днём (макс. за сутки, Москва): ${t.toLocaleString("ru", { maximumFractionDigits: 1 })}°</title>
         <rect x="${x}" y="${y0}" width="${w}" height="${h}" rx="3" fill="${wxCol(t)}" opacity=".85"/>
         <text x="${x + w / 2}" y="${y0 + 10}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="#fff">${wxFmt(t)}</text></g>`;
     });
@@ -210,7 +210,7 @@ export function chartHTML(n, vm, type) {
       </span>
       <span class="ctog">
         <button class="${showPrice ? "on" : ""}" onclick="App.togChartPrice(${n})" data-tip="Линия — средняя цена на сайте за штуку (финиш-прайс) по каждому интервалу, шкала справа">— Цена</button>
-        <button class="${SHOW_WX ? "on" : ""}" onclick="App.togChartWx(${n})" data-tip="Полоска под графиком (Неделя/Месяц): минимальная температура за сутки в Москве, обычно ночью. Синий — мороз, голубой — около нуля, бежевый — +1…+2°, оранжевый — от +3°. Данные Open-Meteo">🌡 Ночь</button>
+        <button class="${SHOW_WX ? "on" : ""}" onclick="App.togChartWx(${n})" data-tip="Полоска под графиком (Неделя/Месяц): максимальная температура за сутки в Москве, обычно днём. Синий — мороз, голубой — около нуля, бежевый — +1…+2°, оранжевый — от +3°. Данные Open-Meteo">☀️ День</button>
       </span>
       <span class="ctog">
         <button class="${on(CV[n], "ord")}" onclick="App.setChartVal(${n},'ord')">Шт</button>
