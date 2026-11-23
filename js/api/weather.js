@@ -5,7 +5,7 @@
    ══════════════════════════════════════════════════════════ */
 const URL_BASE = "https://api.open-meteo.com/v1/forecast?latitude=55.7558&longitude=37.6173&daily=temperature_2m_max&timezone=Europe%2FMoscow";
 const LS = "wxMaxMsk";
-export const WX = { min: {}, status: null };
+export const WX = { max: {}, status: null };
 try { Object.assign(WX.max, JSON.parse(localStorage.getItem(LS) || "{}")); } catch (_) {}
 
 let pending = null;
