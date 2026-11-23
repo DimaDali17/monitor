@@ -1,5 +1,5 @@
 import { VERSION } from "./config.js";
-import { togChartWx } from "./render/chart.js";
+import { setChartWx } from "./render/chart.js";
 import {
   D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
   CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
@@ -164,7 +164,7 @@ const App = {
   setChartMode(n, m) { CM[n] = m; renderCabinet(n); },
   setChartVal(n, v) { CV[n] = v; renderCabinet(n); },
   togChartPrice(n) { CP[n] = !CP[n]; renderCabinet(n); },
-  togChartWx(n) { togChartWx(); renderCabinet(n); },
+  setChartWx(n, mode) { setChartWx(mode); renderCabinet(n); },
   setPlanUnit(u) { setPlanUnit(u); repaintPlan(1); },
   setPlanBase(b) { setPlanBase(b); repaintPlan(1); },
   setPlanPer(p) { setPlanPer(p); repaintPlan(1); },
