@@ -242,7 +242,9 @@ if (MODE === "morning" || MODE === "fbs") {
   let prev = null;
   try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { /* первый запуск */ }
   const next = { at: new Date().toISOString(), cabs: { ...(prev?.cabs || {}) }, zero: { ...(prev?.zero || {}) } };
-  const gone = [], again = [];
+  const gone = [], again = [], weekLeft = [];
+  /* Понедельник 10:00 (morning) — итог недели по FBS: что так и не пополнили. После итога про это молчим. */
+  const isMonMorning = MODE === "morning" && new Date(Date.now() + 3 * 3600e3).getUTCDay() === 1;
   const FBS_MIN_HAVE = 10;  /* меньше 10 шт СГП + сырья у размера — пополнять толком нечем, не пишем */
   const REPEAT_H = 23.5;   /* «сутки» — с запасом на то, что запуски идут в начале часа с разбросом */
   for (const n of [1, 2, 3]) {
@@ -263,12 +265,14 @@ if (MODE === "morning" || MODE === "fbs") {
     }
     next.cabs[n] = snap;
     if (!old) continue;
-    /* Память о нулях: ключ → { since: когда стал 0, last: когда последний раз писали }.
-       Стал 0 — пишем сразу. Через сутки после сообщения всё ещё 0 — повтор (и так раз в сутки),
-       пока не пополнят. Пополнили (>0) или правило/спрос пропали — забываем. */
+    /* Память о нулях: ключ → { since: когда стал 0, last: когда последний раз писали,
+       al: писали ли вообще, reps: сколько было повторов, wk: попал в итог недели }.
+       Стал 0 — пишем сразу. Через сутки всё ещё 0 — ОДИН повтор. Дальше молчим; в понедельник 10:00 —
+       итог «так и не пополнили», после него молчим совсем. Пополнили (>0) или правило/спрос пропали — забываем. */
     const zm = (next.zero[n] ||= {});
     const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
-    const byArt = {}, rep = {};
+    const byArt = {}, rep = {}, wk = {};
+    const EPOCH = new Date(0).toISOString();
     for (const [k, q] of Object.entries(snap)) {
       if (q > 0) { delete zm[k]; continue; }
       const [art, sz, w] = k.split("|");
@@ -282,14 +286,25 @@ if (MODE === "morning" || MODE === "fbs") {
         else zm[k].last = new Date(0).toISOString();
         continue;
       }
+      const z = zm[k];
+      if (z) {   /* старые записи (до этой версии): писали ли и был ли уже повтор — восстанавливаем по датам */
+        if (z.al == null) z.al = !!z.since && z.last !== EPOCH;
+        if (z.reps == null) z.reps = z.al && Date.parse(z.last) - Date.parse(z.since) >= REPEAT_H * 3600e3 ? 1 : 0;
+      }
+      const daysZ = (x) => (x.since ? Math.floor((nowMs - Date.parse(x.since)) / 864e5) : null);
       if (old[k] > 0) {                                   /* только что закончилось */
-        zm[k] = { since: nowIso, last: nowIso };
+        zm[k] = { since: nowIso, last: nowIso, al: true, reps: 0 };
         ((byArt[art] ||= {})[w] ||= []).push(sz);
-      } else if (!zm[k]) {
-        zm[k] = { since: null, last: nowIso };           /* был 0 ещё до этой функции: с какого дня — не знаем; сутки считаем с сейчас */
-      } else if (nowMs - Date.parse(zm[k].last) >= REPEAT_H * 3600e3) {
-        zm[k].last = nowIso;
-        ((rep[art] ||= {})[w] ||= []).push({ sz, days: zm[k].since ? Math.floor((nowMs - Date.parse(zm[k].since)) / 864e5) : null });
+      } else if (!z) {
+        zm[k] = { since: null, last: nowIso, al: false, reps: 0 };   /* был 0 ещё до этой функции: с какого дня — не знаем; сутки считаем с сейчас */
+      } else if (z.wk) {
+        /* уже было в итоге недели — больше не напоминаем */
+      } else if (isMonMorning && z.al && (z.reps >= 1 || nowMs - Date.parse(z.last) >= REPEAT_H * 3600e3)) {
+        z.wk = true;                                       /* итог недели: так и не пополнили — и забываем */
+        ((wk[art] ||= {})[w] ||= []).push({ sz, days: daysZ(z) });
+      } else if (z.reps < 1 && nowMs - Date.parse(z.last) >= REPEAT_H * 3600e3) {
+        z.last = nowIso; z.al = true; z.reps = (z.reps || 0) + 1;      /* один повтор через сутки */
+        ((rep[art] ||= {})[w] ||= []).push({ sz, days: daysZ(z) });
       }
     }
     for (const k of Object.keys(zm)) if (!(k in snap)) delete zm[k];
@@ -307,11 +322,20 @@ if (MODE === "morning" || MODE === "fbs") {
       return `• <code>${esc(art)}</code> — ${where}${ago}`;
     });
     if (rlines.length) again.push(`\n<b>${cabName(n)}</b>\n` + cap(rlines).join("\n"));
+    const wlines = Object.entries(wk).map(([art, ws]) => {
+      const dmax = Math.max(0, ...Object.values(ws).flat().map((x) => x.days || 0));
+      const ago = dmax >= 1 ? ` · 0 уже ${dmax} дн.` : "";
+      if (n === 3) return `• <code>${esc(art)}</code> — FBS 0${ago}`;
+      const where = Object.entries(ws).map(([w, xs]) => xs.some((x) => x.sz) ? `${w} (${xs.map((x) => esc(x.sz)).join(", ")})` : w).join(", ");
+      return `• <code>${esc(art)}</code> — ${where}${ago}`;
+    });
+    if (wlines.length) weekLeft.push(`\n<b>${cabName(n)}</b>\n` + cap(wlines).join("\n"));
   }
   fs.mkdirSync(STATE.replace(/\/[^/]*$/, ""), { recursive: true });
   fs.writeFileSync(STATE, JSON.stringify(next));
   if (gone.length) msgs.push(`🔴 <b>Закончилось на FBS</b>\n` + gone.join("\n"));
   if (again.length) msgs.push(`🔁 <b>Повтор: всё ещё 0 на FBS</b> (прошли сутки с сообщения, не пополнили)\n` + again.join("\n"));
+  if (weekLeft.length) msgs.push(`📋 <b>Итог недели: так и не пополнили FBS</b>\n` + weekLeft.join("\n") + `\n\nБольше про эти позиции не напоминаем — до следующего обнуления.`);
 }
 
 if (MODE === "drop") {
