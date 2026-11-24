@@ -70,8 +70,25 @@ export function stocksTbl(n) {
 
   const { arts, whList } = vm;
   const fbsCells = vm.fbsCells || {};
-  /* FBS-склады продавца — отдельные колонки справа, справочно, но в «Итого» входят */
-  const fbsWhList = Object.keys(vm.fbsWh || {}).sort((a, b) => (vm.fbsWh[b] || 0) - (vm.fbsWh[a] || 0));
+  /* Объединяем WB- и FBS-склады в один порядок: WB РФ всегда первый,
+     затем склады с остатками (включая FBS), в конце полностью пустые. */
+  const fbsWhList = Object.keys(vm.fbsWh || {});
+  const whCols = [
+    ...whList.map((name) => ({ name, fbs: false, total: 0 })),
+    ...fbsWhList.map((name) => ({ name, fbs: true, total: 0 })),
+  ];
+  for (const col of whCols) {
+    col.total = col.fbs ? (vm.fbsWh[col.name] || 0)
+      : Object.values(arts).reduce((sum, v) => sum + (v.wh?.[col.name] || 0), 0);
+  }
+  const isWbRf = (name) => /склад\s*(?:wb|вб)\s*рф|(?:wb|вб)\s*рф|wildberries\s*рф/i.test(name);
+  whCols.sort((a, b) => {
+    const aMain = !a.fbs && isWbRf(a.name), bMain = !b.fbs && isWbRf(b.name);
+    if (aMain !== bMain) return aMain ? -1 : 1;
+    const aHas = a.total > 0, bHas = b.total > 0;
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    return b.total - a.total || a.name.localeCompare(b.name);
+  });
 
   const { c, d: dir } = SS[n];
   const fa = (FS[n] || "").trim().toLowerCase();
@@ -99,14 +116,10 @@ export function stocksTbl(n) {
   const cls = (k) => (SS[n].c === k ? " sa" : "");
   const qc = (v, lo) => (v === 0 ? "qx" : v < lo ? "ql" : "qo");
 
-  const whHead = whList.map((w) =>
-    `<th class="${cls(w)}" data-sort style="background:var(--bg2);color:var(--ink2)" onclick="App.sortS(${n},'${q(w)}')">` +
-    `<span style="font-size:8px">${esc(w.slice(0, 14))}</span>${arrow(w)}</th>`
-  ).join("");
-
-  const fbsHead = fbsWhList.map((w) =>
-    `<th class="${cls(w)}" data-sort style="background:#FBE9E7;color:#8B4513" onclick="App.sortS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}">` +
-    `<span style="font-size:8px">FBS·${esc(w)}</span>${arrow(w)}</th>`
+  const whHead = whCols.map(({ name: w, fbs }) =>
+    fbs
+      ? `<th class="${cls(w)}" data-sort style="background:#FBE9E7;color:#8B4513" onclick="App.sortS(${n},'${q(w)}')" data-tip="FBS-склад продавца: ${esc(w)}"><span style="font-size:8px">FBS·${esc(w)}</span>${arrow(w)}</th>`
+      : `<th class="${cls(w)}" data-sort style="background:var(--bg2);color:var(--ink2)" onclick="App.sortS(${n},'${q(w)}')"><span style="font-size:8px">${esc(w.slice(0, 14))}</span>${arrow(w)}</th>`
   ).join("");
 
   const shown = EXS[n] ? keys : keys.slice(0, LIM);
@@ -118,13 +131,11 @@ export function stocksTbl(n) {
     const hasSizes = g.sizes.length > 1;
     const tog = hasSizes ? `<span class="tog">${open ? "▼" : "▶"}</span>` : '<span class="tog"> </span>';
 
-    const cells = whList.map((w) => {
-      const qy = g.wh[w] || 0;
-      return `<td class="${qc(qy, 10)}" style="text-align:center">${qy || "—"}</td>`;
-    }).join("");
-    const cellsF = fbsWhList.map((w) => {
-      const qy = g.fbsWh[w] || 0;
-      return `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;color:#8B4513">${qy || "—"}</td>`;
+    const cells = whCols.map(({ name: w, fbs }) => {
+      const qy = fbs ? (g.fbsWh[w] || 0) : (g.wh[w] || 0);
+      return fbs
+        ? `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;color:#8B4513">${qy || "—"}</td>`
+        : `<td class="${qc(qy, 10)}" style="text-align:center">${qy || "—"}</td>`;
     }).join("");
 
     /* сверка с дефицитом — только для WB и без фильтра по размеру (иначе суммы неполные) */
@@ -136,20 +147,18 @@ export function stocksTbl(n) {
 
     rows += `<tr class="ar-row"${hasSizes ? ` onclick="App.togArt(${n},'${q(a)}')"` : ""}>
       <td style="white-space:nowrap">${tog}<span class="art">${esc(a)}</span><span style="font-size:10px;color:var(--ink3);margin-left:6px">${esc(g.name.slice(0, 22))}</span></td>
-      <td class="tc ${qc(g.total, 10)}"${mark ? ' style="color:#B3261E"' : ""}>${g.total}${mark}</td>${cells}${cellsF}
+      <td class="tc ${qc(g.total, 10)}"${mark ? ' style="color:#B3261E"' : ""}>${g.total}${mark}</td>${cells}
     </tr>`;
 
     if (open) {
       for (const sv of [...g.sizes].sort((x, y) => szCmp(x.sz, y.sz))) {
         const fc = fbsCells[a + " · " + sv.sz] || {};
         const szFbs = Object.values(fc).reduce((s, x) => s + x, 0);
-        const sc = whList.map((w) => {
-          const qy = sv.wh[w] || 0;
-          return `<td class="${qy === 0 ? "qx" : qy < 10 ? "ql" : ""}" style="text-align:center;font-size:11px">${qy || "—"}</td>`;
-        }).join("");
-        const scF = fbsWhList.map((w) => {
-          const qy = fc[w] || 0;
-          return `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`;
+        const sc = whCols.map(({ name: w, fbs }) => {
+          const qy = fbs ? (fc[w] || 0) : (sv.wh[w] || 0);
+          return fbs
+            ? `<td class="${qy === 0 ? "qx" : ""}" style="text-align:center;font-size:11px;color:#8B4513">${qy || "—"}</td>`
+            : `<td class="${qy === 0 ? "qx" : qy < 10 ? "ql" : ""}" style="text-align:center;font-size:11px">${qy || "—"}</td>`;
         }).join("");
         let markSz = "";
         if (!vm.isOz && szFbs > 0) {
@@ -158,13 +167,13 @@ export function stocksTbl(n) {
         }
         rows += `<tr class="sz-row">
           <td style="padding-left:28px">${esc(sv.sz)}</td>
-          <td class="${qc(sv.total + szFbs, 10)}" style="text-align:center;font-weight:600${markSz ? ";color:#B3261E" : ""}">${sv.total + szFbs}${markSz}</td>${sc}${scF}
+          <td class="${qc(sv.total + szFbs, 10)}" style="text-align:center;font-weight:600${markSz ? ";color:#B3261E" : ""}">${sv.total + szFbs}${markSz}</td>${sc}
         </tr>`;
       }
     }
   }
 
-  const span = whList.length + fbsWhList.length + 2;
+  const span = whCols.length + 2;
   const more = keys.length > LIM
     ? `<tr class="er"><td class="stick" colspan="${span}"><button class="eb" onclick="App.togExS(${n})">${EXS[n] ? "▲ Свернуть" : "▼ Все " + keys.length}</button></td></tr>`
     : "";
@@ -173,7 +182,7 @@ export function stocksTbl(n) {
     <thead><tr>
       <th class="${cls('art')}" data-sort style="text-align:left" onclick="App.sortS(${n},'art')">Артикул${arrow('art')}</th>
       <th class="${cls("total")}" data-sort style="background:var(--bg3)" onclick="App.sortS(${n},'total')">Итого${arrow("total")}</th>
-      ${whHead}${fbsHead}
+      ${whHead}
     </tr></thead>
     <tbody>${rows || '<tr><td class="em" colspan="99">Ничего не найдено</td></tr>'}${more}</tbody>
   </table>`;
