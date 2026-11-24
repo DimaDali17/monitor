@@ -238,7 +238,7 @@ const App = {
     renderCabinet(n);
   },
   setOrdFilter(n, v) { OFM[n] = v; renderCabinet(n); },
-  setProfitInput,
+  setProfitInput(n, art, field, value) { setProfitInput(n, art, field, value); renderCabinet(n); },
 
   /* заказы */
   togExp(n) { EXP[n] = !EXP[n]; renderCabinet(n); },
