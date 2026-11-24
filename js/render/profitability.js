@@ -40,10 +40,13 @@ const overrides = () => read(LSKEY);
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
 const parseCSV = txt => {
-  const delim=(txt.split(/\r?\n/,1)[0]||"").split(";").length>(txt.split(/\r?\n/,1)[0]||"").split(",").length?";":",";
+  const delim=(txt.split(/\r?
+/,1)[0]||"").split(";").length>(txt.split(/\r?
+/,1)[0]||"").split(",").length?";":",";
   const rows=[];let row=[],f="",q=false;
   for(let i=0;i<txt.length;i++){const c=txt[i];if(q){if(c==='"'){if(txt[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
-    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="\n"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\r")f+=c;}
+    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="
+"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\r")f+=c;}
   if(f.length||row.length){row.push(f);rows.push(row);}return rows;
 };
 const col = (h,...names) => {for(const x of names){const i=h.findIndex(v=>v===x);if(i>=0)return i;}for(const x of names){const i=h.findIndex(v=>v.includes(x));if(i>=0)return i;}return -1;};
@@ -150,9 +153,17 @@ function detail(cab,r,st,z,ad){
     field(cab,r.art,st,"prep_box","Обработка короба, ₽","0.1")+
     field(cab,r.art,st,"prep_move_l","Перемещение, ₽/л","0.1")+
     field(cab,r.art,st,"ff_flat","ФФ, ₽")+
-    field(cab,r.art,st,"store_per_l","Хранение, ₽/л/день","0.01")+\n    field(cab,r.art,st,"store_days","Хранение, дней")+\n    field(cab,r.art,st,"ff_on","ФФ включён (1/0)")+\n    field(cab,r.art,st,"log_t20","Тариф до 0,2 л")+\n    field(cab,r.art,st,"log_t40","Тариф до 0,4 л")+\n    field(cab,r.art,st,"log_t60","Тариф до 0,6 л")+\n    field(cab,r.art,st,"log_t80","Тариф до 0,8 л")+\n    field(cab,r.art,st,"log_t100","Тариф до 1 л")+
+    field(cab,r.art,st,"store_per_l","Хранение, ₽/л/день","0.01")+
+    field(cab,r.art,st,"store_days","Хранение, дней")+
+    field(cab,r.art,st,"ff_on","ФФ включён (1/0)")+
+    field(cab,r.art,st,"log_t20","Тариф до 0,2 л")+
+    field(cab,r.art,st,"log_t40","Тариф до 0,4 л")+
+    field(cab,r.art,st,"log_t60","Тариф до 0,6 л")+
+    field(cab,r.art,st,"log_t80","Тариф до 0,8 л")+
+    field(cab,r.art,st,"log_t100","Тариф до 1 л")+
     field(cab,r.art,st,"ad_bid","Ставка / 1000, ₽")+
-    field(cab,r.art,st,"ad_ctr","CTR, %","0.1")+\n    field(cab,r.art,st,"ad_cr","CR, %","0.1")+
+    field(cab,r.art,st,"ad_ctr","CTR, %","0.1")+
+    field(cab,r.art,st,"ad_cr","CR, %","0.1")+
     '</div><div class="pf-note">CTR: '+ad.source+'. Если CTR не найден, расходы на рекламу равны нулю, а CR принят 10% до появления фактических данных. Значения сохраняются в этом браузере.</div>';
   return '<tr class="pf-detail-row"><td colspan="9"><div class="pf-detail"><div><div class="pf-detail-title">Экономика по шагам · '+esc(r.art)+'</div>'+editable+'</div><div class="pf-steps"><table><tbody>'+rows.join("")+'</tbody></table></div></div></td></tr>';
 }
