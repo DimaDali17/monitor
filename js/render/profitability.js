@@ -18,7 +18,7 @@ const IP_DATA = {
     rashod:"https://docs.google.com/spreadsheets/d/e/2PACX-1vQuVvUEHyqdVP2ZHULOoeNyKdJrnI5qHcp8EI9uEns-xFfRaH_OifbV4yZEqeS_1a7CBVKMQ2TYi9pp/pub?gid=103296320&single=true&output=csv"
   }
 };
-const PROF_DATA = {};
+const PROF_DATA = {};\nconst LAST_VM = {};
 const DEFAULT = {
   disc:0,spp:0,buyout:null,cogs:null,vol:null,commission:null,
   wallet:3,acquiring:3,tax:6,vat:null,fixed:60,
@@ -104,7 +104,7 @@ function calc(st){
 }
 function input(cab,art,field,value){
   const all=overrides(),k=keyOf(cab,art);all[k]={...(all[k]||{}),[field]:value===""?0:Number(value)};write(LSKEY,all);
-  const vm=window.__monitorVM?.[cab];if(vm)repaintProfitability(cab,vm);
+  const vm=LAST_VM[cab];if(vm)repaintProfitability(cab,vm);
 }
 function toggle(cab,art){
   const all=opened(),k=keyOf(cab,art);all[k]=!all[k];write(OPENKEY,all);
