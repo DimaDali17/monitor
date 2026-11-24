@@ -158,7 +158,8 @@ async function checkVersion() {
 
 /* ══ Обработчики, на которые ссылается разметка ══ */
 const App = {
-  reload, reloadForConso, go, doLogin, logout, checkVersion,\n  setProfitInput, toggleProfit,
+  reload, reloadForConso, go, doLogin, logout, checkVersion,
+  setProfitInput, toggleProfit,
   fpInput, faInput, fgInput,
   exportXlsx: exportBlock,
 
