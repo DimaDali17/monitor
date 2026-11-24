@@ -90,7 +90,7 @@ function logistic(vol,buy) {
   const forward=base*C.log_fbw_coef;
   return buy>0?(forward+(1-buy)*base)/buy:forward;
 }
-function compute({price,cogs,vol,buy,subject,ctr,cr}) {
+function compute({price,cogs,vol,buy,subject,ctr,cr,cab}) {
   const p=price, spp=0, priceDisc=p, priceSPP=priceDisc*(1-spp/100), wallet=priceSPP*C.wallet/100, site=priceSPP-wallet;
   const rec=COMM.find(x=>norm(x.pred)===norm(subject));
   const comm=rec?rec.fbw:C.comm_def_fbw;
@@ -99,7 +99,7 @@ function compute({price,cogs,vol,buy,subject,ctr,cr}) {
   const logistics=logistic(vol,buy);
   const prep=C.prep_box+C.prep_move_l*vol;
   const store=C.store_per_l*Math.max(1,vol)*C.log_fbw_coef*C.store_days;
-  const tax=site*C.tax/100, vat=C.vat>0?site*C.vat/(100+C.vat):0;
+  const tax=site*C.tax/100, vat=(cab===1?5:0)>0?site*5/105:0;
   const profitBeforeAds=transfer-cogs-C.fixed-logistics-prep-store-(C.ff_on?C.ff_flat:0)-tax-vat;
   const clicks=1000*ctr/100;
   const orders=Math.ceil(clicks*cr/100);
@@ -137,7 +137,7 @@ export function profitabilityHTML(cab,vm) {
     const key=cab+"|"+norm(r.art), ov=overrides[key]||{};
     const br=getBuyrate(r.art), ref=PROF_DATA[cab]?.[norm(r.art)]||{}, buy=n(ov.buyout??br.val), cogs=n(ov.cogs??ref.cogs??0), vol=n(ref.vol);
     const ad=adMetrics(cab,r.art,r.orders);
-    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr});
+    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr,cab});
     const buySum=r.sum*buy, profitSum=r.qty*buy*calc.profit;
     const est=br.est&&!ov.buyout;
     return `<tr>
@@ -169,7 +169,7 @@ export function profitabilityHTML(cab,vm) {
     </tbody></table></div>
   </div>`;
 }
-export function setProfitInput(cab,art,field,value) {
+export function repaintProfitability(cab,vm) { const el=document.getElementById("profitability"+cab); if(el&&vm) el.outerHTML=profitabilityHTML(cab,vm); }\n\nexport function setProfitInput(cab,art,field,value) {
   const all=readOverrides(),key=cab+"|"+norm(art),o=all[key]||{};
   o[field]=field==="buyout"?Math.max(0,Math.min(1,n(value)/100)):Math.max(0,n(value));
   all[key]=o;writeOverrides(all);
