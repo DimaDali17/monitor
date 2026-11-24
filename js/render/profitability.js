@@ -135,7 +135,7 @@ function detail(cab,r,st,z,ad){
   const editable=fields.map(([name,label])=>field(cab,r.art,st,name,label,
     ["vol","log_fbw_coef","store_per_l","ad_ctr","ad_cr","disc","spp","buyout","commission","wallet","acquiring","tax","vat","log_fbw_addl","prep_move_l"].includes(name)?"0.1":"1"
   )).join("");
-  return '<tr class="pf-settings-row"><td colspan="20"><details><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 30%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по фактическим CTR/CR SKU, если данные доступны; иначе CTR можно задать вручную.</div></details></td></tr>';
+  return '<tr class="pf-settings-row"><td colspan="20"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 30%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по фактическим CTR/CR SKU, если данные доступны; иначе CTR можно задать вручную.</div></details></td></tr>';
 }
 export function profitabilityHTML(cab,vm){
   if(cab===3||!vm||!sheets.loaded)return "";
