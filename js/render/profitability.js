@@ -169,7 +169,9 @@ export function profitabilityHTML(cab,vm) {
     </tbody></table></div>
   </div>`;
 }
-export function repaintProfitability(cab,vm) { const el=document.getElementById("profitability"+cab); if(el&&vm) el.outerHTML=profitabilityHTML(cab,vm); }\n\nexport function setProfitInput(cab,art,field,value) {
+export function repaintProfitability(cab,vm) { const el=document.getElementById("profitability"+cab); if(el&&vm) el.outerHTML=profitabilityHTML(cab,vm); }
+
+export function setProfitInput(cab,art,field,value) {
   const all=readOverrides(),key=cab+"|"+norm(art),o=all[key]||{};
   o[field]=field==="buyout"?Math.max(0,Math.min(1,n(value)/100)):Math.max(0,n(value));
   all[key]=o;writeOverrides(all);
