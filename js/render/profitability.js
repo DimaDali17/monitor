@@ -99,7 +99,7 @@ function calc(st){
   const store=st.store_per_l*Math.max(1,vol)*st.log_fbw_coef*st.store_days;
   const ff=st.ff_on?st.ff_flat:0,tax=site*st.tax/100,vat=st.vat>0?site*st.vat/(100+st.vat):0;
   const profit0=transfer-st.cogs-st.fixed-logistics-prep-store-ff-tax-vat;
-  const ctr=st.ctr==null?0:st.ctr,clicks=1000*ctr/100,ordersAd=ctr>0?Math.ceil(clicks*st.cr/100):0;
+  const ctr=st.ctr==null?0:st.ctr,clicks=1000*ctr,ordersAd=ctr>0?Math.ceil(clicks*st.cr):0;
   const cpo=ordersAd>0?st.ad_bid/ordersAd:0,cps=b>0?cpo/b:cpo,drr=priceSPP>0?cps/priceSPP:0;
   return {priceDisc,priceSPP,wallet,site,acquiring,realCommPct,commRub,transfer,base,tarif,dop,logFwd,logReturn,logistics,prepBox,prepMove,prep,store,ff,tax,vat,profit0,clicks,ordersAd,cpo,cps,drr,profit:profit0-cps,margin:site>0?(profit0-cps)/site:0};
 }
