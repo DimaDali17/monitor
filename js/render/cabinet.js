@@ -12,6 +12,7 @@ import { issuesHTML } from "./issues.js";
 import { returnsHTML } from "./returns.js";
 import { planHTML, seasonHTML } from "./plan.js";
 import { adsHTML } from "./ads.js";
+import { profitabilityHTML } from "./profitability.js";
 import { setRawScope } from "../api/sheets.js";
 
 /* Артикулы кабинета (без фильтров) — чтобы общий пул сырья показывался
@@ -52,7 +53,8 @@ export function renderCabinet(n) {
     stocksHTML(n) +
     fbsStocksHTML(n) +
     seasonHTML(n) +
-    adsHTML(n);
+    adsHTML(n) +
+    (type === "wb" && (n === 1 || n === 2) ? profitabilityHTML(n, vm) : "");
 }
 
 /* Точечная перерисовка — сортировка таблицы не должна пересобирать график */
