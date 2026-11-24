@@ -1,7 +1,7 @@
 import { VERSION } from "./config.js";
 import { setChartWx } from "./render/chart.js";
 import {
-  D, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
+  D, VM, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
   CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
@@ -10,7 +10,7 @@ import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
 import { loadAds } from "./api/ads.js";
 import { repaintAds, setAdPer, setAdRows, togAdQ, togAdQAll } from "./render/ads.js";
-import { loadProfitData, setProfitInput } from "./render/profitability.js";
+import { loadProfitData, setProfitInput, repaintProfitability } from "./render/profitability.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -64,7 +64,7 @@ async function reload(n, force = false) {
     /* План / факт — большая таблица, грузим фоном и дорисовываем блок */
     if (n === 1 || n === 2) loadPlan().then(() => { if (curTab === 1) repaintPlan(1); });
     /* Реклама — после кабинета, в общей очереди запросов WB (лимит рекламы 3 в минуту) */
-    if (n !== 3) loadAds(n, { force }).then(() => repaintAds(n));
+    if (n !== 3) loadAds(n, { force }).then(() => { repaintAds(n); if (curTab === n) repaintProfitability(n, VM[n]); });
     /* План общий на оба кабинета: открыли Easyform — подгружаем EZFR фоном (его свежие заказы нужны блоку плана) */
     if (n === 1 && !D[2]) setTimeout(() => { if (!D[2]) reload(2); }, 1500);
     if (n !== 3) loadReturns(n).then(() => { if (curTab === 4) renderConso(); else repaintReturns(n); });
@@ -176,7 +176,7 @@ const App = {
   setAdRows(n, r) { setAdRows(r); repaintAds(n); },
   togAdQ(n, k) { togAdQ(n, k); repaintAds(n); },
   togAdQAll(n, k) { togAdQAll(n, k); repaintAds(n); },
-  reloadAds(n) { const el = document.getElementById("ads" + n); if (el) el.innerHTML = '<span class="st">📣 Эффективность рекламы</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем заново…</div>'; loadAds(n, { force: true }).then(() => repaintAds(n)); },
+  reloadAds(n) { const el = document.getElementById("ads" + n); if (el) el.innerHTML = '<span class="st">📣 Эффективность рекламы</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем заново…</div>'; loadAds(n, { force: true }).then(() => { repaintAds(n); repaintProfitability(n, VM[n]); }); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {
