@@ -157,7 +157,7 @@ export function profitabilityHTML(cab,vm) {
   const totalProfit=data.reduce((s,r)=>{
     const ov=overrides[cab+"|"+norm(r.art)]||{},br=getBuyrate(r.art);
     const ad=adMetrics(cab,r.art,r.orders),ref=PROF_DATA[cab]?.[norm(r.art)]||{},buy=n(ov.buyout??br.val),cogs=n(ov.cogs??ref.cogs??0),vol=n(ref.vol);
-    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr});
+    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr,cab});
     return s+r.qty*buy*calc.profit;
   },0);
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
