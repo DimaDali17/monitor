@@ -10,6 +10,7 @@ import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
 import { loadAds } from "./api/ads.js";
 import { repaintAds, setAdPer, setAdRows, togAdQ, togAdQAll } from "./render/ads.js";
+import { loadProfitData, setProfitInput } from "./render/profitability.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -48,6 +49,7 @@ async function reload(n, force = false) {
 
   try {
     await loadExternal();
+    if (n === 1 || n === 2) loadProfitData(n).catch(e => console.warn("Экономика товара не загрузилась:", e));
     say("справочники загружены, запрашиваем маркетплейс");
     if (n === 3) await loadOZ({ force });
     else await loadWB(n, { force, onRetry });
@@ -236,6 +238,7 @@ const App = {
     renderCabinet(n);
   },
   setOrdFilter(n, v) { OFM[n] = v; renderCabinet(n); },
+  setProfitInput,
 
   /* заказы */
   togExp(n) { EXP[n] = !EXP[n]; renderCabinet(n); },
