@@ -70,7 +70,7 @@ function selectedOrders(vm,nCab) {
   const start=mode==="month"?iso(Date.now()-30*864e5):mode==="week"?iso(Date.now()-7*864e5):mode==="yesterday"?iso(Date.now()-864e5):today;
   const end=mode==="yesterday"?today:iso(Date.now()+864e5);
   let rows=all.filter(o=>{const d=String(o.date||"").slice(0,10);return d>=start&&(mode==="yesterday"?d<today:d<end);});
-  if((OFM[nCab]||"all")!=="all") rows=rows.filter(o=>String(o.warehouseType||"").toLowerCase().includes("склад wb") || String(o.warehouseType||"").toLowerCase()==="wb");
+  rows=rows.filter(o=>{const w=String(o.warehouseType||"").toLowerCase();return w.includes("склад wb")||w==="wb";});
   const arts=FA[nCab]||[], subs=FP[nCab]||[], grps=FG[nCab]||[];
   return rows.filter(o=>{
     const a=o.supplierArticle||"",g=artGroup(a)||{};
@@ -94,8 +94,8 @@ function compute({price,cogs,vol,buy,subject,ctr,cr,cab}) {
   const p=price, spp=0, priceDisc=p, priceSPP=priceDisc*(1-spp/100), wallet=priceSPP*C.wallet/100, site=priceSPP-wallet;
   const rec=COMM.find(x=>norm(x.pred)===norm(subject));
   const comm=rec?rec.fbw:C.comm_def_fbw;
-  const realComm=Math.max(0,comm)*p/100;
-  const transfer=spp-realComm-site*C.acquiring/100;
+  const realComm=Math.max(0,comm-spp)*priceDisc/100;
+  const transfer=priceSPP-realComm-site*C.acquiring/100;
   const logistics=logistic(vol,buy);
   const prep=C.prep_box+C.prep_move_l*vol;
   const store=C.store_per_l*Math.max(1,vol)*C.log_fbw_coef*C.store_days;
