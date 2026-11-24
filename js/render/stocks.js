@@ -81,7 +81,7 @@ export function stocksTbl(n) {
     col.total = col.fbs ? (vm.fbsWh[col.name] || 0)
       : Object.values(arts).reduce((sum, v) => sum + (v.wh?.[col.name] || 0), 0);
   }
-  const isWbRf = (name) => /склад\\s*вб\\s*рф|вб\\s*рф|wildberries\\s*рф/i.test(name);
+  const isWbRf = (name) => /склад\s*(?:wb|вб)\s*рф|(?:wb|вб)\s*рф|wildberries\s*рф/i.test(name);
   whCols.sort((a, b) => {
     const aMain = !a.fbs && isWbRf(a.name), bMain = !b.fbs && isWbRf(b.name);
     if (aMain !== bMain) return aMain ? -1 : 1;
