@@ -49,7 +49,7 @@ async function reload(n, force = false) {
 
   try {
     await loadExternal();
-    if (n === 1 || n === 2) loadProfitData(n).catch(e => console.warn("Экономика товара не загрузилась:", e));
+    if (n === 1 || n === 2) await loadProfitData(n).catch(e => console.warn("Экономика товара не загрузилась:", e));
     say("справочники загружены, запрашиваем маркетплейс");
     if (n === 3) await loadOZ({ force });
     else await loadWB(n, { force, onRetry });
