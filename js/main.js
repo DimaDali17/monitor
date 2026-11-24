@@ -10,7 +10,7 @@ import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
 import { loadAds } from "./api/ads.js";
 import { repaintAds, setAdPer, setAdRows, togAdQ, togAdQAll } from "./render/ads.js";
-import { loadProfitData, setProfitInput, repaintProfitability } from "./render/profitability.js";
+import { loadProfitData, setProfitInput, repaintProfitability, toggleProfit } from "./render/profitability.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -159,6 +159,7 @@ async function checkVersion() {
 /* ══ Обработчики, на которые ссылается разметка ══ */
 const App = {
   reload, reloadForConso, go, doLogin, logout, checkVersion,
+  setProfitInput, toggleProfit,
   fpInput, faInput, fgInput,
   exportXlsx: exportBlock,
 
