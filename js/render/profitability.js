@@ -91,7 +91,7 @@ function logistic(vol,buy) {
   return buy>0?(forward+(1-buy)*base)/buy:forward;
 }
 function compute({price,cogs,vol,buy,subject,ctr,cr}) {
-  const p=price, disc=p, spp=p, wallet=spp*C.wallet/100, site=spp-wallet;
+  const p=price, spp=0, priceDisc=p, priceSPP=priceDisc*(1-spp/100), wallet=priceSPP*C.wallet/100, site=priceSPP-wallet;
   const rec=COMM.find(x=>norm(x.pred)===norm(subject));
   const comm=rec?rec.fbw:C.comm_def_fbw;
   const realComm=Math.max(0,comm)*p/100;
@@ -118,7 +118,7 @@ function adMetrics(cab,art,orders) {
     if(day<A.from||day>A.to) continue;
     views+=n(x.views);clicks+=n(x.clicks);adOrders+=n(x.orders);
   }
-  if(!views||!clicks) return {ctr:null,cr:10,source:"нет точной статистики SKU; CR 10%"};
+  if(!views||!clicks) return {ctr:null,cr:10,source:"нет CTR SKU; реклама не учтена, CR 10%"};
   return {ctr:clicks/views*100,cr:adOrders>0?adOrders/clicks*100:10,source:adOrders>0?"CTR и CR по рекламе SKU":"CTR по рекламе SKU; CR 10%"};
 }
 
@@ -137,7 +137,7 @@ export function profitabilityHTML(cab,vm) {
     const key=cab+"|"+norm(r.art), ov=overrides[key]||{};
     const br=getBuyrate(r.art), ref=PROF_DATA[cab]?.[norm(r.art)]||{}, buy=n(ov.buyout??br.val), cogs=n(ov.cogs??ref.cogs??0), vol=n(ref.vol);
     const ad=adMetrics(cab,r.art,r.orders);
-    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??1,cr:ad.cr});
+    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr});
     const buySum=r.sum*buy, profitSum=r.qty*buy*calc.profit;
     const est=br.est&&!ov.buyout;
     return `<tr>
@@ -157,7 +157,7 @@ export function profitabilityHTML(cab,vm) {
   const totalProfit=data.reduce((s,r)=>{
     const ov=overrides[cab+"|"+norm(r.art)]||{},br=getBuyrate(r.art);
     const ad=adMetrics(cab,r.art,r.orders),ref=PROF_DATA[cab]?.[norm(r.art)]||{},buy=n(ov.buyout??br.val),cogs=n(ov.cogs??ref.cogs??0),vol=n(ref.vol);
-    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??1,cr:ad.cr});
+    const calc=compute({price:r.sum/Math.max(1,r.qty),cogs,vol,buy,subject:r.subject,ctr:ad.ctr??0,cr:ad.cr});
     return s+r.qty*buy*calc.profit;
   },0);
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
