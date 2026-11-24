@@ -109,7 +109,7 @@ function input(cab,art,field,value){
 }
 function toggle(cab,art){
   const all=opened(),k=keyOf(cab,art);all[k]=!all[k];write(OPENKEY,all);
-  const vm=window.__monitorVM?.[cab];if(vm)repaintProfitability(cab,vm);
+  const vm=LAST_VM[cab];if(vm)repaintProfitability(cab,vm);
 }
 function field(cab,art,st,name,label,step="1",suffix=""){
   const v=st[name]??0;
@@ -150,7 +150,7 @@ function detail(cab,r,st,z,ad){
     field(cab,r.art,st,"prep_box","Обработка короба, ₽","0.1")+
     field(cab,r.art,st,"prep_move_l","Перемещение, ₽/л","0.1")+
     field(cab,r.art,st,"ff_flat","ФФ, ₽")+
-    field(cab,r.art,st,"store_days","Хранение, дней")+
+    field(cab,r.art,st,"store_per_l","Хранение, ₽/л/день","0.01")+\n    field(cab,r.art,st,"store_days","Хранение, дней")+\n    field(cab,r.art,st,"ff_on","ФФ включён (1/0)")+\n    field(cab,r.art,st,"log_t20","Тариф до 0,2 л")+\n    field(cab,r.art,st,"log_t40","Тариф до 0,4 л")+\n    field(cab,r.art,st,"log_t60","Тариф до 0,6 л")+\n    field(cab,r.art,st,"log_t80","Тариф до 0,8 л")+\n    field(cab,r.art,st,"log_t100","Тариф до 1 л")+
     field(cab,r.art,st,"ad_bid","Ставка / 1000, ₽")+
     field(cab,r.art,st,"ad_ctr","CTR, %","0.1")+\n    field(cab,r.art,st,"ad_cr","CR, %","0.1")+
     '</div><div class="pf-note">CTR: '+ad.source+'. Если CTR не найден, расходы на рекламу равны нулю, а CR принят 10% до появления фактических данных. Значения сохраняются в этом браузере.</div>';
@@ -164,7 +164,7 @@ export function profitabilityHTML(cab,vm){
   const records=data.map(r=>{
     const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art),ad=adMetrics(cab,r.art,r.orders);
     const price= n(ov.price??(r.price/Math.max(1,r.qty)));
-    const st={...DEFAULT,...ov,price,disc:n(ov.disc??r.disc/Math.max(1,r.qty)),spp:n(ov.spp??0),buyout:n(ov.buyout??(br.val*100)),cogs:n(ov.cogs??ref.cogs??0),vol:n(ov.vol??ref.vol??0),commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),vat:n(ov.vat??(cab===1?5:0)),ctr:ov.ad_ctr!=null?n(ov.ad_ctr)/100:ad.ctr,cr:n(ov.ad_cr??ad.cr*100)/100,ad_bid:n(ov.ad_bid??500),ff_on:n(ov.ff_on??0)};
+    const st={...DEFAULT,...ov,price,disc:n(ov.disc??r.disc/Math.max(1,r.qty)),spp:n(ov.spp??0),buyout:n(ov.buyout??(br.val*100)),cogs:n(ov.cogs??ref.cogs??0),vol:n(ov.vol??ref.vol??0),commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),vat:n(ov.vat??(cab===1?5:0)),ad_ctr:ov.ad_ctr??(ad.ctr==null?null:ad.ctr*100),ctr:ov.ad_ctr!=null?n(ov.ad_ctr)/100:ad.ctr,cr:n(ov.ad_cr??ad.cr*100)/100,ad_bid:n(ov.ad_bid??500),ff_on:n(ov.ff_on??0)};
     const z=calc(st),buySum=r.sum*(st.buyout/100),profitSum=r.qty*(st.buyout/100)*z.profit;
     return {r,st,z,ad,buySum,profitSum,expanded:!!open[keyOf(cab,r.art)]};
   });
