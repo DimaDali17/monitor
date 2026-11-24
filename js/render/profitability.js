@@ -40,13 +40,11 @@ const overrides = () => read(LSKEY);
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
 const parseCSV = txt => {
-  const delim=(txt.split(/\r?
-/,1)[0]||"").split(";").length>(txt.split(/\r?
-/,1)[0]||"").split(",").length?";":",";
+  const first=(txt.split("\\n",1)[0]||"");
+  const delim=first.split(";").length>first.split(",").length?";":",";
   const rows=[];let row=[],f="",q=false;
   for(let i=0;i<txt.length;i++){const c=txt[i];if(q){if(c==='"'){if(txt[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
-    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="
-"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\r")f+=c;}
+    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="\\n"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\\r")f+=c;}
   if(f.length||row.length){row.push(f);rows.push(row);}return rows;
 };
 const col = (h,...names) => {for(const x of names){const i=h.findIndex(v=>v===x);if(i>=0)return i;}for(const x of names){const i=h.findIndex(v=>v.includes(x));if(i>=0)return i;}return -1;};
