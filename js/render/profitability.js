@@ -18,18 +18,19 @@ const IP_DATA = {
     rashod:"https://docs.google.com/spreadsheets/d/e/2PACX-1vQuVvUEHyqdVP2ZHULOoeNyKdJrnI5qHcp8EI9uEns-xFfRaH_OifbV4yZEqeS_1a7CBVKMQ2TYi9pp/pub?gid=103296320&single=true&output=csv"
   }
 };
-const PROF_DATA = {};\nconst LAST_VM = {};
+const PROF_DATA = {};
+const LAST_VM = {};
 const DEFAULT = {
   disc:0,spp:0,buyout:null,cogs:null,vol:null,commission:null,
   wallet:3,acquiring:3,tax:6,vat:null,fixed:60,
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
-  prep_box:5,prep_move_l:7,ff_on:1,ff_flat:50,
+  prep_box:5,prep_move_l:7,ff_on:0,ff_flat:50,
   store_per_l:0.08,store_days:0,ad_bid:500,ad_ctr:null,ad_cr:10
 };
 const COMM = {"термоноски":39.5,"термокомплекты":34.5,"трусы":43.5,"термомайки":43.5,"леггинсы":43.5};
 const n = x => Number.isFinite(Number(x)) ? Number(x) : 0;
-const norm = x => String(x||"").trim().toLowerCase().replace(/\\s+/g,"");
+const norm = x => String(x||"").trim().toLowerCase().replace(/\s+/g,"");
 const money = x => Math.round(x).toLocaleString("ru-RU")+" ₽";
 const fmt = x => (Math.round(x*10)/10).toLocaleString("ru-RU");
 const pct = x => fmt(x*100)+"%";
@@ -39,14 +40,14 @@ const overrides = () => read(LSKEY);
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
 const parseCSV = txt => {
-  const delim=(txt.split(/\\r?\\n/,1)[0]||"").split(";").length>(txt.split(/\\r?\\n/,1)[0]||"").split(",").length?";":",";
+  const delim=(txt.split(/\r?\n/,1)[0]||"").split(";").length>(txt.split(/\r?\n/,1)[0]||"").split(",").length?";":",";
   const rows=[];let row=[],f="",q=false;
   for(let i=0;i<txt.length;i++){const c=txt[i];if(q){if(c==='"'){if(txt[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
-    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="\\n"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\\r")f+=c;}
+    else if(c==='"')q=true;else if(c===delim){row.push(f);f="";}else if(c==="\n"){row.push(f);rows.push(row);row=[];f="";}else if(c!=="\r")f+=c;}
   if(f.length||row.length){row.push(f);rows.push(row);}return rows;
 };
 const col = (h,...names) => {for(const x of names){const i=h.findIndex(v=>v===x);if(i>=0)return i;}for(const x of names){const i=h.findIndex(v=>v.includes(x));if(i>=0)return i;}return -1;};
-const numRu = v => {const x=parseFloat(String(v??"").replace(/\\u00a0/g,"").replace(/\\s/g,"").replace(",", "."));return Number.isFinite(x)?x:0;};
+const numRu = v => {const x=parseFloat(String(v??"").replace(/\u00a0/g,"").replace(/\s/g,"").replace(",", "."));return Number.isFinite(x)?x:0;};
 
 export async function loadProfitData(cab) {
   if(PROF_DATA[cab])return PROF_DATA[cab];
@@ -128,7 +129,7 @@ function detail(cab,r,st,z,ad){
     section("Удержания WB"),row("КВВ номинальная",fmt(st.commission)+"%"),row("Реальная комиссия (КВВ − СПП)",neg(z.commRub)),row("Эквайринг "+fmt(st.acquiring)+"%",neg(z.acquiring)),row("Цена к перечислению",p(z.transfer),"pf-total"),
     section("Логистика FBW"),row("Объём",fmt(st.vol)+" л"),row(z.tarif?"Тариф по объёму":"База логистики",p(z.base)),row("Коэффициент склада", "× "+fmt(st.log_fbw_coef)),row("Логистика вперёд",p(z.logFwd)),row("Отправок на 1 выкуп",st.buyout>0?fmt(100/st.buyout)+" шт":"—"),row("Возвраты на выкуп",neg(z.logReturn)),row("Логистика с выкупом",neg(z.logistics),"pf-total"),
     section("Приёмка и прочие расходы"),row("Обработка короба",neg(z.prepBox)),row("Перемещение",neg(z.prepMove)),row("Итого приёмка",neg(z.prep),"pf-total"),row("Себестоимость товара",neg(st.cogs)),row("Хранение",neg(z.store)),row("ФФ (DarkStore)",neg(z.ff)),row("Постоянные расходы",neg(st.fixed)),row("Налог "+fmt(st.tax)+"%",neg(z.tax)),row("НДС "+fmt(st.vat)+"%",neg(z.vat)),
-    row("Прибыль до рекламы",p(z.profit0),"pf-total"),section("Реклама и итог"),row("CTR",st.ctr==null?"нет данных":fmt(st.ctr)+"%"),row("CR",fmt(st.cr*100)+"%"),row("Заказов на 1000 показов",z.ordersAd+" шт"),row("Ставка / 1000 показов",p(st.ad_bid)),row("CPO",p(z.cpo)),row("CPS на выкуп",neg(z.cps)),row("ДРР",pct(z.drr)),row("Прибыль с продажи",p(z.profit),"pf-total"),row("Маржинальность",pct(z.margin),"pf-total")
+    row("Прибыль до рекламы",p(z.profit0),"pf-total"),section("Реклама и итог"),row("CTR",st.ctr==null?"нет данных":fmt(st.ctr*100)+"%"),row("CR",fmt(st.cr*100)+"%"),row("Заказов на 1000 показов",z.ordersAd+" шт"),row("Ставка / 1000 показов",p(st.ad_bid)),row("CPO",p(z.cpo)),row("CPS на выкуп",neg(z.cps)),row("ДРР",pct(z.drr)),row("Прибыль с продажи",p(z.profit),"pf-total"),row("Маржинальность",pct(z.margin),"pf-total")
   ];
   const editable='<div class="pf-edit-grid">'+
     field(cab,r.art,st,"price","Цена продавца, ₽")+
@@ -151,7 +152,7 @@ function detail(cab,r,st,z,ad){
     field(cab,r.art,st,"ff_flat","ФФ, ₽")+
     field(cab,r.art,st,"store_days","Хранение, дней")+
     field(cab,r.art,st,"ad_bid","Ставка / 1000, ₽")+
-    field(cab,r.art,st,"ad_cr","CR, %","0.1")+
+    field(cab,r.art,st,"ad_ctr","CTR, %","0.1")+\n    field(cab,r.art,st,"ad_cr","CR, %","0.1")+
     '</div><div class="pf-note">CTR: '+ad.source+'. Если CTR не найден, расходы на рекламу равны нулю, а CR принят 10% до появления фактических данных. Значения сохраняются в этом браузере.</div>';
   return '<tr class="pf-detail-row"><td colspan="9"><div class="pf-detail"><div><div class="pf-detail-title">Экономика по шагам · '+esc(r.art)+'</div>'+editable+'</div><div class="pf-steps"><table><tbody>'+rows.join("")+'</tbody></table></div></div></td></tr>';
 }
