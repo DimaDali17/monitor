@@ -28,7 +28,7 @@ const DEFAULT = {
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
   prep_box:5,prep_move_l:7,ff_on:0,ff_flat:50,
-  store_per_l:0.08,store_days:60,ad_bid:500,ad_ctr:5.6145,ad_cr:10
+  store_per_l:0.08,store_days:60,ad_bid:500,ad_ctr:10,ad_cr:10
 };
 const COGS_GROUPS = [
   ["TermoMai.EF.Black1","TermoMai.EF.Beige1","TermoMai.EF.Grey1"],
@@ -46,7 +46,12 @@ const fmt = x => (Math.round(x*10)/10).toLocaleString("ru-RU");
 const pct = x => fmt(x*100)+"%";
 const read = key => { try{return JSON.parse(localStorage.getItem(key)||"{}");}catch{return {};} };
 const write = (key,v) => { try{localStorage.setItem(key,JSON.stringify(v));}catch{} };
-const overrides = () => read(LSKEY);
+const overrides = () => {
+  const all=read(LSKEY);let migrated=false;
+  for(const value of Object.values(all))if(value&&Number(value.ad_ctr)===5.6145){value.ad_ctr=10;migrated=true;}
+  if(migrated)write(LSKEY,all);
+  return all;
+};
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
 function cogsValue(cab,art,ov,allOverrides){
@@ -180,7 +185,7 @@ function detail(cab,r,st,z){
   const editable=fields.map(([name,label])=>field(cab,r.art,st,name,label,
     ["vol","log_fbw_coef","store_per_l","ad_cr","spp","buyout","commission","wallet","acquiring","tax","vat","log_fbw_addl","prep_move_l"].includes(name)?"0.1":name==="ad_ctr"?"0.0001":"1"
   )).join("");
-  return '<tr class="pf-settings-row"><td colspan="21"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 31%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по модели: ставка ÷ расчётные заказы от 1000 показов ÷ выкуп. Старт: 500 ₽, CTR 5,6145%, CR 10%; можно менять для артикула.</div></details></td></tr>';
+  return '<tr class="pf-settings-row"><td colspan="21"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 31%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по модели: ставка ÷ расчётные заказы от 1000 показов ÷ выкуп. Старт: 500 ₽ за 1000 показов, CTR 10%, CR 10%; можно менять для артикула.</div></details></td></tr>';
 }
 export function profitabilityHTML(cab,vm){
   if(cab===3||!vm||!sheets.loaded)return "";
@@ -217,30 +222,11 @@ export function profitabilityHTML(cab,vm){
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
   return '<div class="sec" id="profitability'+cab+'"><style>'+
     '#profitability'+cab+' .tw{width:100%;max-width:100%;overflow:hidden}'+
-    '#profitability'+cab+' table{width:100%!important;min-width:0!important;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:10px}'+
-    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:5px 3px;white-space:normal;overflow-wrap:anywhere;line-height:1.15;text-align:right;font-size:9px}#profitability'+cab+' td{padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left}'+
-    '#profitability'+cab+' th:nth-child(1),#profitability'+cab+' td:nth-child(1){width:11%}'+
-    '#profitability'+cab+' th:nth-child(2),#profitability'+cab+' td:nth-child(2){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(3),#profitability'+cab+' td:nth-child(3){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(4),#profitability'+cab+' td:nth-child(4){width:5%}'+
-    '#profitability'+cab+' th:nth-child(5),#profitability'+cab+' td:nth-child(5){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(6),#profitability'+cab+' td:nth-child(6){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(7),#profitability'+cab+' td:nth-child(7){width:5%}'+
-    '#profitability'+cab+' th:nth-child(8),#profitability'+cab+' td:nth-child(8){width:5%}'+
-    '#profitability'+cab+' th:nth-child(9),#profitability'+cab+' td:nth-child(9){width:4.5%}'+
-    '#profitability'+cab+' th:nth-child(10),#profitability'+cab+' td:nth-child(10){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(11),#profitability'+cab+' td:nth-child(11){width:4.5%}'+
-    '#profitability'+cab+' th:nth-child(12),#profitability'+cab+' td:nth-child(12){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(13),#profitability'+cab+' td:nth-child(13){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(14),#profitability'+cab+' td:nth-child(14){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(15),#profitability'+cab+' td:nth-child(15){width:3.5%}'+
-    '#profitability'+cab+' th:nth-child(16),#profitability'+cab+' td:nth-child(16){width:6%}'+
-    '#profitability'+cab+' th:nth-child(17),#profitability'+cab+' td:nth-child(17){width:5%}'+
-    '#profitability'+cab+' th:nth-child(18),#profitability'+cab+' td:nth-child(18){width:6%}'+
-    '#profitability'+cab+' th:nth-child(19),#profitability'+cab+' td:nth-child(19){width:5%}'+
-    '#profitability'+cab+' th:nth-child(20),#profitability'+cab+' td:nth-child(20){width:7%}'+
-    '#profitability'+cab+' th:nth-child(21),#profitability'+cab+' td:nth-child(21){width:5%}'+
-    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:54px;box-sizing:border-box;padding:3px 3px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:10px;text-align:right}'+
+    '#profitability'+cab+' table{width:max-content!important;min-width:0!important;max-width:100%;table-layout:auto;border-collapse:collapse;font-size:10px}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:4px 3px;white-space:nowrap;line-height:1.15;text-align:right;font-size:9px}#profitability'+cab+' td{padding:4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:130px;max-width:130px}'+
+    '#profitability'+cab+' th:nth-child(18),#profitability'+cab+' td:nth-child(18){width:58px}'+
+    '#profitability'+cab+' th:nth-child(20),#profitability'+cab+' td:nth-child(20){width:82px}'+
+    '#profitability'+cab+' .pf-cell-input{width:54px;max-width:100%;box-sizing:border-box;padding:3px 3px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:10px;text-align:right}'+
     '#profitability'+cab+' .pf-art-settings{border:0;border-radius:4px;background:var(--bg3);color:var(--ink2);padding:3px 4px;font:inherit;font-size:9px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
@@ -253,8 +239,8 @@ export function profitabilityHTML(cab,vm){
     '#profitability'+cab+' .pf-note{font-size:10px;color:var(--ink3);line-height:1.5}'+
     '#profitability'+cab+' .pf-table-toggle{border:1px solid var(--border2);border-radius:6px;background:var(--bg3);padding:4px 8px;color:var(--ink2);font:inherit;font-size:10px;cursor:pointer}'+
     '</style><div class="sh"><span class="st">Прибыльность заказов · WB</span><span class="sm2">'+period+' · '+qty+' шт. · FBW + FBS</span><button class="pf-table-toggle" onclick="App.toggleProfitTable('+cab+')">'+(TABLE_HIDDEN[cab]?"Показать таблицу":"Скрыть таблицу")+'</button></div>'+
-    (TABLE_HIDDEN[cab]?"":'<div class="sm2" style="margin:4px 0 8px">Реклама рассчитывается для всех артикулов по CPM, CTR и CR. Если артикул не рекламируется, укажи CPM 0. CPM и CTR можно менять прямо в строке. СПП по умолчанию 31%, можно изменить прямо в таблице.</div>'+
-    '<div class="tw"><table><thead><tr><th onclick="App.sortProfit('+cab+',&#39;art&#39;)">Артикул</th><th onclick="App.sortProfit('+cab+',&#39;qty&#39;)">Заказы</th><th onclick="App.sortProfit('+cab+',&#39;buyout&#39;)">Выкуп %</th><th onclick="App.sortProfit('+cab+',&#39;price&#39;)">Цена</th><th onclick="App.sortProfit('+cab+',&#39;disc&#39;)">Скидка %</th><th onclick="App.sortProfit('+cab+',&#39;spp&#39;)">СПП %</th><th onclick="App.sortProfit('+cab+',&#39;site&#39;)">На сайте</th><th onclick="App.sortProfit('+cab+',&#39;hold&#39;)">Удержания WB</th><th onclick="App.sortProfit('+cab+',&#39;logistics&#39;)">Логистика</th><th onclick="App.sortProfit('+cab+',&#39;prep&#39;)">Приёмка</th><th onclick="App.sortProfit('+cab+',&#39;cogs&#39;)">Себест.</th><th onclick="App.sortProfit('+cab+',&#39;store&#39;)">Хранение</th><th onclick="App.sortProfit('+cab+',&#39;tax&#39;)">Налог</th><th onclick="App.sortProfit('+cab+',&#39;vat&#39;)">НДС</th><th onclick="App.sortProfit('+cab+',&#39;fixed&#39;)">Постоянные</th><th onclick="App.sortProfit('+cab+',&#39;adBid&#39;)" title="Стоимость 1000 показов, ₽">CPM ₽/1000</th><th onclick="App.sortProfit('+cab+',&#39;adCtr&#39;)">CTR %</th><th onclick="App.sortProfit('+cab+',&#39;ads&#39;)">Реклама</th><th onclick="App.sortProfit('+cab+',&#39;profit&#39;)">Прибыль/шт.</th><th onclick="App.sortProfit('+cab+',&#39;profitSum&#39;)">Прибыль всего</th><th onclick="App.sortProfit('+cab+',&#39;margin&#39;)">Маржа</th></tr></thead><tbody>'+
+    (TABLE_HIDDEN[cab]?"":'<div class="sm2" style="margin:4px 0 8px">Реклама рассчитывается для всех артикулов: по умолчанию CPM 500 ₽, CTR 10%, CR 10%. Если артикул не рекламируется, укажи CPM 0. CPM и CTR можно менять прямо в строке. СПП по умолчанию 31%, можно изменить прямо в таблице.</div>'+
+    '<div class="tw"><table><thead><tr><th onclick="App.sortProfit('+cab+',&#39;art&#39;)">Артикул</th><th onclick="App.sortProfit('+cab+',&#39;qty&#39;)">Заказы</th><th onclick="App.sortProfit('+cab+',&#39;buyout&#39;)">Выкуп %</th><th onclick="App.sortProfit('+cab+',&#39;price&#39;)">Цена</th><th onclick="App.sortProfit('+cab+',&#39;disc&#39;)">Скидка %</th><th onclick="App.sortProfit('+cab+',&#39;spp&#39;)">СПП %</th><th onclick="App.sortProfit('+cab+',&#39;site&#39;)">Сайт</th><th onclick="App.sortProfit('+cab+',&#39;hold&#39;)" title="Удержания WB">Удерж. WB</th><th onclick="App.sortProfit('+cab+',&#39;logistics&#39;)">Логист.</th><th onclick="App.sortProfit('+cab+',&#39;prep&#39;)" title="Приёмка">Приём</th><th onclick="App.sortProfit('+cab+',&#39;cogs&#39;)">Себест.</th><th onclick="App.sortProfit('+cab+',&#39;store&#39;)" title="Хранение">Хран.</th><th onclick="App.sortProfit('+cab+',&#39;tax&#39;)">Налог</th><th onclick="App.sortProfit('+cab+',&#39;vat&#39;)">НДС</th><th onclick="App.sortProfit('+cab+',&#39;fixed&#39;)" title="Постоянные расходы">Пост.</th><th onclick="App.sortProfit('+cab+',&#39;adBid&#39;)" title="Стоимость 1000 показов, ₽">CPM ₽/1000</th><th onclick="App.sortProfit('+cab+',&#39;adCtr&#39;)">CTR %</th><th onclick="App.sortProfit('+cab+',&#39;ads&#39;)">Реклама</th><th onclick="App.sortProfit('+cab+',&#39;profit&#39;)" title="Прибыль на единицу">Приб./шт.</th><th onclick="App.sortProfit('+cab+',&#39;profitSum&#39;)" title="Общая прибыль">Приб. всего</th><th onclick="App.sortProfit('+cab+',&#39;margin&#39;)">Маржа</th></tr></thead><tbody>'+
     (body||'<tr><td colspan="21" class="em">Нет заказов WB за выбранный период</td></tr>')+
     '<tr style="border-top:2px solid var(--border2);font-weight:700"><td>Итого</td><td>'+qty+'</td><td colspan="4">—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;color:'+(profit>=0?"var(--green)":"var(--red)")+'">'+money(profit)+'</td><td>—</td></tr></tbody></table></div>')+'</div>';
 }
