@@ -29,6 +29,14 @@ const DEFAULT = {
   prep_box:5,prep_move_l:7,ff_on:0,ff_flat:50,
   store_per_l:0.08,store_days:60,ad_bid:500,ad_ctr:5.6145,ad_cr:10
 };
+const COGS_GROUPS = [
+  ["TermoMai.EF.Black1","TermoMai.EF.Beige1","TermoMai.EF.Grey1"],
+  ["TS21num1","TS21num3","TS21num4","TS26num3new"],
+  ["TermSocks.Al-ESS.black.01","TermSocks.Al-ESS.grey.01","TermSocks.Al-ESS.purp.01"],
+  ["TermSocks.EF.Rab.01","TermSocks.EF.Rab.02","TermSocks.EF.Rab.03","TermSocks.EF.Rab.04"],
+  ["TermSocks.Kash.Assor.01","TermSocks.Kash.Assor.04"],
+  ["TermShort.new.SK.black.01","TermShort.new.SK.beige.01"]
+];
 const COMM = {"термоноски":39.5,"термокомплекты":34.5,"трусы":43.5,"термомайки":43.5,"леггинсы":43.5};
 const n = x => Number.isFinite(Number(x)) ? Number(x) : 0;
 const norm = x => String(x||"").trim().toLowerCase().replace(/\s+/g,"");
@@ -40,6 +48,23 @@ const write = (key,v) => { try{localStorage.setItem(key,JSON.stringify(v));}catc
 const overrides = () => read(LSKEY);
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
+function cogsValue(cab,art,ov,allOverrides){
+  const own=n(ov.cogs??PROF_DATA[cab]?.[norm(art)]?.cogs??0);
+  if(own>0)return own;
+  const group=COGS_GROUPS.find(xs=>xs.some(x=>norm(x)===norm(art)));
+  if(!group)return own;
+  for(const sibling of group){
+    if(norm(sibling)===norm(art))continue;
+    const value=n(allOverrides[keyOf(cab,sibling)]?.cogs);
+    if(value>0)return value;
+  }
+  for(const sibling of group){
+    if(norm(sibling)===norm(art))continue;
+    const value=n(PROF_DATA[cab]?.[norm(sibling)]?.cogs);
+    if(value>0)return value;
+  }
+  return own;
+}
 const parseCSV = txt => {
   const first=(txt.split("\n",1)[0]||"");
   const delim=first.split(";").length>first.split(",").length?";":",";
@@ -142,7 +167,7 @@ export function profitabilityHTML(cab,vm){
     const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art);
     const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
       disc:Math.round(n(ov.disc??r.disc/Math.max(1,r.qty))),spp:n(ov.spp??31),
-      buyout:n(ov.buyout??(br.val*100)),cogs:n(ov.cogs??ref.cogs??0),vol:n(ov.vol??ref.vol??0),
+      buyout:n(ov.buyout??(br.val*100)),cogs:cogsValue(cab,r.art,ov,all),vol:n(ov.vol??ref.vol??0),
       commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
       vat:n(ov.vat??(cab===1?5:0)),ad_ctr:n(ov.ad_ctr??DEFAULT.ad_ctr),
       ctr:n(ov.ad_ctr??DEFAULT.ad_ctr)/100,cr:n(ov.ad_cr??DEFAULT.ad_cr)/100,
