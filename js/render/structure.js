@@ -1,6 +1,7 @@
-import { VM, CM, GB, FP, FG, FA } from "../state.js";
-import { esc, iso, q } from "../utils.js";
+import { VM, CM, GB, DV, FP, FG, FA } from "../state.js";
+import { esc, iso, q, wbPrice } from "../utils.js";
 import { artGroup } from "../api/sheets.js";
+import { expectedProfitForOrders } from "./profitability.js";
 
 /* Структура спроса = навигатор по заказам за период (вчера/день/неделя/месяц).
    Уровень выбирается переключателем Предмет/Группа/Артикул (GB); фильтры FP/FG/FA — область (scope).
@@ -11,6 +12,7 @@ export function structureHTML(n) {
   const vm = VM[n];
   if (!vm) return "";
   const mode = CM[n] || "day";
+  const valueMode = DV[n] || "qty";
   const type = vm.isOz ? "oz" : "wb";
   const modeName = mode === "day" ? "сегодня" : mode === "yesterday" ? "вчера" : mode === "week" ? "неделя" : "месяц";
 
@@ -40,35 +42,51 @@ export function structureHTML(n) {
       : lvl === "grp" ? ((artGroup(art) && artGroup(art).kratko) || "— без группы —")
         : (art || "—");
 
-  const grp = {};
-  let total = 0;
-  const bump = (k, qty) => { grp[k] = (grp[k] || 0) + qty; total += qty; };
+  const groups = {};
+  const bump = (k, qty, revenue, order) => {
+    const item=groups[k]||(groups[k]={qty:0,revenue:0,orders:[]});
+    item.qty+=qty;item.revenue+=revenue;if(order)item.orders.push(order);
+  };
   for (const o of orders) {
-    if (type === "wb") bump(keyOf(o.supplierArticle || "", o.subject || o.category, null), o.quantity || 1);
-    else for (const p of o.products || []) bump(keyOf(baseOz(p.offer_id), null, p.name), p.quantity || 1);
+    if (type === "wb") {
+      const qty=o.quantity||1;
+      bump(keyOf(o.supplierArticle||"",o.subject||o.category,null),qty,wbPrice(o)*qty,o);
+    } else for (const p of o.products || []) {
+      const qty=p.quantity||1;
+      bump(keyOf(baseOz(p.offer_id),null,p.name),qty,(Number(p.price||p.offer_price)||0)*qty,null);
+    }
   }
 
-  const rows = Object.entries(grp).sort((a, b) => b[1] - a[1]);
+  const rows=Object.entries(groups).map(([name,item])=>{
+    const value=valueMode==="profit"?expectedProfitForOrders(n,item.orders):valueMode==="rev"?item.revenue:item.qty;
+    return [name,{...item,value}];
+  }).sort((a,b)=>b[1].value-a[1].value);
   const shown = rows;                                  /* показываем всё — без «Прочее» */
-  const max = shown.length ? shown[0][1] : 1;
+  const max = shown.length ? Math.max(1,...shown.map(([,x])=>Math.abs(x.value))) : 1;
+  const totalQty=shown.reduce((s,[,x])=>s+x.qty,0);
+  const totalValue=valueMode==="qty"?totalQty:shown.reduce((s,[,x])=>s+x.value,0);
+  const shareBase=valueMode==="profit"?shown.reduce((s,[,x])=>s+Math.abs(x.value),0):totalValue;
+  const valueText=v=>valueMode==="qty"?Math.round(v).toLocaleString("ru-RU"):Math.round(v).toLocaleString("ru-RU")+" ₽";
 
   /* Ряд: имя | дорожка с полосой | число | % — клик добавляет общий фильтр */
-  const row = (name, v) => {
-    const w = Math.max(2, Math.round((v / max) * 100));
-    const pct = total ? Math.round((v / total) * 100) : 0;
+  const row = (name, item) => {
+    const v=item.value;
+    const w = Math.max(2, Math.round((Math.abs(v) / max) * 100));
+    const pct = shareBase ? Math.round(((valueMode==="profit"?Math.abs(v):v) / shareBase) * 100) : 0;
     const clickable = canDrill && name !== "— без группы —";
     const act = clickable ? `onclick="App.structDrill(${n},'${q(name)}')"` : "";
-    return `<div ${act} title="${esc(name)}${clickable ? " — раскрыть" : ""}" style="display:grid;grid-template-columns:40% 1fr 34px 30px;align-items:center;gap:10px;height:19px;font-size:11px;${clickable ? "cursor:pointer" : ""}">
+    const color=valueMode==="profit"?(v<0?"var(--red)":"var(--green)"):"#8A8275";
+    return `<div ${act} title="${esc(name)}${clickable ? " — раскрыть" : ""}" style="display:grid;grid-template-columns:40% 1fr minmax(52px,auto) 30px;align-items:center;gap:10px;min-height:21px;font-size:11px;${clickable ? "cursor:pointer" : ""}">
       <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)">${esc(name)}</div>
       <div style="background:var(--bg3);border-radius:4px;height:12px">
-        <div style="width:${w}%;height:100%;background:#8A8275;border-radius:4px"></div>
+        <div style="width:${w}%;height:100%;background:${color};border-radius:4px"></div>
       </div>
-      <div style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${v}</div>
+      <div style="text-align:right;font-weight:600;color:${valueMode==="profit"?color:"var(--ink)"};font-variant-numeric:tabular-nums">${valueText(v)}</div>
       <div style="text-align:right;color:var(--ink3);font-size:10px;font-variant-numeric:tabular-nums">${pct}%</div>
     </div>`;
   };
 
-  const bars = shown.map(([name, v]) => row(name, v)).join("");
+  const bars = shown.map(([name, item]) => row(name, item)).join("");
 
   /* Переключатель периода — над структурой, т.к. он влияет на неё (и на график) */
   const onp = (k) => (mode === k ? "on" : "");
@@ -78,6 +96,9 @@ export function structureHTML(n) {
       <button class="${onp("week")}" onclick="App.setChartMode(${n},'week')">Неделя</button>
       <button class="${onp("month")}" onclick="App.setChartMode(${n},'month')">Месяц</button>
     </span>`;
+
+  const valueButton=(value,label)=>`<button class="${valueMode===value?"on":""}" onclick="App.setDemandValue(${n},'${value}')">${label}</button>`;
+  const valueTog=`<span class="ctog">${valueButton("qty","Шт.")}${valueButton("rev","Выручка ₽")}${type==="wb"?`<button class="${valueMode==="profit"?"on":""}" title="Ожидаемая прибыль по расчётной модели FBW" onclick="App.setDemandValue(${n},'profit')">Ожид. прибыль ₽</button>`:""}</span>`;
 
   /* Срез Предмет/Группа/Артикул — прямой выбор уровня (влияет и на график) */
   const onl = (k) => (lvl === k ? "on" : "");
@@ -99,11 +120,11 @@ export function structureHTML(n) {
   return `<div class="filter-bar" style="margin-bottom:0">
     <div class="sh" style="margin-bottom:6px;flex-wrap:wrap;gap:6px">
       <span class="st">Структура спроса
-        <span style="color:var(--ink3);font-weight:400;font-size:11px">· по ${lvlName} · ${total} шт</span></span>
+        <span style="color:var(--ink3);font-weight:400;font-size:11px">· по ${lvlName} · ${valueMode==="qty"?`${totalQty} шт`:valueText(totalValue)}</span></span>
       ${periodTog}
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-      ${levelTog}
+      ${levelTog}${valueTog}
       <span style="font-size:10px;min-width:0">${crumbs}${canDrill && shown.length ? `<span style="color:var(--ink3);margin-left:6px">клик — глубже</span>` : ""}</span>
     </div>
     <div style="padding-right:2px">
@@ -111,3 +132,4 @@ export function structureHTML(n) {
     </div>
   </div>`;
 }
+
