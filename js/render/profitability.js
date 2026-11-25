@@ -36,7 +36,8 @@ const COGS_GROUPS = [
   ["TermSocks.Al-ESS.black.01","TermSocks.Al-ESS.grey.01","TermSocks.Al-ESS.purp.01"],
   ["TermSocks.EF.Rab.01","TermSocks.EF.Rab.02","TermSocks.EF.Rab.03","TermSocks.EF.Rab.04"],
   ["TermSocks.Kash.Assor.01","TermSocks.Kash.Assor.04"],
-  ["TermShort.new.SK.black.01","TermShort.new.SK.beige.01"]
+  ["TermShort.new.SK.black.01","TermShort.new.SK.beige.01"],
+  ["Pantal.SK.blacknew.02","Pantal.SK.bejnew.02"]
 ];
 const COMM = {"термоноски":39.5,"термокомплекты":34.5,"трусы":43.5,"термомайки":43.5,"леггинсы":43.5};
 const n = x => Number.isFinite(Number(x)) ? Number(x) : 0;
@@ -212,7 +213,7 @@ export function profitabilityHTML(cab,vm){
       '<td>'+r.qty+'</td><td>'+cellInput(cab,r.art,st,"buyout","0.1")+'</td>'+
       '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+cellInput(cab,r.art,st,"disc","0.1")+'</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
       '<td>'+money(z.site)+'</td><td>'+money(z.commRub+z.acquiring+z.wallet)+'</td><td>'+money(z.logistics)+'</td><td>'+money(z.prep)+'</td>'+
-      '<td>'+cellInput(cab,r.art,st,"cogs","1")+'</td><td>'+money(z.store)+'</td><td>'+money(z.tax)+'</td><td>'+money(z.vat)+'</td>'+
+      '<td class="pf-cogs-cell'+(st.cogs<=0?' zero':'')+'">'+cellInput(cab,r.art,st,"cogs","1")+'</td><td>'+money(z.store)+'</td><td>'+money(z.tax)+'</td><td>'+money(z.vat)+'</td>'+
       '<td>'+money(st.fixed)+'</td><td>'+cellInput(cab,r.art,st,"ad_bid","1")+'</td><td>'+cellInput(cab,r.art,st,"ad_ctr","0.0001")+'</td>'+
       '<td>'+money(z.cps)+'</td>'+
       '<td>'+money(z.profit)+'</td><td style="color:'+color+';font-weight:700">'+money(profitSum)+'</td><td>'+pct(z.margin)+'</td>'+
@@ -227,6 +228,7 @@ export function profitabilityHTML(cab,vm){
     '#profitability'+cab+' th:nth-child(18),#profitability'+cab+' td:nth-child(18){width:58px}'+
     '#profitability'+cab+' th:nth-child(20),#profitability'+cab+' td:nth-child(20){width:82px}'+
     '#profitability'+cab+' .pf-cell-input{width:54px;max-width:100%;box-sizing:border-box;padding:3px 3px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:10px;text-align:right}'+
+    '#profitability'+cab+' .pf-cogs-cell.zero{background:#ffe2e2!important;box-shadow:inset 0 0 0 1px #d93025}#profitability'+cab+' .pf-cogs-cell.zero .pf-cell-input{background:#fff0f0;border-color:#d93025;color:#b42318;font-weight:700}'+
     '#profitability'+cab+' .pf-art-settings{border:0;border-radius:4px;background:var(--bg3);color:var(--ink2);padding:3px 4px;font:inherit;font-size:9px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
