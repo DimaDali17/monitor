@@ -162,7 +162,7 @@ export function profitabilityHTML(cab,vm){
   const body=records.map(({r,st,z,ad,buySum,profitSum})=>{
     const color=profitSum>=0?"var(--green)":"var(--red)";
     return '<tr class="pf-main-row">'+
-      '<td><b>'+esc(r.art)+'</b><div class="sm2">'+esc(r.subject)+'</div><button class="pf-settings-btn" onclick="App.toggleProfit('+cab+',\''+esc(r.art)+'\')">Настройки</button></td>'+
+      '<td><b>'+esc(r.art)+'</b></td>'+
       '<td>'+r.qty+'</td><td>'+cellInput(cab,r.art,st,"buyout","0.1")+'</td>'+
       '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+cellInput(cab,r.art,st,"disc","0.1")+'</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
       '<td>'+money(z.site)+'</td><td>'+money(z.commRub+z.acquiring+z.wallet)+'</td><td>'+money(z.logistics)+'</td><td>'+money(z.prep)+'</td>'+
@@ -188,7 +188,7 @@ export function profitabilityHTML(cab,vm){
     '#profitability'+cab+' .pf-field input{width:100%;box-sizing:border-box;border:1px solid var(--border2);border-radius:5px;background:white;padding:6px 7px;font:inherit;font-size:12px;color:var(--ink)}'+
     '#profitability'+cab+' .pf-note{font-size:10px;color:var(--ink3);line-height:1.5}'+
     '</style><div class="sh"><span class="st">Прибыльность заказов · FBW</span><span class="sm2">'+period+' · '+qty+' шт.</span></div>'+
-    '<div class="sm2" style="margin:4px 0 8px">СПП по умолчанию 30%, можно изменить прямо в таблице. Все остальные параметры доступны в настройках артикула. Если источник не передал значение, используется редактируемое значение по умолчанию.</div>'+
+    '<div class="sm2" style="margin:4px 0 8px">СПП по умолчанию 31%, можно изменить прямо в таблице. Если источник не передал значение, используется редактируемое значение по умолчанию.</div>'+
     '<div class="tw"><table><thead><tr><th>Артикул</th><th>Заказы, шт.</th><th>Выкуп, %</th><th>Цена продавца</th><th>Скидка, %</th><th>СПП, %</th><th>Цена на сайте</th><th>Удержания WB</th><th>Логистика</th><th>Приёмка</th><th>Себестоимость</th><th>Хранение</th><th>Налог</th><th>НДС</th><th>Постоянные</th><th>ФФ</th><th>Реклама</th><th>Прибыль/выкуп</th><th>Ожид. прибыль</th><th>Маржа</th></tr></thead><tbody>'+
     (body||'<tr><td colspan="20" class="em">Нет заказов FBW за выбранный период</td></tr>')+
     '<tr style="border-top:2px solid var(--border2);font-weight:700"><td>Итого</td><td>'+qty+'</td><td colspan="4">—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;color:'+(profit>=0?"var(--green)":"var(--red)")+'">'+money(profit)+'</td><td>—</td></tr></tbody></table></div></div>';
