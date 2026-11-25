@@ -174,10 +174,10 @@ export function profitabilityHTML(cab,vm){
   const qty=records.reduce((s,x)=>s+x.r.qty,0),sum=records.reduce((s,x)=>s+x.r.sum,0),buy=records.reduce((s,x)=>s+x.buySum,0),profit=records.reduce((s,x)=>s+x.profitSum,0);
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
   return '<div class="sec" id="profitability'+cab+'"><style>'+
-    '#profitability'+cab+' .tw{overflow-x:auto}'+
-    '#profitability'+cab+' table{min-width:1450px}'+
-    '#profitability'+cab+' .pf-main-row td{vertical-align:middle;white-space:nowrap}'+
-    '#profitability'+cab+' .pf-cell-input{width:76px;box-sizing:border-box;padding:5px 6px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:11px}'+
+    '#profitability'+cab+' .tw{width:100%;overflow:visible}'+
+    '#profitability'+cab+' table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:9px}'+
+    '#profitability'+cab+' th,#profitability'+cab+' td{padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
+    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:52px;box-sizing:border-box;padding:2px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:9px;text-align:right}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
     '#profitability'+cab+' .pf-settings-row details>summary{cursor:pointer;font-size:11px;color:var(--ink2);padding:4px 0}'+
