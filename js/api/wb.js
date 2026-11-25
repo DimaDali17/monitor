@@ -42,10 +42,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* Дедупликация в полёте */
 const inflight = new Map();
 
-export function wbGet(url, cab, force, onRetry) {
+export function wbGet(url, cab, force, onRetry, minGap = WB_GAP) {
   const key = cab + "|" + url;
   if (inflight.has(key)) return inflight.get(key);
-  const p = enqueue(() => attempt("GET", url, null, cab, force, onRetry))
+  const p = enqueue(() => attempt("GET", url, null, cab, force, onRetry), minGap)
     .finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
@@ -79,11 +79,14 @@ async function attempt(method, url, body, cab, force, onRetry) {
          а не истёкшую сессию — не выкидываем пользователя на логин */
       const isAnalDomain = url.includes("analytics-api") || url.includes("content-api");
       const isAdv = url.includes("advert-api");
-      if (!isAnalDomain && !isAdv) expired();
+      const isPrices = url.includes("discounts-prices-api");
+      if (!isAnalDomain && !isAdv && !isPrices) expired();
       throw new Error(isAdv
         ? `401 — проверьте токен «Продвижение» WB_ADV_KEY_${cab} в секретах воркера`
         : isAnalDomain
         ? `401 — проверьте токен Аналитика WB_ANAL_KEY_${cab} в секретах воркера`
+        : isPrices
+        ? `401 — нет доступа к WB API «Цены и скидки» для кабинета ${cab}; проверьте токен этой категории и прокси`
         : "Сессия истекла");
     }
 
@@ -136,6 +139,49 @@ function fetchWithTimeout(url, opts, ms) {
    размер покажется как chrtId. */
 
 const CARDS_URL = "https://content-api.wildberries.ru/content/v2/get/cards/list";
+const PRICES_BASE = "https://discounts-prices-api.wildberries.ru";
+const PRICE_CACHE_KEY = "monitor_wb_seller_prices_v1_";
+const PRICE_CACHE_TTL = 15 * 60 * 1000;
+const PRICE_DATA = { 1: null, 2: null };
+const PRICE_ERRORS = { 1: "", 2: "" };
+
+export const wbSellerPrices = cab => PRICE_DATA[cab];
+export const wbSellerPricesError = cab => PRICE_ERRORS[cab];
+
+export async function loadWbSellerPrices(cab, { onRetry } = {}) {
+  const storageKey=PRICE_CACHE_KEY+cab;
+  try {
+    const cached=JSON.parse(localStorage.getItem(storageKey)||"null");
+    if(cached?.at&&Date.now()-cached.at<PRICE_CACHE_TTL&&cached.data){
+      PRICE_DATA[cab]=cached.data;PRICE_ERRORS[cab]="";return cached.data;
+    }
+  } catch {}
+  try {
+    const goods=[];let offset=0;
+    for(let page=0;page<20;page++){
+      const url=`${PRICES_BASE}/api/v2/list/goods/filter?limit=1000&offset=${offset}`;
+      const response=await wbGet(url,cab,false,onRetry,700);
+      if(response?.error)throw new Error(response.errorText||"WB API «Цены и скидки» вернул ошибку");
+      const list=response?.data?.listGoods||response?.listGoods||[];
+      if(!Array.isArray(list))throw new Error("WB вернул некорректный список цен");
+      goods.push(...list);
+      if(list.length<1000)break;
+      offset+=list.length;
+    }
+    if(!goods.length)throw new Error("WB API «Цены и скидки» вернул пустой список");
+    const prices={};
+    for(const item of goods){
+      const art=String(item.vendorCode||"").trim();
+      if(art&&Number.isFinite(Number(item.discount)))prices[art.trim().toLowerCase().replace(/\\s+/g,"")]={discount:Number(item.discount),price:Number(item.sizes?.[0]?.price)||0,nmId:item.nmID||null};
+    }
+    PRICE_DATA[cab]=prices;PRICE_ERRORS[cab]="";
+    try{localStorage.setItem(storageKey,JSON.stringify({at:Date.now(),data:prices}));}catch{}
+    return prices;
+  }catch(error){
+    PRICE_DATA[cab]=null;PRICE_ERRORS[cab]=error.message||String(error);
+    throw error;
+  }
+}
 
 /* Отдельно на кабинет: у EF и EZFR свои каталоги, общий словарь
    подставлял бы чужие артикулы при переключении вкладок. */
