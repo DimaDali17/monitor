@@ -196,9 +196,9 @@ export function profitabilityHTML(cab,vm){
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
   return '<div class="sec" id="profitability'+cab+'"><style>'+
     '#profitability'+cab+' .tw{width:100%;overflow-x:auto}'+
-    '#profitability'+cab+' table{width:100%!important;min-width:1600px!important;max-width:none;table-layout:fixed;border-collapse:collapse;font-size:11px}'+
-    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:6px 9px;white-space:normal;line-height:1.2;text-align:right}#profitability'+cab+' td{padding:5px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
-    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:64px;box-sizing:border-box;padding:3px 5px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:11px;text-align:right}'+
+    '#profitability'+cab+' table{width:100%!important;min-width:1700px!important;max-width:none;table-layout:fixed;border-collapse:collapse;font-size:12px}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:7px 10px;white-space:normal;line-height:1.25;text-align:right}#profitability'+cab+' td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
+    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:68px;box-sizing:border-box;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:12px;text-align:right}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
     '#profitability'+cab+' .pf-settings-row details>summary{cursor:pointer;font-size:11px;color:var(--ink2);padding:4px 0}'+
