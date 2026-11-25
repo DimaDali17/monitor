@@ -159,7 +159,8 @@ async function checkVersion() {
 /* ══ Обработчики, на которые ссылается разметка ══ */
 const App = {
   reload, reloadForConso, go, doLogin, logout, checkVersion,
-  setProfitInput, toggleProfit, sortProfit,
+  setProfitInput, toggleProfit,
+  sortProfit(n, key) { sortProfit(n, key); renderCabinet(n); },
   fpInput, faInput, fgInput,
   exportXlsx: exportBlock,
 
