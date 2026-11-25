@@ -43,6 +43,7 @@ export const CM = { 1: "day", 2: "day", 3: "day" };  /* day | week | month */
 export const CV = { 1: "ord", 2: "ord", 3: "ord" };  /* ord | rev */
 export const CP = { 1: true, 2: true, 3: true };     /* линия «Цена на сайте» на графике */
 export const GB = { 1: "sub", 2: "sub", 3: "sub" }; /* sub | grp | art — уровень «Структуры спроса» и графика */
+export const DV = { 1: "qty", 2: "qty", 3: "qty" }; /* qty | rev | profit — показатель «Структуры спроса» */
 
 /* Детализация графика («Глубже»): стек по предметам → группам → артикулам.
    deep — режим вкл/выкл; predmet/group — текущий фокус (drill); hi — подсветка листа. */
@@ -57,3 +58,4 @@ export const CONSO = { expandOrders: false, log: [] };
 
 export const cabName = (n) => (n === 1 ? "Easyform" : n === 2 ? "EZFR" : n === 3 ? "Ozon" : "Консолидация");
 export const cabShort = (n) => (n === 1 ? "EF" : n === 2 ? "EZFR" : "Ozon");
+
