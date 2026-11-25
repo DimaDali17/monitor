@@ -168,7 +168,7 @@ export function profitabilityHTML(cab,vm){
     const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art);
     const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
       disc:Math.round(n(ov.disc??r.disc/Math.max(1,r.qty))),spp:n(ov.spp??31),
-      buyout:n(ov.buyout??(br.val*100)),cogs:cogsValue(cab,r.art,ov,all),vol:n(ov.vol??ref.vol??0),
+      buyout:n(ov.buyout??Math.round(br.val*100)),cogs:cogsValue(cab,r.art,ov,all),vol:n(ov.vol??ref.vol??0),
       commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
       vat:n(ov.vat??(cab===1?5:0)),ad_ctr:n(ov.ad_ctr??DEFAULT.ad_ctr),
       ctr:n(ov.ad_ctr??DEFAULT.ad_ctr)/100,cr:n(ov.ad_cr??DEFAULT.ad_cr)/100,
@@ -197,7 +197,7 @@ export function profitabilityHTML(cab,vm){
   return '<div class="sec" id="profitability'+cab+'"><style>'+
     '#profitability'+cab+' .tw{width:100%;overflow-x:auto}'+
     '#profitability'+cab+' table{width:100%!important;min-width:1700px!important;max-width:none;table-layout:fixed;border-collapse:collapse;font-size:12px}'+
-    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:7px 10px;white-space:normal;line-height:1.25;text-align:right}#profitability'+cab+' td{padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:9px 12px;white-space:normal;line-height:1.3;text-align:right}#profitability'+cab+' td{padding:9px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
     '#profitability'+cab+' .pf-cell-input{width:100%;max-width:68px;box-sizing:border-box;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:12px;text-align:right}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
@@ -218,4 +218,5 @@ export function sortProfit(cab,key){const cur=SORT[cab]||{key:"sum",dir:-1};SORT
 export function repaintProfitability(cab,vm){const el=document.getElementById("profitability"+cab);if(el&&vm)el.outerHTML=profitabilityHTML(cab,vm);}
 export function setProfitInput(cab,art,field,value){input(cab,art,field,value);}
 export function toggleProfit(cab,art){toggle(cab,art);}
+
 
