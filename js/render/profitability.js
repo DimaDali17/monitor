@@ -26,7 +26,7 @@ const DEFAULT = {
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
   prep_box:5,prep_move_l:7,ff_on:0,ff_flat:50,
-  store_per_l:0.08,store_days:0,ad_bid:500,ad_ctr:null,ad_cr:10
+  store_per_l:0.08,store_days:60,ad_bid:400,ad_ctr:null,ad_cr:10
 };
 const COMM = {"термоноски":39.5,"термокомплекты":34.5,"трусы":43.5,"термомайки":43.5,"леггинсы":43.5};
 const n = x => Number.isFinite(Number(x)) ? Number(x) : 0;
@@ -135,7 +135,7 @@ function detail(cab,r,st,z,ad){
   const editable=fields.map(([name,label])=>field(cab,r.art,st,name,label,
     ["vol","log_fbw_coef","store_per_l","ad_ctr","ad_cr","disc","spp","buyout","commission","wallet","acquiring","tax","vat","log_fbw_addl","prep_move_l"].includes(name)?"0.1":"1"
   )).join("");
-  return '<tr class="pf-settings-row"><td colspan="20"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 30%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по фактическим CTR/CR SKU, если данные доступны; иначе CTR можно задать вручную.</div></details></td></tr>';
+  return '<tr class="pf-settings-row"><td colspan="20"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 31%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по фактическим CTR/CR SKU, если данные доступны; иначе CTR можно задать вручную.</div></details></td></tr>';
 }
 export function profitabilityHTML(cab,vm){
   if(cab===3||!vm||!sheets.loaded)return "";
@@ -149,12 +149,12 @@ export function profitabilityHTML(cab,vm){
   const records=data.map(r=>{
     const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art),ad=adMetrics(cab,r.art,r.orders);
     const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
-      disc:n(ov.disc??r.disc/Math.max(1,r.qty)),spp:n(ov.spp??30),
+      disc:n(ov.disc??r.disc/Math.max(1,r.qty)),spp:n(ov.spp??31),
       buyout:n(ov.buyout??(br.val*100)),cogs:n(ov.cogs??ref.cogs??0),vol:n(ov.vol??ref.vol??0),
       commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
       vat:n(ov.vat??(cab===1?5:0)),ad_ctr:ov.ad_ctr??(ad.ctr==null?null:ad.ctr*100),
       ctr:ov.ad_ctr!=null?n(ov.ad_ctr)/100:ad.ctr,cr:n(ov.ad_cr??ad.cr*100)/100,
-      ad_bid:n(ov.ad_bid??500),ff_on:n(ov.ff_on??0)};
+      ad_bid:n(ov.ad_bid??400),ff_on:n(ov.ff_on??0)};
     const z=calc(st),buySum=r.sum*(st.buyout/100),profitSum=r.qty*(st.buyout/100)*z.profit;
     return {r,st,z,ad,buySum,profitSum};
   });
