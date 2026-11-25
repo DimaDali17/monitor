@@ -81,10 +81,10 @@ function adMetrics(cab,art,orders){
   const ids=new Set();
   for(const o of orders)if(norm(o.supplierArticle)===norm(art)&&o.nmId)ids.add(String(o.nmId));
   for(const nm of cardsNmList(cab)||[]){const c=cardByNm(cab,nm);if(c&&norm(c.supplierArticle)===norm(art))ids.add(String(nm));}
-  let views=0,clicks=0,ordersAd=0;
-  for(const id of ids)for(const [day,x] of Object.entries(A.nm[id]||{})){if(day<A.from||day>A.to)continue;views+=n(x.views);clicks+=n(x.clicks);ordersAd+=n(x.orders);}
-  if(!views||!clicks)return {ctr:null,cr:10,source:"нет CTR по SKU, реклама не списана; CR 10%"};
-  return {ctr:clicks/views,cr:ordersAd>0?ordersAd/clicks:0.10,source:ordersAd>0?"CTR и CR по рекламе SKU":"CTR по SKU; CR 10%"};
+  let views=0,clicks=0,ordersAd=0,spend=0;
+  for(const id of ids)for(const [day,x] of Object.entries(A.nm[id]||{})){if(day<A.from||day>A.to)continue;views+=n(x.views);clicks+=n(x.clicks);ordersAd+=n(x.orders);spend+=n(x.sum);}
+  if(!views||!clicks)return {ctr:null,cr:10,cpo:null,source:"нет статистики рекламы SKU"};
+  return {ctr:clicks/views,cr:ordersAd>0?ordersAd/clicks:0.10,cpo:ordersAd>0&&spend>0?spend/ordersAd:null,source:ordersAd>0&&spend>0?"фактический расход и заказы WB":"CTR по SKU; CR 10%"};
 }
 function calc(st){
   const b=Math.max(0,Math.min(1,st.buyout/100));
@@ -101,7 +101,7 @@ function calc(st){
   const ff=st.ff_on?st.ff_flat:0,tax=site*st.tax/100,vat=st.vat>0?site*st.vat/(100+st.vat):0;
   const profit0=transfer-st.cogs-st.fixed-logistics-prep-store-ff-tax-vat;
   const ctr=st.ctr==null?0:st.ctr,clicks=1000*ctr,ordersAd=ctr>0?Math.ceil(clicks*st.cr):0;
-  const cpo=ordersAd>0?st.ad_bid/ordersAd:0,cps=b>0?cpo/b:cpo,drr=priceSPP>0?cps/priceSPP:0;
+  const cpo=st.ad_cpo!=null?st.ad_cpo:(ordersAd>0?st.ad_bid/ordersAd:0),cps=b>0?cpo/b:cpo,drr=priceSPP>0?cps/priceSPP:0;
   return {priceDisc,priceSPP,wallet,site,acquiring,realCommPct,commRub,transfer,base,tarif,dop,logFwd,logReturn,logistics,prepBox,prepMove,prep,store,ff,tax,vat,profit0,clicks,ordersAd,cpo,cps,drr,profit:profit0-cps,margin:site>0?(profit0-cps)/site:0};
 }
 function input(cab,art,field,value){
@@ -154,7 +154,7 @@ export function profitabilityHTML(cab,vm){
       commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
       vat:n(ov.vat??(cab===1?5:0)),ad_ctr:ov.ad_ctr??(ad.ctr==null?null:ad.ctr*100),
       ctr:ov.ad_ctr!=null?n(ov.ad_ctr)/100:ad.ctr,cr:n(ov.ad_cr??ad.cr*100)/100,
-      ad_bid:n(ov.ad_bid??400),ff_on:n(ov.ff_on??0)};
+      ad_bid:n(ov.ad_bid??400),ad_cpo:ov.ad_cpo??ad.cpo,ff_on:n(ov.ff_on??0)};
     const z=calc(st),buySum=r.sum*(st.buyout/100),profitSum=r.qty*(st.buyout/100)*z.profit;
     return {r,st,z,ad,buySum,profitSum};
   });
