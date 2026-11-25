@@ -22,7 +22,7 @@ const PROF_DATA = {};
 const LAST_VM = {};
 const SORT = {};
 const DEFAULT = {
-  disc:0,spp:30,buyout:null,cogs:null,vol:null,commission:null,
+  disc:0,spp:31,buyout:null,cogs:null,vol:null,commission:null,
   wallet:3,acquiring:3,tax:6,vat:null,fixed:60,
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
@@ -179,8 +179,8 @@ export function profitabilityHTML(cab,vm){
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
   return '<div class="sec" id="profitability'+cab+'"><style>'+
     '#profitability'+cab+' .tw{width:100%;overflow:visible}'+
-    '#profitability'+cab+' table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:9px}'+
-    '#profitability'+cab+' th,#profitability'+cab+' td{padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
+    '#profitability'+cab+' table{width:100%!important;min-width:0!important;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:9px}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th,#profitability'+cab+' td{padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
     '#profitability'+cab+' .pf-cell-input{width:100%;max-width:52px;box-sizing:border-box;padding:2px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:9px;text-align:right}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
