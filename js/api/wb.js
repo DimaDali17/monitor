@@ -172,7 +172,7 @@ export async function loadWbSellerPrices(cab, { onRetry } = {}) {
     const prices={};
     for(const item of goods){
       const art=String(item.vendorCode||"").trim();
-      if(art&&Number.isFinite(Number(item.discount)))prices[art.trim().toLowerCase().replace(/\\s+/g,"")]={discount:Number(item.discount),price:Number(item.sizes?.[0]?.price)||0,nmId:item.nmID||null};
+      if(art&&Number.isFinite(Number(item.discount)))prices[art.trim().toLowerCase().replace(/\s+/g,"")]={discount:Number(item.discount),price:Number(item.sizes?.[0]?.price)||0,nmId:item.nmID||null};
     }
     PRICE_DATA[cab]=prices;PRICE_ERRORS[cab]="";
     try{localStorage.setItem(storageKey,JSON.stringify({at:Date.now(),data:prices}));}catch{}

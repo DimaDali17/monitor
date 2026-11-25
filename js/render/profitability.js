@@ -1,7 +1,7 @@
 import { CM } from "../state.js";
 import { sheets, getBuyrate, artGroup } from "../api/sheets.js";
 import { ADS } from "../api/ads.js";
-import { cardByNm, cardsNmList } from "../api/wb.js";
+import { cardByNm, cardsNmList, wbSellerPrices, wbSellerPricesError } from "../api/wb.js";
 import { wbPrice, esc, iso } from "../utils.js";
 
 const LSKEY = "monitor_profit_overrides_v2";
@@ -23,7 +23,7 @@ const LAST_VM = {};
 const SORT = {};
 const TABLE_HIDDEN = {};
 const DEFAULT = {
-  disc:0,spp:31,buyout:null,cogs:null,vol:null,commission:null,
+  spp:31,buyout:null,cogs:null,vol:null,commission:null,
   wallet:3,acquiring:3,tax:6,vat:null,fixed:60,
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
@@ -49,7 +49,10 @@ const read = key => { try{return JSON.parse(localStorage.getItem(key)||"{}");}ca
 const write = (key,v) => { try{localStorage.setItem(key,JSON.stringify(v));}catch{} };
 const overrides = () => {
   const all=read(LSKEY);let migrated=false;
-  for(const value of Object.values(all))if(value&&Number(value.ad_ctr)===5.6145){value.ad_ctr=10;migrated=true;}
+  for(const value of Object.values(all))if(value){
+    if(Number(value.ad_ctr)===5.6145){value.ad_ctr=10;migrated=true;}
+    if(Object.prototype.hasOwnProperty.call(value,"disc")){delete value.disc;migrated=true;}
+  }
   if(migrated)write(LSKEY,all);
   return all;
 };
@@ -144,8 +147,9 @@ function calc(st){
 }
 function estimateSettings(cab,r,all){
   const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art);
+  const sellerPrice=wbSellerPrices(cab)?.[norm(r.art)];
   const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
-    disc:Math.round(n(ov.disc??r.disc/Math.max(1,r.qty))),spp:n(ov.spp??31),
+    disc:sellerPrice?Number(sellerPrice.discount):null,spp:n(ov.spp??31),
     buyout:n(ov.buyout??Math.round(br.val*100)),cogs:cogsValue(cab,r.art,ov,all),vol:n(ov.vol??ref.vol??0),
     commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
     vat:n(ov.vat??(cab===1?5:0)),ad_ctr:n(ov.ad_ctr??DEFAULT.ad_ctr),
@@ -157,8 +161,8 @@ export function expectedProfitByArticle(cab,orders){
   const grouped=new Map();
   for(const o of orders||[]){
     const art=o.supplierArticle||"—";if(art==="—")continue;
-    const x=grouped.get(art)||{art,subject:o.subject||o.category||artGroup(art)?.predmet||"",qty:0,price:0,disc:0};
-    const q=n(o.quantity)||1;x.qty+=q;x.price+=(n(o.totalPrice)||wbPrice(o))*q;x.disc+=(n(o.discountPercent)||0)*q;grouped.set(art,x);
+    const x=grouped.get(art)||{art,subject:o.subject||o.category||artGroup(art)?.predmet||"",qty:0,price:0};
+    const q=n(o.quantity)||1;x.qty+=q;x.price+=(n(o.totalPrice)||wbPrice(o))*q;grouped.set(art,x);
   }
   const all=overrides();
   const result=new Map();
@@ -205,13 +209,23 @@ function detail(cab,r,st,z){
 export function profitabilityHTML(cab,vm){
   if(cab===3||!vm||!sheets.loaded)return "";
   LAST_VM[cab]=vm;
+  const all=overrides();
+  const sellerPrices=wbSellerPrices(cab);
+  if(!sellerPrices){
+    const error=wbSellerPricesError(cab);
+    return '<div class="sec" id="profitability'+cab+'"><div class="sh"><span class="st">Прибыльность заказов · WB</span></div><div class="sm2" style="color:var(--red);padding:8px 0">Не удалось получить текущие скидки продавца из WB API «Цены и скидки». Таблица расчётов скрыта, чтобы не использовать скидки из истории заказов.'+(error?' '+esc(error):'')+'</div></div>';
+  }
   const orders=profitabilityOrders(vm,cab),grouped=new Map();
   for(const o of orders){
     const art=o.supplierArticle||"—";if(art==="—")continue;
-    const x=grouped.get(art)||{art,subject:o.subject||o.category||artGroup(art)?.predmet||"",qty:0,sum:0,price:0,disc:0,orders:[]};
-    const q=n(o.quantity)||1;x.qty+=q;x.sum+=wbPrice(o)*q;x.price+=(n(o.totalPrice)||wbPrice(o))*q;x.disc+=(n(o.discountPercent)||0)*q;x.orders.push(o);grouped.set(art,x);
+    const x=grouped.get(art)||{art,subject:o.subject||o.category||artGroup(art)?.predmet||"",qty:0,sum:0,price:0,orders:[]};
+    const q=n(o.quantity)||1;x.qty+=q;x.sum+=wbPrice(o)*q;x.price+=(n(o.totalPrice)||wbPrice(o))*q;x.orders.push(o);grouped.set(art,x);
   }
-  const all=overrides(),data=[...grouped.values()].sort((a,b)=>b.sum-a.sum),profitByArticle=expectedProfitByArticle(cab,orders);
+  const missingPrices=[...grouped.keys()].filter(art=>!sellerPrices[norm(art)]);
+  if(missingPrices.length){
+    return '<div class="sec" id="profitability'+cab+'"><div class="sh"><span class="st">Прибыльность заказов · WB</span></div><div class="sm2" style="color:var(--red);padding:8px 0">В WB API «Цены и скидки» не найдены текущие скидки для артикулов: '+missingPrices.map(esc).join(', ')+'. Таблица расчётов скрыта, чтобы не подставлять исторические скидки из заказов.</div></div>';
+  }
+  const data=[...grouped.values()].sort((a,b)=>b.sum-a.sum),profitByArticle=expectedProfitByArticle(cab,orders);
   const records=data.map(r=>{
     const {st,z}=estimateSettings(cab,r,all),buySum=r.sum*(st.buyout/100),profitSum=profitByArticle.get(r.art)?.total||0;
     return {r,st,z,buySum,profitSum};
@@ -225,7 +239,7 @@ export function profitabilityHTML(cab,vm){
     return '<tr class="pf-main-row">'+
     '<td><button class="pf-art-settings" title="Настроить рекламу и расчёт для артикула" onclick="App.toggleProfit('+cab+',\''+esc(r.art)+'\')">Настр.</button> <b>'+esc(r.art)+'</b></td>'+
       '<td>'+r.qty+'</td><td>'+cellInput(cab,r.art,st,"buyout","0.1")+'</td>'+
-      '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+cellInput(cab,r.art,st,"disc","0.1")+'</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
+      '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+st.disc+'%</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
       '<td>'+money(z.site)+'</td><td>'+money(z.commRub+z.acquiring+z.wallet)+'</td><td>'+money(z.logistics)+'</td><td>'+money(z.prep)+'</td>'+
       '<td class="pf-cogs-cell'+(st.cogs<=0?' zero':'')+'">'+cellInput(cab,r.art,st,"cogs","1")+'</td><td>'+money(z.store)+'</td><td>'+money(z.tax)+'</td><td>'+money(z.vat)+'</td>'+
       '<td>'+money(st.fixed)+'</td><td>'+cellInput(cab,r.art,st,"ad_bid","1")+'</td><td>'+cellInput(cab,r.art,st,"ad_ctr","0.0001")+'</td>'+
