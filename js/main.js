@@ -2,7 +2,7 @@ import { VERSION } from "./config.js";
 import { setChartWx } from "./render/chart.js";
 import {
   D, VM, EXP, EXS, EXFS, EXD, EXA, DRW, OA, OAD, OAF, OAC, SS, DS, FSS, FA, FP,
-  CM, CV, CP, GB, CD, FG, OFM, CONSO, cabName,
+  CM, CV, CP, GB, DV, CD, FG, OFM, CONSO, cabName,
 } from "./state.js";
 import { L1, L2, L3 } from "./logos.js";
 import { loadPass, login, logout as dropPass } from "./api/auth.js";
@@ -10,7 +10,7 @@ import { loadExternal, rawSplitMode, setRawSplitMode } from "./api/sheets.js";
 import { loadPlan } from "./api/plan.js";
 import { loadAds } from "./api/ads.js";
 import { repaintAds, setAdPer, setAdRows, togAdQ, togAdQAll } from "./render/ads.js";
-import { loadProfitData, setProfitInput, repaintProfitability, toggleProfit, sortProfit } from "./render/profitability.js";
+import { loadProfitData, setProfitInput, repaintProfitability, toggleProfit, toggleProfitTable, sortProfit } from "./render/profitability.js";
 import { repaintPlan, setPlanUnit, setPlanBase, setPlanPer, setSeasMode, setPlanRows } from "./render/plan.js";
 import { loadWB } from "./api/wb.js";
 import { loadReturns, RETURNS } from "./api/returns.js";
@@ -160,6 +160,7 @@ async function checkVersion() {
 const App = {
   reload, reloadForConso, go, doLogin, logout, checkVersion,
   setProfitInput, toggleProfit,
+  toggleProfitTable(n) { toggleProfitTable(n); renderCabinet(n); },
   sortProfit(n, key) { sortProfit(n, key); renderCabinet(n); },
   fpInput, faInput, fgInput,
   exportXlsx: exportBlock,
@@ -180,6 +181,7 @@ const App = {
   togAdQAll(n, k) { togAdQAll(n, k); repaintAds(n); },
   reloadAds(n) { const el = document.getElementById("ads" + n); if (el) el.innerHTML = '<span class="st">📣 Эффективность рекламы</span><div style="font-size:11px;color:var(--ink3);margin-top:6px">загружаем заново…</div>'; loadAds(n, { force: true }).then(() => { repaintAds(n); repaintProfitability(n, VM[n]); }); },
   setGroupBy(n, g) { GB[n] = g; renderCabinet(n); },
+  setDemandValue(n, value) { DV[n] = value; renderCabinet(n); },
   /* Детализация графика («Глубже») */
   chartDeep(n, on) {
     const c = CD[n]; c.deep = on;
@@ -387,3 +389,4 @@ init();
 
 /* Погода для графика догрузилась — перерисовать открытые кабинеты */
 if (typeof window !== "undefined") window.addEventListener("wx-ready", () => { for (const n of [1, 2, 3]) if (D[n]) renderCabinet(n); });
+
