@@ -55,18 +55,32 @@ const overrides = () => {
 };
 const opened = () => read(OPENKEY);
 const keyOf = (cab,art) => cab+"|"+norm(art);
+function cogsSiblings(art){
+  const name=String(art||"");
+  const configured=COGS_GROUPS.find(xs=>xs.some(x=>norm(x)===norm(name)))||[];
+  const generated=[];
+  const colors=[
+    [/blacknew/ig,"bejnew"],[/black/ig,"beige"],[/black/ig,"bej"],
+    [/beige/ig,"black"],[/bejnew/ig,"blacknew"],[/bej/ig,"black"],
+    [/grey/ig,"black"],[/gray/ig,"black"],[/purp/ig,"black"]
+  ];
+  for(const [pattern,replacement] of colors){
+    pattern.lastIndex=0;
+    if(pattern.test(name))generated.push(name.replace(pattern,replacement));
+    pattern.lastIndex=0;
+  }
+  return [...new Set([...configured,...generated].filter(x=>norm(x)!==norm(name)))];
+}
 function cogsValue(cab,art,ov,allOverrides){
   const own=n(ov.cogs??PROF_DATA[cab]?.[norm(art)]?.cogs??0);
   if(own>0)return own;
-  const group=COGS_GROUPS.find(xs=>xs.some(x=>norm(x)===norm(art)));
-  if(!group)return own;
-  for(const sibling of group){
-    if(norm(sibling)===norm(art))continue;
+  const siblings=cogsSiblings(art);
+  if(!siblings.length)return own;
+  for(const sibling of siblings){
     const value=n(allOverrides[keyOf(cab,sibling)]?.cogs);
     if(value>0)return value;
   }
-  for(const sibling of group){
-    if(norm(sibling)===norm(art))continue;
+  for(const sibling of siblings){
     const value=n(PROF_DATA[cab]?.[norm(sibling)]?.cogs);
     if(value>0)return value;
   }
