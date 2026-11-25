@@ -148,7 +148,7 @@ export function profitabilityHTML(cab,vm){
       ctr:n(ov.ad_ctr??DEFAULT.ad_ctr)/100,cr:n(ov.ad_cr??DEFAULT.ad_cr)/100,
       ad_bid:n(ov.ad_bid??DEFAULT.ad_bid),ff_on:n(ov.ff_on??0)};
     const z=calc(st),buySum=r.sum*(st.buyout/100),profitSum=r.qty*(st.buyout/100)*z.profit;
-    return {r,st,z,ad,buySum,profitSum};
+    return {r,st,z,buySum,profitSum};
   });
   const cellInput=(cab,art,st,name,step="1")=>'<input class="pf-cell-input" type="number" step="'+step+'" value="'+(st[name]??0)+'" onchange="App.setProfitInput('+cab+',\''+esc(art)+'\',\''+name+'\',this.value)">';
   const sort=SORT[cab]||{key:"sum",dir:-1};
