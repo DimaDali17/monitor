@@ -1,7 +1,7 @@
 import { VM, CM, GB, DV, FP, FG, FA } from "../state.js";
 import { esc, iso, q, wbPrice } from "../utils.js";
 import { artGroup } from "../api/sheets.js";
-import { expectedProfitForOrders } from "./profitability.js";
+import { expectedProfitByArticle, profitabilityOrders } from "./profitability.js";
 
 /* Структура спроса = навигатор по заказам за период (вчера/день/неделя/месяц).
    Уровень выбирается переключателем Предмет/Группа/Артикул (GB); фильтры FP/FG/FA — область (scope).
@@ -18,7 +18,8 @@ export function structureHTML(n) {
 
   /* Заказы за диапазон — тот же принцип, что и в графике */
   let orders;
-  if (mode === "week") orders = vm.orders7 || [];
+  if (type === "wb") orders = profitabilityOrders(vm,n);
+  else if (mode === "week") orders = vm.orders7 || [];
   else if (mode === "month") {
     const w = iso(Date.now() - 30 * 864e5);
     const dOf = (o) => ((type === "wb" ? o.date : o.in_process_at || o.created_at) || "").slice(0, 10);
@@ -43,6 +44,7 @@ export function structureHTML(n) {
         : (art || "—");
 
   const groups = {};
+  const profitByArticle=valueMode==="profit"&&type==="wb"?expectedProfitByArticle(n,orders):null;
   const bump = (k, qty, revenue, order) => {
     const item=groups[k]||(groups[k]={qty:0,revenue:0,orders:[]});
     item.qty+=qty;item.revenue+=revenue;if(order)item.orders.push(order);
@@ -58,7 +60,7 @@ export function structureHTML(n) {
   }
 
   const rows=Object.entries(groups).map(([name,item])=>{
-    const value=valueMode==="profit"?expectedProfitForOrders(n,item.orders):valueMode==="rev"?item.revenue:item.qty;
+    const value=valueMode==="profit"?item.orders.reduce((sum,o)=>sum+(profitByArticle.get(o.supplierArticle)?.perUnit||0)*(o.quantity||1),0):valueMode==="rev"?item.revenue:item.qty;
     return [name,{...item,value}];
   }).sort((a,b)=>b[1].value-a[1].value);
   const shown = rows;                                  /* показываем всё — без «Прочее» */
