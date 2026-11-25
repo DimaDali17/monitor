@@ -223,7 +223,7 @@ export function profitabilityHTML(cab,vm){
   return '<div class="sec" id="profitability'+cab+'"><style>'+
     '#profitability'+cab+' .tw{width:100%;max-width:100%;overflow:hidden}'+
     '#profitability'+cab+' table{width:max-content!important;min-width:0!important;max-width:100%;table-layout:auto;border-collapse:collapse;font-size:10px}'+
-    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:4px 3px;white-space:nowrap;line-height:1.15;text-align:right;font-size:9px}#profitability'+cab+' td{padding:4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:130px;max-width:130px}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th{padding:4px 3px;white-space:nowrap;line-height:1.15;text-align:right;font-size:9px}#profitability'+cab+' td{padding:4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:max-content;min-width:190px;max-width:none;overflow:visible;text-overflow:clip}'+
     '#profitability'+cab+' th:nth-child(18),#profitability'+cab+' td:nth-child(18){width:58px}'+
     '#profitability'+cab+' th:nth-child(20),#profitability'+cab+' td:nth-child(20){width:82px}'+
     '#profitability'+cab+' .pf-cell-input{width:54px;max-width:100%;box-sizing:border-box;padding:3px 3px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:10px;text-align:right}'+
