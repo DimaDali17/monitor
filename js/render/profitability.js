@@ -27,7 +27,7 @@ const DEFAULT = {
   log_fbw_base1:46,log_fbw_addl:14,log_fbw_coef:1.7,
   log_t20:23,log_t40:26,log_t60:29,log_t80:30,log_t100:32,
   prep_box:5,prep_move_l:7,ff_on:0,ff_flat:50,
-  store_per_l:0.08,store_days:60,ad_bid:400,ad_ctr:null,ad_cr:10
+  store_per_l:0.08,store_days:60,ad_bid:500,ad_ctr:5.6145,ad_cr:10
 };
 const COMM = {"термоноски":39.5,"термокомплекты":34.5,"трусы":43.5,"термомайки":43.5,"леггинсы":43.5};
 const n = x => Number.isFinite(Number(x)) ? Number(x) : 0;
@@ -77,16 +77,7 @@ function selectedOrders(vm,cab){
   const arts=FA[cab]||[],subs=FP[cab]||[],groups=FG[cab]||[];
   return rows.filter(o=>{const a=o.supplierArticle||"",g=artGroup(a)||{};return (!arts.length||arts.some(x=>norm(x)===norm(a)))&&(!subs.length||subs.includes(o.subject||o.category||g.predmet||""))&&(!groups.length||groups.includes(g.kratko||""));});
 }
-function adMetrics(cab,art,orders){
-  const A=ADS[cab];if(!A||A.error)return {ctr:null,cr:10,source:"рекламная статистика не загружена"};
-  const ids=new Set();
-  for(const o of orders)if(norm(o.supplierArticle)===norm(art)&&o.nmId)ids.add(String(o.nmId));
-  for(const nm of cardsNmList(cab)||[]){const c=cardByNm(cab,nm);if(c&&norm(c.supplierArticle)===norm(art))ids.add(String(nm));}
-  let views=0,clicks=0,ordersAd=0,spend=0;
-  for(const id of ids)for(const [day,x] of Object.entries(A.nm[id]||{})){if(day<A.from||day>A.to)continue;views+=n(x.views);clicks+=n(x.clicks);ordersAd+=n(x.orders);spend+=n(x.sum);}
-  if(!views||!clicks)return {ctr:null,cr:10,cpo:null,source:"нет статистики рекламы SKU"};
-  return {ctr:clicks/views,cr:ordersAd>0?ordersAd/clicks:0.10,cpo:ordersAd>0&&spend>0?spend/ordersAd:null,source:ordersAd>0&&spend>0?"фактический расход и заказы WB":"CTR по SKU; CR 10%"};
-}
+
 function calc(st){
   const b=Math.max(0,Math.min(1,st.buyout/100));
   const priceDisc=st.price*(1-st.disc/100),priceSPP=priceDisc*(1-st.spp/100);
@@ -102,7 +93,7 @@ function calc(st){
   const ff=st.ff_on?st.ff_flat:0,tax=site*st.tax/100,vat=st.vat>0?site*st.vat/(100+st.vat):0;
   const profit0=transfer-st.cogs-st.fixed-logistics-prep-store-ff-tax-vat;
   const ctr=st.ctr==null?0:st.ctr,clicks=1000*ctr,ordersAd=ctr>0?Math.ceil(clicks*st.cr):0;
-  const cpo=st.ad_cpo!=null?st.ad_cpo:(ordersAd>0?st.ad_bid/ordersAd:0),cps=b>0?cpo/b:cpo,drr=priceSPP>0?cps/priceSPP:0;
+  const cpo=ordersAd>0?st.ad_bid/ordersAd:0,cps=b>0?cpo/b:cpo,drr=priceSPP>0?cps/priceSPP:0;
   return {priceDisc,priceSPP,wallet,site,acquiring,realCommPct,commRub,transfer,base,tarif,dop,logFwd,logReturn,logistics,prepBox,prepMove,prep,store,ff,tax,vat,profit0,clicks,ordersAd,cpo,cps,drr,profit:profit0-cps,margin:site>0?(profit0-cps)/site:0};
 }
 function input(cab,art,field,value){
@@ -120,7 +111,7 @@ function field(cab,art,st,name,label,step="1",suffix=""){
 function row(label,value,cls=""){
   return '<tr class="'+cls+'"><td>'+label+'</td><td>'+value+'</td></tr>';
 }
-function detail(cab,r,st,z,ad){
+function detail(cab,r,st,z){
   const fields=[
     ["price","Цена продавца, ₽"],["disc","Скидка продавца, %"],["spp","СПП, %"],["buyout","Выкуп, %"],
     ["cogs","Себестоимость, ₽"],["vol","Объём, л"],["commission","Комиссия WB, %"],
@@ -134,9 +125,9 @@ function detail(cab,r,st,z,ad){
     ["ad_bid","Реклама: ставка / 1000, ₽"],["ad_ctr","CTR рекламы, %"],["ad_cr","CR рекламы, %"]
   ];
   const editable=fields.map(([name,label])=>field(cab,r.art,st,name,label,
-    ["vol","log_fbw_coef","store_per_l","ad_ctr","ad_cr","disc","spp","buyout","commission","wallet","acquiring","tax","vat","log_fbw_addl","prep_move_l"].includes(name)?"0.1":"1"
+    ["vol","log_fbw_coef","store_per_l","ad_ctr","ad_cr","spp","buyout","commission","wallet","acquiring","tax","vat","log_fbw_addl","prep_move_l"].includes(name)?"0.1":"1"
   )).join("");
-  return '<tr class="pf-settings-row"><td colspan="20"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 31%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по фактическим CTR/CR SKU, если данные доступны; иначе CTR можно задать вручную.</div></details></td></tr>';
+  return '<tr class="pf-settings-row"><td colspan="20"><details open><summary>Настройки расчёта · '+esc(r.art)+' <span class="pf-note-inline">СПП по умолчанию 31%, все параметры можно менять</span></summary><div class="pf-edit-grid">'+editable+'</div><div class="pf-note">Изменения сохраняются в этом браузере. Реклама рассчитывается по по модели: ставка ÷ расчётные заказы от 1000 показов ÷ выкуп. Старт: 500 ₽, CTR 5,6145%, CR 10%; можно менять для артикула.</div></details></td></tr>';
 }
 export function profitabilityHTML(cab,vm){
   if(cab===3||!vm||!sheets.loaded)return "";
@@ -148,14 +139,14 @@ export function profitabilityHTML(cab,vm){
   }
   const all=overrides(),data=[...grouped.values()].sort((a,b)=>b.sum-a.sum);
   const records=data.map(r=>{
-    const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art),ad=adMetrics(cab,r.art,r.orders);
+    const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art);
     const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
-      disc:n(ov.disc??r.disc/Math.max(1,r.qty)),spp:n(ov.spp??31),
+      disc:Math.round(n(ov.disc??r.disc/Math.max(1,r.qty))),spp:n(ov.spp??31),
       buyout:n(ov.buyout??(br.val*100)),cogs:n(ov.cogs??ref.cogs??0),vol:n(ov.vol??ref.vol??0),
       commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
-      vat:n(ov.vat??(cab===1?5:0)),ad_ctr:ov.ad_ctr??(ad.ctr==null?null:ad.ctr*100),
-      ctr:ov.ad_ctr!=null?n(ov.ad_ctr)/100:ad.ctr,cr:n(ov.ad_cr??ad.cr*100)/100,
-      ad_bid:n(ov.ad_bid??400),ad_cpo:ov.ad_cpo??ad.cpo,ff_on:n(ov.ff_on??0)};
+      vat:n(ov.vat??(cab===1?5:0)),ad_ctr:n(ov.ad_ctr??DEFAULT.ad_ctr),
+      ctr:n(ov.ad_ctr??DEFAULT.ad_ctr)/100,cr:n(ov.ad_cr??DEFAULT.ad_cr)/100,
+      ad_bid:n(ov.ad_bid??DEFAULT.ad_bid),ff_on:n(ov.ff_on??0)};
     const z=calc(st),buySum=r.sum*(st.buyout/100),profitSum=r.qty*(st.buyout/100)*z.profit;
     return {r,st,z,ad,buySum,profitSum};
   });
@@ -163,7 +154,7 @@ export function profitabilityHTML(cab,vm){
   const sort=SORT[cab]||{key:"sum",dir:-1};
   const sortValue=x=>({art:x.r.art,qty:x.r.qty,buyout:x.st.buyout,price:x.st.price,disc:x.st.disc,spp:x.st.spp,site:x.z.site,hold:x.z.commRub+x.z.acquiring+x.z.wallet,logistics:x.z.logistics,prep:x.z.prep,cogs:x.st.cogs,store:x.z.store,tax:x.z.tax,vat:x.z.vat,fixed:x.st.fixed,ff:x.z.ff,ads:x.z.cps,profit:x.z.profit,profitSum:x.profitSum,margin:x.z.margin,sum:x.r.sum}[sort.key]);
   records.sort((a,b)=>{const x=sortValue(a),y=sortValue(b);return typeof x==="string"?x.localeCompare(y,"ru")*sort.dir:(n(x)-n(y))*sort.dir;});
-  const body=records.map(({r,st,z,ad,buySum,profitSum})=>{
+  const body=records.map(({r,st,z,buySum,profitSum})=>{
     const color=profitSum>=0?"var(--green)":"var(--red)";
     return '<tr class="pf-main-row">'+
       '<td><b>'+esc(r.art)+'</b></td>'+
@@ -173,15 +164,15 @@ export function profitabilityHTML(cab,vm){
       '<td>'+cellInput(cab,r.art,st,"cogs","1")+'</td><td>'+money(z.store)+'</td><td>'+money(z.tax)+'</td><td>'+money(z.vat)+'</td>'+
       '<td>'+money(st.fixed)+'</td><td>'+money(z.ff)+'</td><td>'+money(z.cps)+'</td>'+
       '<td>'+money(z.profit)+'</td><td style="color:'+color+';font-weight:700">'+money(profitSum)+'</td><td>'+pct(z.margin)+'</td>'+
-      '</tr>'+(opened()[keyOf(cab,r.art)]?detail(cab,r,st,z,ad):"");
+      '</tr>'+(opened()[keyOf(cab,r.art)]?detail(cab,r,st,z):"");
   }).join("");
   const qty=records.reduce((s,x)=>s+x.r.qty,0),sum=records.reduce((s,x)=>s+x.r.sum,0),buy=records.reduce((s,x)=>s+x.buySum,0),profit=records.reduce((s,x)=>s+x.profitSum,0);
   const period=(CM[cab]||"day")==="month"?"30 дней":(CM[cab]||"day")==="week"?"7 дней":(CM[cab]||"day")==="yesterday"?"вчера":"сегодня";
   return '<div class="sec" id="profitability'+cab+'"><style>'+
-    '#profitability'+cab+' .tw{width:100%;overflow:visible}'+
-    '#profitability'+cab+' table{width:100%!important;min-width:0!important;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:9px}'+
-    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th,#profitability'+cab+' td{padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
-    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:52px;box-sizing:border-box;padding:2px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:9px;text-align:right}'+
+    '#profitability'+cab+' .tw{width:100%;overflow-x:auto}'+
+    '#profitability'+cab+' table{width:100%!important;min-width:1450px!important;max-width:none;table-layout:fixed;border-collapse:collapse;font-size:10px}'+
+    '#profitability'+cab+' th{cursor:pointer}#profitability'+cab+' th,#profitability'+cab+' td{padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}#profitability'+cab+' th{white-space:normal;line-height:1.15}#profitability'+cab+' th:first-child,#profitability'+cab+' td:first-child{text-align:left;width:13%}'+
+    '#profitability'+cab+' .pf-cell-input{width:100%;max-width:56px;box-sizing:border-box;padding:2px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:10px;text-align:right}'+
     '#profitability'+cab+' .pf-settings-btn{margin-top:5px;border:1px solid var(--border2);background:#fff;border-radius:5px;padding:3px 7px;font:inherit;font-size:10px;cursor:pointer}'+
     '#profitability'+cab+' .pf-settings-row>td{padding:8px!important;background:#f8f6f1}'+
     '#profitability'+cab+' .pf-settings-row details>summary{cursor:pointer;font-size:11px;color:var(--ink2);padding:4px 0}'+
@@ -201,3 +192,4 @@ export function sortProfit(cab,key){const cur=SORT[cab]||{key:"sum",dir:-1};SORT
 export function repaintProfitability(cab,vm){const el=document.getElementById("profitability"+cab);if(el&&vm)el.outerHTML=profitabilityHTML(cab,vm);}
 export function setProfitInput(cab,art,field,value){input(cab,art,field,value);}
 export function toggleProfit(cab,art){toggle(cab,art);}
+
