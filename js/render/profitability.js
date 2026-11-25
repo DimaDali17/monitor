@@ -20,6 +20,7 @@ const IP_DATA = {
 };
 const PROF_DATA = {};
 const LAST_VM = {};
+const SORT = {};
 const DEFAULT = {
   disc:0,spp:30,buyout:null,cogs:null,vol:null,commission:null,
   wallet:3,acquiring:3,tax:6,vat:null,fixed:60,
@@ -159,6 +160,9 @@ export function profitabilityHTML(cab,vm){
     return {r,st,z,ad,buySum,profitSum};
   });
   const cellInput=(cab,art,st,name,step="1")=>'<input class="pf-cell-input" type="number" step="'+step+'" value="'+(st[name]??0)+'" onchange="App.setProfitInput('+cab+',\''+esc(art)+'\',\''+name+'\',this.value)">';
+  const sort=SORT[cab]||{key:"sum",dir:-1};
+  const sortValue=x=>({art:x.r.art,qty:x.r.qty,buyout:x.st.buyout,price:x.st.price,disc:x.st.disc,spp:x.st.spp,site:x.z.site,hold:x.z.commRub+x.z.acquiring+x.z.wallet,logistics:x.z.logistics,prep:x.z.prep,cogs:x.st.cogs,store:x.z.store,tax:x.z.tax,vat:x.z.vat,fixed:x.st.fixed,ff:x.z.ff,ads:x.z.cps,profit:x.z.profit,profitSum:x.profitSum,margin:x.z.margin,sum:x.r.sum}[sort.key]);
+  records.sort((a,b)=>{const x=sortValue(a),y=sortValue(b);return typeof x==="string"?x.localeCompare(y,"ru")*sort.dir:(n(x)-n(y))*sort.dir;});
   const body=records.map(({r,st,z,ad,buySum,profitSum})=>{
     const color=profitSum>=0?"var(--green)":"var(--red)";
     return '<tr class="pf-main-row">'+
@@ -189,10 +193,11 @@ export function profitabilityHTML(cab,vm){
     '#profitability'+cab+' .pf-note{font-size:10px;color:var(--ink3);line-height:1.5}'+
     '</style><div class="sh"><span class="st">Прибыльность заказов · FBW</span><span class="sm2">'+period+' · '+qty+' шт.</span></div>'+
     '<div class="sm2" style="margin:4px 0 8px">СПП по умолчанию 31%, можно изменить прямо в таблице. Если источник не передал значение, используется редактируемое значение по умолчанию.</div>'+
-    '<div class="tw"><table><thead><tr><th>Артикул</th><th>Заказы, шт.</th><th>Выкуп, %</th><th>Цена продавца</th><th>Скидка, %</th><th>СПП, %</th><th>Цена на сайте</th><th>Удержания WB</th><th>Логистика</th><th>Приёмка</th><th>Себестоимость</th><th>Хранение</th><th>Налог</th><th>НДС</th><th>Постоянные</th><th>ФФ</th><th>Реклама</th><th>Прибыль/выкуп</th><th>Ожид. прибыль</th><th>Маржа</th></tr></thead><tbody>'+
+    '<div class="tw"><table><thead><tr><th onclick="App.sortProfit('+cab+',&#39;art&#39;)">Артикул</th><th onclick="App.sortProfit('+cab+',&#39;qty&#39;)">Заказы</th><th onclick="App.sortProfit('+cab+',&#39;buyout&#39;)">Выкуп %</th><th onclick="App.sortProfit('+cab+',&#39;price&#39;)">Цена</th><th onclick="App.sortProfit('+cab+',&#39;disc&#39;)">Скидка %</th><th onclick="App.sortProfit('+cab+',&#39;spp&#39;)">СПП %</th><th onclick="App.sortProfit('+cab+',&#39;site&#39;)">На сайте</th><th onclick="App.sortProfit('+cab+',&#39;hold&#39;)">Удержания WB</th><th onclick="App.sortProfit('+cab+',&#39;logistics&#39;)">Логистика</th><th onclick="App.sortProfit('+cab+',&#39;prep&#39;)">Приёмка</th><th onclick="App.sortProfit('+cab+',&#39;cogs&#39;)">Себест.</th><th onclick="App.sortProfit('+cab+',&#39;store&#39;)">Хранение</th><th onclick="App.sortProfit('+cab+',&#39;tax&#39;)">Налог</th><th onclick="App.sortProfit('+cab+',&#39;vat&#39;)">НДС</th><th onclick="App.sortProfit('+cab+',&#39;fixed&#39;)">Постоянные</th><th onclick="App.sortProfit('+cab+',&#39;ff&#39;)">ФФ</th><th onclick="App.sortProfit('+cab+',&#39;ads&#39;)">Реклама</th><th onclick="App.sortProfit('+cab+',&#39;profit&#39;)">Прибыль/шт.</th><th onclick="App.sortProfit('+cab+',&#39;profitSum&#39;)">Прибыль всего</th><th onclick="App.sortProfit('+cab+',&#39;margin&#39;)">Маржа</th></tr></thead><tbody>'+
     (body||'<tr><td colspan="20" class="em">Нет заказов FBW за выбранный период</td></tr>')+
     '<tr style="border-top:2px solid var(--border2);font-weight:700"><td>Итого</td><td>'+qty+'</td><td colspan="4">—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;color:'+(profit>=0?"var(--green)":"var(--red)")+'">'+money(profit)+'</td><td>—</td></tr></tbody></table></div></div>';
 }
+export function sortProfit(cab,key){const cur=SORT[cab]||{key:"sum",dir:-1};SORT[cab]={key,dir:cur.key===key?-cur.dir:(key==="art"?1:-1)};const vm=LAST_VM[cab];if(vm)repaintProfitability(cab,vm);}
 export function repaintProfitability(cab,vm){const el=document.getElementById("profitability"+cab);if(el&&vm)el.outerHTML=profitabilityHTML(cab,vm);}
 export function setProfitInput(cab,art,field,value){input(cab,art,field,value);}
 export function toggleProfit(cab,art){toggle(cab,art);}
