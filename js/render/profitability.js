@@ -51,7 +51,6 @@ const overrides = () => {
   const all=read(LSKEY);let migrated=false;
   for(const value of Object.values(all))if(value){
     if(Number(value.ad_ctr)===5.6145){value.ad_ctr=10;migrated=true;}
-    if(Object.prototype.hasOwnProperty.call(value,"disc")){delete value.disc;migrated=true;}
   }
   if(migrated)write(LSKEY,all);
   return all;
@@ -149,7 +148,7 @@ function estimateSettings(cab,r,all){
   const ov=all[keyOf(cab,r.art)]||{},ref=PROF_DATA[cab]?.[norm(r.art)]||{},br=getBuyrate(r.art);
   const sellerPrice=wbSellerPrices(cab)?.[norm(r.art)];
   const st={...DEFAULT,...ov,price:n(ov.price??(r.price/Math.max(1,r.qty))),
-    disc:sellerPrice?Number(sellerPrice.discount):null,spp:n(ov.spp??31),
+    disc:n(ov.disc??(sellerPrice?Number(sellerPrice.discount):0)),spp:n(ov.spp??31),
     buyout:n(ov.buyout??Math.round(br.val*100)),cogs:cogsValue(cab,r.art,ov,all),vol:n(ov.vol??ref.vol??0),
     commission:n(ov.commission??COMM[norm(r.subject)]??40),tax:n(ov.tax??6),
     vat:n(ov.vat??(cab===1?5:0)),ad_ctr:n(ov.ad_ctr??DEFAULT.ad_ctr),
@@ -239,7 +238,7 @@ export function profitabilityHTML(cab,vm){
     return '<tr class="pf-main-row">'+
     '<td><button class="pf-art-settings" title="Настроить рекламу и расчёт для артикула" onclick="App.toggleProfit('+cab+',\''+esc(r.art)+'\')">Настр.</button> <b>'+esc(r.art)+'</b></td>'+
       '<td>'+r.qty+'</td><td>'+cellInput(cab,r.art,st,"buyout","0.1")+'</td>'+
-      '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+st.disc+'%</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
+      '<td>'+cellInput(cab,r.art,st,"price","1")+'</td><td>'+cellInput(cab,r.art,st,"disc","1")+'%</td><td>'+cellInput(cab,r.art,st,"spp","0.1")+'</td>'+
       '<td>'+money(z.site)+'</td><td>'+money(z.commRub+z.acquiring+z.wallet)+'</td><td>'+money(z.logistics)+'</td><td>'+money(z.prep)+'</td>'+
       '<td class="pf-cogs-cell'+(st.cogs<=0?' zero':'')+'">'+cellInput(cab,r.art,st,"cogs","1")+'</td><td>'+money(z.store)+'</td><td>'+money(z.tax)+'</td><td>'+money(z.vat)+'</td>'+
       '<td>'+money(st.fixed)+'</td><td>'+cellInput(cab,r.art,st,"ad_bid","1")+'</td><td>'+cellInput(cab,r.art,st,"ad_ctr","0.0001")+'</td>'+
