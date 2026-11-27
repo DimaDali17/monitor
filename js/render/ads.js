@@ -99,7 +99,7 @@ export function adsHTML(n) {
     (!ok || [...(members[gk] || [])].some((nm) => ok(art[nm] || "", subj[nm])))).map(([gk]) => gk));
   for (const [nmId, byDay] of Object.entries(A.nm)) {
     if (!live.has(glue(nmId))) continue;
-    for (const [day, x] of Object.entries(byDay)) if (day >= from && day <= to) (days[day] ||= { sum: 0, r: 0 }).sum += x.sum;
+    for (const [day, x] of Object.entries(byDay)) if (day >= from && day <= to) (days[day] ||= { sum: 0, r: 0, q: 0 }).sum += x.sum;
   }
   /* реальные заказы всей склейки (вкл. нерекламируемые цвета) */
   const real = {};
@@ -111,7 +111,8 @@ export function adsHTML(n) {
     const r = (real[gk] ||= { q: 0, r: 0 });
     const q = o.quantity || 1;
     r.q += q; r.r += wbPrice(o);
-    (days[day] ||= { sum: 0, r: 0 }).r += wbPrice(o);
+    const dayData = (days[day] ||= { sum: 0, r: 0, q: 0 });
+    dayData.r += wbPrice(o); dayData.q += q;
   }
 
   const nameOf = (gk) => ({ label: gk, all: [...new Set([...(members[gk] || [])].map((nm) => art[nm]).filter(Boolean))].sort((x, y) => x.localeCompare(y)) });
@@ -181,7 +182,7 @@ export function adsHTML(n) {
   /* По дням: расход и ДРР — два маленьких графика (одна шкала на график) */
   const dl = []; for (let x = from; x <= to; x = addDays(x, 1)) dl.push(x);
   /* Маленький график: значения подписаны над столбцами/точками, пунктир — цель */
-  const mini = (vals, fmtv, color, label, isLine, target, targetTxt) => {
+  const mini = (vals, fmtv, color, label, isLine, target, targetTxt, bars = null) => {
     const VW = 720, VH = 190, pl = 6, pr = 6, pt = 18, pb = 18;   /* ≈ реальная ширина на экране — шрифт не раздувается */
     const mx = Math.max(1, target || 0, ...vals.filter((v) => v != null)) * 1.15;
     const w = (VW - pl - pr) / vals.length;
@@ -190,6 +191,15 @@ export function adsHTML(n) {
     const fs = vals.length > 16 ? 9 : 11;                                 /* 30 дней — подписи мельче */
     let g = `<line x1="${pl}" x2="${VW - pr}" y1="${ys(0)}" y2="${ys(0)}" stroke="var(--border)"/>`;
     if (isLine) {
+      if (bars) {
+        const maxBars = Math.max(1, ...bars);
+        const barWidth = Math.max(2, w * .38);
+        bars.forEach((v, i) => {
+          const y = pt + (VH - pt - pb) * (1 - v / (maxBars * 1.15));
+          g += `<rect x="${(xc(i) - barWidth / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${(ys(0) - y).toFixed(1)}" rx="2" fill="#C9B596" opacity=".9"><title>${dShort(dl[i])}: заказов ${v}</title></rect>`;
+        });
+        g += `<text x="${VW - pr}" y="${pt + 9}" text-anchor="end" font-size="${fs}" fill="#9A8E7B">шт.</text>`;
+      }
       const pts = vals.map((v, i) => (v == null ? null : [xc(i), ys(v)]));
       g += `<path d="${pts.filter(Boolean).map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join("")}" fill="none" stroke="${color}" stroke-width="2"/>`;
       pts.forEach((p, i) => { if (p) g += `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${color}"/><text x="${p[0]}" y="${p[1] - 6}" text-anchor="middle" font-size="${fs}" font-weight="600" fill="var(--ink2)">${fmtv(vals[i])}</text>`; });
@@ -204,17 +214,18 @@ export function adsHTML(n) {
     if (target) g += `<line x1="${pl}" x2="${VW - pr}" y1="${ys(target)}" y2="${ys(target)}" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
     const step = vals.length > 16 ? 3 : 1;
     vals.forEach((_, i) => { if (i % step === 0 || i === vals.length - 1) g += `<text x="${xc(i)}" y="${VH - 4}" text-anchor="middle" font-size="${fs}" fill="var(--ink3)">${dShort(dl[i])}</text>`; });
-    vals.forEach((v, i) => { g += `<rect x="${pl + i * w}" y="${pt}" width="${w}" height="${VH - pt - pb}" fill="transparent" data-tip="${dShort(dl[i])}: ${label} ${v == null ? "—" : fmtv(v)}"/>`; });
+    vals.forEach((v, i) => { g += `<rect x="${pl + i * w}" y="${pt}" width="${w}" height="${VH - pt - pb}" fill="transparent" data-tip="${dShort(dl[i])}: ${bars ? `заказов ${bars[i]} · ` : ""}${label} ${v == null ? "—" : fmtv(v)}"/>`; });
     return `<svg viewBox="0 0 ${VW} ${VH}" style="width:100%;height:auto;display:block">${g}</svg>`;
   };
   const spend = dl.map((x) => (days[x] ? days[x].sum : 0));
   const drrD = dl.map((x) => (days[x] && days[x].r > 0 ? (days[x].sum / days[x].r) * 100 : null));
+  const ordersD = dl.map((x) => days[x]?.q || 0);
   const k1 = (v) => (v / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 });        /* тыс ₽ без буквы — единица в заголовке */
   const hdr = (t, legend) => `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase">
       <span>${t}</span><span style="color:var(--red);text-transform:none;letter-spacing:0;font-weight:600">${legend}</span></div>`;
   const charts = list.length && PER !== "1" ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:12px">
       <div>${hdr("Расход по дням, тыс ₽", budget ? `- - бюджет ${k1(budget)} тыс/день (${ADS_DRR_TARGET}% от заказов)` : "")}${mini(spend, k1, "#C9B596", "расход, тыс ₽", false, budget)}</div>
-      <div>${hdr("ДРР по дням, %", `- - цель ${ADS_DRR_TARGET}%`)}${mini(drrD, (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }), "#4A6FA5", "ДРР, %", true, ADS_DRR_TARGET)}</div>
+      <div>${hdr("ДРР и заказы по дням", `- - цель ${ADS_DRR_TARGET}%`)}<div style="font-size:10px;color:var(--ink3);margin:2px 0 0">Бежевые столбики — заказы · синяя линия — ДРР</div>${mini(drrD, (v) => v.toLocaleString("ru-RU", { maximumFractionDigits: 1 }), "#4A6FA5", "ДРР, %", true, ADS_DRR_TARGET, null, ordersD)}</div>
     </div>` : "";
 
   return box(`
